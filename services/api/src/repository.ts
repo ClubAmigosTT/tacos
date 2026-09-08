@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import bcrypt from 'bcryptjs';
-import { places, type ApiPlace } from './data.js';
+import { lists as fixtureLists, places, type ApiList, type ApiPlace } from './data.js';
 
 const pool = process.env.DATABASE_URL
   ? new Pool({ connectionString: process.env.DATABASE_URL, max: 10, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined })
@@ -13,6 +13,8 @@ export type PublicUser = { id: string; email: string; displayName: string };
 type LocalUser = PublicUser & { passwordHash: string };
 const localUsers = new Map<string, LocalUser>();
 const localVisits = new Map<string, { userId: string; placeId: string; tacoIds: string[]; rating: number; createdAt: string }>();
+const localFollows = new Set<string>();
+const localLists = new Map<string, { id: string; ownerId: string; title: string; description: string; visibility: 'public' | 'private'; coverImage: string; placeIds: string[]; createdAt: string }>();
 
 function publicUser(user: LocalUser): PublicUser {
   return { id: user.id, email: user.email, displayName: user.displayName };
@@ -161,5 +163,137 @@ export async function getDiary(userId: string) {
     const place = places.find((item) => item.id === visit.placeId);
     const tacoNames = visit.tacoIds.map((tacoId) => place?.tacos.find((taco) => taco.id === tacoId)?.name ?? tacoId).join(', ');
     return { id, visited_at: visit.createdAt, rating: visit.rating, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', tacos: tacoNames, image_url: place?.image ?? '' };
+  });
+}
+
+function normalizeList(row: any): ApiList {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description ?? '',
+    owner: { id: row.owner_id, displayName: row.owner_name },
+    itemCount: Number(row.item_count ?? 0),
+    visitedCount: Number(row.visited_count ?? 0),
+    coverImage: row.cover_image_url ?? places[0].image
+  };
+}
+
+export async function getLists(userId?: string): Promise<ApiList[]> {
+  if (pool) {
+    const result = await pool.query(`
+      SELECT l.id, l.title, l.description, l.owner_id, u.display_name AS owner_name,
+        COUNT(li.branch_id)::int AS item_count,
+        COALESCE(SUM(CASE WHEN EXISTS (
+          SELECT 1 FROM visits vv WHERE vv.user_id = $1 AND vv.branch_id = li.branch_id
+        ) THEN 1 ELSE 0 END), 0)::int AS visited_count,
+        COALESCE(l.cover_image_url, MIN(b.image_url)) AS cover_image_url
+      FROM lists l JOIN users u ON u.id = l.owner_id
+      LEFT JOIN list_items li ON li.list_id = l.id
+      LEFT JOIN branches b ON b.id = li.branch_id
+      WHERE l.visibility = 'public' OR l.owner_id = $1
+      GROUP BY l.id, u.display_name
+      ORDER BY l.updated_at DESC LIMIT 100
+    `, [userId ?? null]);
+    return result.rows.map(normalizeList);
+  }
+  const own = userId ? [...localLists.values()].filter((list) => list.ownerId === userId && list.visibility === 'private') : [];
+  const userLists = [...localLists.values()].filter((list) => list.ownerId === userId && list.visibility === 'public');
+  const mapped = [...userLists, ...own].map((list) => {
+    const owner = localUsers.get(list.ownerId);
+    const visitedCount = list.placeIds.filter((placeId) => [...localVisits.values()].some((visit) => visit.userId === userId && visit.placeId === placeId)).length;
+    return { id: list.id, title: list.title, description: list.description, owner: { id: list.ownerId, displayName: owner?.displayName ?? 'Tacos' }, itemCount: list.placeIds.length, visitedCount, coverImage: list.coverImage } satisfies ApiList;
+  });
+  return [...fixtureLists, ...mapped];
+}
+
+export async function createListForUser(input: { title: string; description?: string; visibility?: 'public' | 'private' }, userId: string): Promise<ApiList> {
+  const id = crypto.randomUUID();
+  const title = input.title.trim();
+  const description = input.description?.trim() ?? '';
+  const visibility = input.visibility ?? 'public';
+  if (pool) {
+    await pool.query('INSERT INTO lists (id, owner_id, title, description, visibility) VALUES ($1, $2, $3, $4, $5)', [id, userId, title, description, visibility]);
+    const created = await pool.query(`
+      SELECT l.id, l.title, l.description, l.owner_id, u.display_name AS owner_name,
+        0::int AS item_count, 0::int AS visited_count, NULL::text AS cover_image_url
+      FROM lists l JOIN users u ON u.id = l.owner_id WHERE l.id = $1
+    `, [id]);
+    return normalizeList(created.rows[0]);
+  }
+  const createdAt = new Date().toISOString();
+  localLists.set(id, { id, ownerId: userId, title, description, visibility, coverImage: places[0].image, placeIds: [], createdAt });
+  const owner = localUsers.get(userId);
+  return { id, title, description, owner: { id: userId, displayName: owner?.displayName ?? 'Tacos' }, itemCount: 0, visitedCount: 0, coverImage: places[0].image };
+}
+
+export async function addListItemForUser(listId: string, placeId: string, userId: string, note = ''): Promise<boolean> {
+  if (pool) {
+    const owned = await pool.query('SELECT 1 FROM lists WHERE id = $1 AND owner_id = $2', [listId, userId]);
+    if (!owned.rowCount) return false;
+    await pool.query(`
+      INSERT INTO list_items (list_id, branch_id, position, note)
+      VALUES ($1, $2, COALESCE((SELECT MAX(position) + 1 FROM list_items WHERE list_id = $1), 0), $3)
+      ON CONFLICT (list_id, branch_id) DO UPDATE SET note = EXCLUDED.note
+    `, [listId, placeId, note.trim()]);
+    await pool.query('UPDATE lists SET updated_at = now() WHERE id = $1', [listId]);
+    return true;
+  }
+  const list = localLists.get(listId);
+  if (!list || list.ownerId !== userId || !places.some((place) => place.id === placeId)) return false;
+  if (!list.placeIds.includes(placeId)) list.placeIds.push(placeId);
+  return true;
+}
+
+export async function searchUsers(query: string, currentUserId?: string): Promise<PublicUser[]> {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return [];
+  if (pool) {
+    const result = await pool.query(`
+      SELECT id, email, display_name FROM users
+      WHERE is_active = true AND id <> $1 AND (display_name ILIKE $2 OR email ILIKE $2)
+      ORDER BY display_name LIMIT 20
+    `, [currentUserId ?? '', `%${normalized}%`]);
+    return result.rows.map((row) => ({ id: row.id, email: row.email, displayName: row.display_name }));
+  }
+  return [...localUsers.values()].filter((user) => user.id !== currentUserId && `${user.displayName} ${user.email}`.toLowerCase().includes(normalized)).slice(0, 20).map(publicUser);
+}
+
+export async function followUser(followerId: string, followedId: string): Promise<'ok' | 'not_found' | 'self'> {
+  if (followerId === followedId) return 'self';
+  if (pool) {
+    const target = await pool.query('SELECT 1 FROM users WHERE id = $1 AND is_active = true', [followedId]);
+    if (!target.rowCount) return 'not_found';
+    await pool.query('INSERT INTO follows (follower_id, followed_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [followerId, followedId]);
+    return 'ok';
+  }
+  if (!localUsers.has(followedId)) return 'not_found';
+  localFollows.add(`${followerId}:${followedId}`);
+  return 'ok';
+}
+
+export async function unfollowUser(followerId: string, followedId: string) {
+  if (pool) await pool.query('DELETE FROM follows WHERE follower_id = $1 AND followed_id = $2', [followerId, followedId]);
+  localFollows.delete(`${followerId}:${followedId}`);
+}
+
+export async function getFeed(userId: string) {
+  if (pool) {
+    const result = await pool.query(`
+      SELECT v.id, v.visited_at, v.rating, u.id AS user_id, u.display_name,
+        b.id AS place_id, b.name AS place_name, b.neighborhood, b.image_url,
+        COALESCE(string_agg(m.name, ', ' ORDER BY m.name), '') AS tacos
+      FROM follows f JOIN visits v ON v.user_id = f.followed_id
+      JOIN users u ON u.id = v.user_id JOIN branches b ON b.id = v.branch_id
+      LEFT JOIN visit_items vi ON vi.visit_id = v.id LEFT JOIN menu_items m ON m.id = vi.menu_item_id
+      WHERE f.follower_id = $1 GROUP BY v.id, u.id, b.id ORDER BY v.visited_at DESC LIMIT 50
+    `, [userId]);
+    return result.rows;
+  }
+  const followed = [...localFollows].filter((key) => key.startsWith(`${userId}:`)).map((key) => key.slice(userId.length + 1));
+  return [...localVisits.entries()].filter(([, visit]) => followed.includes(visit.userId)).sort(([, a], [, b]) => b.createdAt.localeCompare(a.createdAt)).map(([id, visit]) => {
+    const place = places.find((item) => item.id === visit.placeId);
+    const user = localUsers.get(visit.userId);
+    const tacos = visit.tacoIds.map((tacoId) => place?.tacos.find((taco) => taco.id === tacoId)?.name ?? tacoId).join(', ');
+    return { id, visited_at: visit.createdAt, rating: visit.rating, user_id: visit.userId, display_name: user?.displayName ?? 'Tacos', place_id: visit.placeId, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', image_url: place?.image ?? '', tacos };
   });
 }

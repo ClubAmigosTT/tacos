@@ -15,6 +15,16 @@ export type ApiPlace = {
   tags: string[];
 };
 
+export type ApiList = {
+  id: string;
+  title: string;
+  description: string;
+  owner: { id: string; displayName: string };
+  itemCount: number;
+  visitedCount: number;
+  coverImage: string;
+};
+
 export const places: ApiPlace[] = [
   {
     id: 'vilsito', name: 'El Vilsito', neighborhood: 'Narvarte', distance: '1.2 km', openUntil: '03:00', rating: 4.87, match: 96, style: 'Pastor nocturno', coordinates: { latitude: 19.3869, longitude: -99.1571 }, image: 'https://images.unsplash.com/photo-1552332386-f8dd00dc2f85?auto=format&fit=crop&w=1200&q=80', description: 'Pastor intenso, tortilla recién hecha y una noche que casi nunca termina.', tags: ['clásico', 'madrugada', 'salsa fuerte'], tacos: [{ id: 'vilsito-pastor', name: 'Pastor', rating: 4.92, price: 22, note: 'Piña, borde crujiente y adobo profundo.' }, { id: 'vilsito-suadero', name: 'Suadero', rating: 4.58, price: 24, note: 'Graso en el buen sentido; pide doble tortilla.' }]
@@ -24,5 +34,17 @@ export const places: ApiPlace[] = [
   },
   {
     id: 'los-parados', name: 'Los Parados', neighborhood: 'Condesa', distance: '3.4 km', openUntil: '00:30', rating: 4.61, match: 84, style: 'Clásico callejero', coordinates: { latitude: 19.4143, longitude: -99.1712 }, image: 'https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?auto=format&fit=crop&w=1200&q=80', description: 'Tacos directos, rápidos y sin pretensiones para una noche de antojo.', tags: ['barato', 'rápido', 'clásico'], tacos: [{ id: 'parados-carnitas', name: 'Carnitas', rating: 4.69, price: 20, note: 'Pide surtida para probar las partes.' }, { id: 'parados-pastor', name: 'Pastor', rating: 4.55, price: 18, note: 'Más dulce y ligero que el promedio.' }]
+  }
+];
+
+export const lists: ApiList[] = [
+  {
+    id: 'editorial-pastor-midnight',
+    title: 'Pastor después de medianoche',
+    description: 'Siete lugares para cuando la ciudad baja el ritmo.',
+    owner: { id: 'editorial', displayName: 'Comelocal' },
+    itemCount: 7,
+    visitedCount: 0,
+    coverImage: places[0].image
   }
 ];

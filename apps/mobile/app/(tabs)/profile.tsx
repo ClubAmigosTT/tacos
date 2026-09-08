@@ -20,13 +20,13 @@ export default function ProfileScreen() {
       <View style={styles.taste}><Text style={styles.tasteEyebrow}>TU TASTE ID</Text><Text style={styles.tasteTitle}>Pastor nocturno</Text><Text style={styles.tasteDescription}>Picante alto · precio sensible · explorador de lugares callejeros</Text><View style={styles.tags}><Text style={styles.tag}>PASTOR 92%</Text><Text style={styles.tag}>PICANTE 84%</Text><Text style={styles.tag}>NOCHE 78%</Text></View></View>
       <View style={styles.stats}><View><Text style={styles.statNumber}>{visits}</Text><Text style={styles.statLabel}>VISITAS</Text></View><View><Text style={styles.statNumber}>{tacos}</Text><Text style={styles.statLabel}>TACOS</Text></View><View><Text style={styles.statNumber}>{average}</Text><Text style={styles.statLabel}>PROMEDIO</Text></View></View>
       <Text style={styles.sectionTitle}>Tu identidad gastronómica</Text>
-      <View style={styles.menu}><MenuRow icon="book-outline" title="Diario" detail={`${visits} visitas registradas`} /><MenuRow icon="list-outline" title="Listas" detail="12 listas públicas" /><MenuRow icon="map-outline" title="Mapa personal" detail="3 colonias exploradas" /><MenuRow icon="shield-checkmark-outline" title="Privacidad" detail="Controla tus datos" last /></View>
+      <View style={styles.menu}><MenuRow icon="book-outline" title="Diario" detail={`${visits} visitas registradas`} onPress={() => router.push('/(tabs)/diary')} /><MenuRow icon="list-outline" title="Listas" detail="12 listas públicas" onPress={() => router.push('/lists')} /><MenuRow icon="map-outline" title="Mapa personal" detail="3 colonias exploradas" onPress={() => router.push('/(tabs)/map')} /><MenuRow icon="shield-checkmark-outline" title="Privacidad" detail="Controla tus datos" last /></View>
     </ScrollView>
   );
 }
 
-function MenuRow({ icon, title, detail, last = false }: { icon: keyof typeof Ionicons.glyphMap; title: string; detail: string; last?: boolean }) {
-  return <View style={[styles.menuRow, !last && styles.menuBorder]}><View style={styles.menuIcon}><Ionicons name={icon} size={18} color={colors.accent} /></View><View style={{ flex: 1 }}><Text style={styles.menuTitle}>{title}</Text><Text style={styles.menuDetail}>{detail}</Text></View><Ionicons name="chevron-forward" size={17} color={colors.dim} /></View>;
+function MenuRow({ icon, title, detail, last = false, onPress }: { icon: keyof typeof Ionicons.glyphMap; title: string; detail: string; last?: boolean; onPress?: () => void }) {
+  return <Pressable style={[styles.menuRow, !last && styles.menuBorder]} onPress={onPress} disabled={!onPress}><View style={styles.menuIcon}><Ionicons name={icon} size={18} color={colors.accent} /></View><View style={{ flex: 1 }}><Text style={styles.menuTitle}>{title}</Text><Text style={styles.menuDetail}>{detail}</Text></View><Ionicons name="chevron-forward" size={17} color={colors.dim} /></Pressable>;
 }
 
 const styles = StyleSheet.create({

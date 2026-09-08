@@ -2,6 +2,8 @@ import Constants from 'expo-constants';
 import { places, type Place } from '@/data/fixtures';
 
 export type AuthUser = { id: string; email: string; displayName: string };
+export type ApiList = { id: string; title: string; description: string; owner: { id: string; displayName: string }; itemCount: number; visitedCount: number; coverImage: string };
+export type FeedItem = { id: string; visited_at: string; rating: number; user_id: string; display_name: string; place_id: string; place_name: string; neighborhood: string; image_url: string; tacos: string };
 
 const configuredUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
 const API_URL = configuredUrl?.replace(/\/$/, '');
@@ -63,4 +65,36 @@ export async function me(token: string) {
 
 export async function diary(token: string) {
   return request<{ entries: Array<{ id: string; visited_at: string; rating: number; place_name: string; neighborhood: string; tacos: string; image_url: string }> }>('/v1/diary', undefined, token);
+}
+
+export async function lists(token?: string) {
+  try {
+    return await request<{ lists: ApiList[] }>('/v1/lists', undefined, token);
+  } catch {
+    return { lists: [] as ApiList[] };
+  }
+}
+
+export async function createList(input: { title: string; description?: string; visibility?: 'public' | 'private' }, token: string) {
+  return request<ApiList>('/v1/lists', { method: 'POST', body: JSON.stringify(input) }, token);
+}
+
+export async function addListItem(listId: string, input: { branchId: string; note?: string }, token: string) {
+  return request<{ status: string; listId: string; branchId: string }>(`/v1/lists/${listId}/items`, { method: 'POST', body: JSON.stringify(input) }, token);
+}
+
+export async function searchUsers(query: string, token?: string) {
+  try {
+    return await request<{ users: AuthUser[] }>(`/v1/users/search?q=${encodeURIComponent(query)}`, undefined, token);
+  } catch {
+    return { users: [] as AuthUser[] };
+  }
+}
+
+export async function followUser(userId: string, token: string) {
+  return request<{ status: string; userId: string }>(`/v1/users/${userId}/follow`, { method: 'POST' }, token);
+}
+
+export async function feed(token: string) {
+  return request<{ items: FeedItem[] }>('/v1/feed', undefined, token);
 }
