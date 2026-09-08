@@ -4,6 +4,7 @@ import { places, type Place } from '@/data/fixtures';
 export type AuthUser = { id: string; email: string; displayName: string };
 export type ApiList = { id: string; title: string; description: string; owner: { id: string; displayName: string }; itemCount: number; visitedCount: number; coverImage: string };
 export type ApiListDetail = ApiList & { items: Array<{ branchId: string; note: string; position: number; place: Place }> };
+export type ApiTaqueria = { id: string; name: string; slug: string; description: string; branchCount: number; branches: Place[] };
 export type FeedItem = { id: string; visited_at: string; rating: number; user_id: string; display_name: string; place_id: string; place_name: string; neighborhood: string; image_url: string; tacos: string };
 export type TasteProfile = { title: string; description: string; tags: string[]; profile: { intensity: number; spicy: number; traditional: number; texture: number; value: number } };
 
@@ -78,6 +79,10 @@ export async function getPlace(id: string): Promise<Place> {
     if (!fallback) throw new Error('Taquería no encontrada');
     return fallback;
   }
+}
+
+export async function getTaqueria(id: string) {
+  return request<ApiTaqueria>(`/v1/taquerias/${id}`);
 }
 
 export async function createVisit(input: { placeId: string; tacoIds: string[]; rating: number; tacoRatings?: Record<string, number>; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number }, token: string) {

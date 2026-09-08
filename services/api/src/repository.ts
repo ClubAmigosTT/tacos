@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import bcrypt from 'bcryptjs';
-import { lists as fixtureLists, places, type ApiList, type ApiListDetail, type ApiPlace, type FlavorProfile, type TasteProfile } from './data.js';
+import { lists as fixtureLists, places, type ApiList, type ApiListDetail, type ApiPlace, type ApiTaqueria, type FlavorProfile, type TasteProfile } from './data.js';
 
 const pool = process.env.DATABASE_URL
   ? new Pool({ connectionString: process.env.DATABASE_URL, max: 10, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined })
@@ -33,6 +33,8 @@ function normalizePlace(row: any): ApiPlace {
   const fallbackProfile: FlavorProfile = places.find((place) => place.id === row.id)?.flavorProfile ?? { intensity: 50, spicy: 50, traditional: 50, texture: 50, value: 50 };
   return {
     id: row.id,
+    taqueriaId: row.taqueria_id ?? row.id,
+    taqueriaName: row.taqueria_name ?? row.name,
     name: row.name,
     neighborhood: row.neighborhood,
     distance: row.distance_km == null ? 'cerca de ti' : `${Number(row.distance_km).toFixed(1)} km`,
@@ -83,7 +85,7 @@ export async function discoverPlaces(query: DiscoverQuery): Promise<ApiPlace[]> 
   values.push(query.limit);
   const orderBy = query.lat != null && query.lng != null ? 'distance_km ASC NULLS LAST, rating DESC' : 'rating DESC';
   const result = await pool.query(`
-    SELECT b.id, b.name, b.neighborhood, b.open_until,
+      SELECT b.id, b.taqueria_id, t.name AS taqueria_name, b.name, b.neighborhood, b.open_until,
       CASE WHEN COALESCE(reviews.review_count, 0) = 0 THEN b.rating
         ELSE ((reviews.review_count * reviews.average_rating) + (10 * 4.2)) / (reviews.review_count + 10) END AS rating,
       b.match_score, b.style,
@@ -94,12 +96,12 @@ export async function discoverPlaces(query: DiscoverQuery): Promise<ApiPlace[]> 
         FROM visit_items vi WHERE vi.menu_item_id = m.id AND vi.rating IS NOT NULL
       ), m.rating),
         'price', m.price, 'note', m.note)) FILTER (WHERE m.id IS NOT NULL), '[]') AS tacos
-    FROM branches b
+    FROM branches b JOIN taquerias t ON t.id = b.taqueria_id
       LEFT JOIN LATERAL (SELECT COUNT(*)::numeric AS review_count, AVG(v.rating)::numeric AS average_rating
         FROM visits v WHERE v.branch_id = b.id) reviews ON true
       LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
     WHERE ${predicates.join(' AND ')}
-    GROUP BY b.id, reviews.review_count, reviews.average_rating ORDER BY ${orderBy} LIMIT $${values.length}
+    GROUP BY b.id, t.name, reviews.review_count, reviews.average_rating ORDER BY ${orderBy} LIMIT $${values.length}
   `, values);
   return result.rows.map(normalizePlace);
 }
@@ -214,7 +216,7 @@ export async function findPlace(id: string): Promise<ApiPlace | undefined> {
   const fallback = places.find((place) => place.id === id);
   if (!pool) return fallback;
   const result = await pool.query(`
-    SELECT b.id, b.name, b.neighborhood, b.open_until,
+    SELECT b.id, b.taqueria_id, t.name AS taqueria_name, b.name, b.neighborhood, b.open_until,
       CASE WHEN COALESCE(reviews.review_count, 0) = 0 THEN b.rating
         ELSE ((reviews.review_count * reviews.average_rating) + (10 * 4.2)) / (reviews.review_count + 10) END AS rating,
       b.match_score, b.style,
@@ -225,13 +227,31 @@ export async function findPlace(id: string): Promise<ApiPlace | undefined> {
         FROM visit_items vi WHERE vi.menu_item_id = m.id AND vi.rating IS NOT NULL
       ), m.rating),
         'price', m.price, 'note', m.note)) FILTER (WHERE m.id IS NOT NULL), '[]') AS tacos
-    FROM branches b
+    FROM branches b JOIN taquerias t ON t.id = b.taqueria_id
       LEFT JOIN LATERAL (SELECT COUNT(*)::numeric AS review_count, AVG(v.rating)::numeric AS average_rating
         FROM visits v WHERE v.branch_id = b.id) reviews ON true
       LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
-    WHERE b.id = $1 AND b.is_active = true GROUP BY b.id, reviews.review_count, reviews.average_rating
+    WHERE b.id = $1 AND b.is_active = true GROUP BY b.id, t.name, reviews.review_count, reviews.average_rating
   `, [id]);
   return result.rows[0] ? normalizePlace(result.rows[0]) : undefined;
+}
+
+export async function getTaqueria(id: string): Promise<ApiTaqueria | undefined> {
+  if (pool) {
+    const parent = await pool.query(`
+      SELECT t.id, t.name, t.slug, t.description, COUNT(b.id)::int AS branch_count
+      FROM taquerias t LEFT JOIN branches b ON b.taqueria_id = t.id AND b.is_active = true
+      WHERE t.id = $1 GROUP BY t.id
+    `, [id]);
+    if (!parent.rows[0]) return undefined;
+    const branchRows = await pool.query('SELECT id FROM branches WHERE taqueria_id = $1 AND is_active = true ORDER BY neighborhood, name', [id]);
+    const branches = (await Promise.all(branchRows.rows.map((row) => findPlace(row.id)))).filter((place): place is ApiPlace => Boolean(place));
+    return { id: parent.rows[0].id, name: parent.rows[0].name, slug: parent.rows[0].slug, description: parent.rows[0].description, branchCount: Number(parent.rows[0].branch_count), branches };
+  }
+  const branches = places.filter((place) => (place.taqueriaId ?? place.id) === id);
+  if (!branches.length) return undefined;
+  const first = branches[0];
+  return { id, name: first.taqueriaName ?? first.name, slug: id, description: `${first.name} y sus sucursales.`, branchCount: branches.length, branches };
 }
 
 export async function createVisit(input: VisitInput) {

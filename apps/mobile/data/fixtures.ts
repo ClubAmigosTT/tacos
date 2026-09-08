@@ -8,6 +8,8 @@ export type Taco = {
 
 export type Place = {
   id: string;
+  taqueriaId?: string;
+  taqueriaName?: string;
   name: string;
   neighborhood: string;
   distance: string;
@@ -39,6 +41,8 @@ export type List = {
 export const places: Place[] = [
   {
     id: 'vilsito',
+    taqueriaId: 'vilsito',
+    taqueriaName: 'El Vilsito',
     name: 'El Vilsito',
     neighborhood: 'Narvarte',
     distance: '1.2 km',
@@ -59,6 +63,8 @@ export const places: Place[] = [
   },
   {
     id: 'oriente',
+    taqueriaId: 'oriente',
+    taqueriaName: 'Tacos Oriente',
     name: 'Tacos Oriente',
     neighborhood: 'Roma Sur',
     distance: '2.8 km',
@@ -78,6 +84,8 @@ export const places: Place[] = [
   },
   {
     id: 'los-parados',
+    taqueriaId: 'los-parados',
+    taqueriaName: 'Los Parados',
     name: 'Los Parados',
     neighborhood: 'Condesa',
     distance: '3.4 km',

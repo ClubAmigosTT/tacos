@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListItemForUser, authenticateUser, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getDiary, getFeed, getListDetails, getLists, getRecommendations, getTasteProfile, registerUser, reportVisitForUser, searchUsers, unfollowUser, type PublicUser } from './repository.js';
+import { addListItemForUser, authenticateUser, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getDiary, getFeed, getListDetails, getLists, getRecommendations, getTaqueria, getTasteProfile, registerUser, reportVisitForUser, searchUsers, unfollowUser, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
 import { uploadVisitImage } from './storage.js';
 
@@ -83,6 +83,13 @@ app.get('/v1/branches/:id', async (request, reply) => {
   const place = await findPlace(params.id);
   if (!place) return reply.code(404).send({ error: 'BRANCH_NOT_FOUND' });
   return place;
+});
+
+app.get('/v1/taquerias/:id', async (request, reply) => {
+  const params = z.object({ id: z.string() }).parse(request.params);
+  const taqueria = await getTaqueria(params.id);
+  if (!taqueria) return reply.code(404).send({ error: 'TAQUERIA_NOT_FOUND' });
+  return taqueria;
 });
 
 app.post('/v1/visits', async (request, reply) => {

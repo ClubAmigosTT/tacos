@@ -27,6 +27,8 @@ const alice = await createUser('Ana Smoke', 'ana');
 const bob = await createUser('Beto Smoke', 'beto');
 const nearby = await request('/v1/discover?lat=19.3869&lng=-99.1571&limit=3');
 if (nearby.places?.[0]?.id !== 'vilsito') throw new Error('Nearby discovery did not prioritize El Vilsito');
+const taqueria = await request('/v1/taquerias/vilsito');
+if (taqueria.branches?.[0]?.taqueriaId !== 'vilsito') throw new Error('Taqueria parent relation missing');
 
 await request(`/v1/users/${bob.user.id}/follow`, { method: 'POST', body: JSON.stringify({}), token: alice.token });
 const visit = await request('/v1/visits', {

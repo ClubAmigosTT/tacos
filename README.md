@@ -50,6 +50,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 20. Recomendaciones por perfil de sabor: compara el historial del usuario con la firma de cada sucursal y expone `tasteMatch` junto al score combinado.
 21. Detalle de listas públicas/privadas: una lista se puede abrir, ver sus lugares, notas y progreso; su contenido se valida en API según visibilidad y propietario.
 22. Moderación inicial: reportes únicos por usuario/visita y estado de visibilidad preparado para que un futuro panel de revisión pueda ocultar contenido del feed.
+23. Modelo normalizado `taquería → sucursal → taco`: migración, endpoint y pantalla de taquería con sus sucursales.
 
 ## Verificación
 
