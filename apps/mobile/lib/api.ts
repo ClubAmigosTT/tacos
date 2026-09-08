@@ -12,6 +12,7 @@ export type UserProfile = { user: { id: string; displayName: string }; stats: { 
 
 const configuredUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
 const API_URL = configuredUrl?.replace(/\/$/, '');
+const REQUEST_TIMEOUT_MS = 15_000;
 
 function haversineKm(from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }) {
   const earthRadiusKm = 6371;
@@ -25,17 +26,24 @@ function haversineKm(from: { latitude: number; longitude: number }, to: { latitu
 
 async function request<T>(path: string, options?: RequestInit, token?: string): Promise<T> {
   if (!API_URL) throw new Error('API URL no configurada');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   const headers: HeadersInit = {
     ...(options?.body ? { 'Content-Type': 'application/json' } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options?.headers ?? {})
   };
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers
-  });
-  if (!response.ok) throw new Error(`API ${response.status}`);
-  return response.json() as Promise<T>;
+  try {
+    const response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers,
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`API ${response.status}`);
+    return response.json() as Promise<T>;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function discover(options: { q?: string; lat?: number; lng?: number; limit?: number } = {}): Promise<Place[]> {

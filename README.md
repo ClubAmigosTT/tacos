@@ -65,6 +65,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 35. Operación Render: `/health` comprueba PostgreSQL y el API cierra conexiones limpiamente durante reinicios.
 36. Mapa responsive: la ubicación concedida después del montaje recentra el mapa nativo con una transición corta.
 37. Health con timeout: las comprobaciones de PostgreSQL fallan rápido para que Render pueda reemplazar una instancia degradada.
+38. Cliente resiliente: las peticiones móviles cancelan solicitudes colgadas después de 15 segundos y activan los fallbacks existentes.
 
 ## Verificación
 
