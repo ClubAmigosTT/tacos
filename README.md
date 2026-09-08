@@ -58,6 +58,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 28. Feed contextual: las notas de una visita viajan con la actividad social para conservar la voz y el criterio de cada registro.
 29. Navegación social: el avatar y nombre del feed abren directamente el perfil público del autor.
 30. Radar personal: cada sucursal puede marcarse como “Quiero ir”; la selección persiste en PostgreSQL y se refleja como “En mi radar”.
+31. Radar navegable: Perfil abre todos los lugares pendientes con sus fichas y conserva el fallback offline.
 
 ## Verificación
 
