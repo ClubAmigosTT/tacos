@@ -85,6 +85,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 55. Privacidad del directorio: buscar personas requiere sesión y los eventos autenticados no mezclan un identificador anónimo con el usuario.
 56. Persistencia transaccional: visitas y moderaciones usan una conexión dedicada del pool para garantizar `BEGIN/COMMIT/ROLLBACK` atómicos en Render.
 57. Reputación robusta: el score combina prior bayesiano, recencia con vida media de 180 días, dispersión y un límite de influencia por revisor; la ficha muestra el volumen de reseñas visibles.
+58. Índices de reputación: las consultas por sucursal y taco tienen índices parciales sobre visitas visibles y ratings de menú para sostener el crecimiento del diario en PostgreSQL.
 
 ## Verificación
 
