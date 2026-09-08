@@ -10,6 +10,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 - **Media:** bucket S3-compatible. Render no debe guardar fotografías en disco local.
 - **Jobs:** worker y cron preparados en Render para recalcular señales, limpiar tareas y actualizar agregados.
 - **Entrega:** GitHub Actions valida cada push; EAS compila iOS/Android; Render mantiene la API y la base de datos sin depender de esta computadora.
+- **Configuración local:** los procesos Node leen el `.env` raíz mediante la opción nativa `--env-file-if-exists`; Render continúa usando sus variables inyectadas.
 
 ## 2. Fases y criterios de aceptación
 
