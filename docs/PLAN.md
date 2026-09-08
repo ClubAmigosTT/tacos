@@ -71,6 +71,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 9. Compartir listas con colaboradores editor/lector y permitir que los editores gestionen lugares sin apropiarse de la curaduría.
 10. Registrar eventos de producto anónimos y acotados para medir descubrimiento, conversión a visita y uso social sin almacenar búsquedas ni PII.
 11. Permitir eliminar una visita propia con confirmación y limpiar sus señales derivadas sin afectar entradas ajenas.
+12. Proponer la sucursal más cercana después de usar la cámara, manteniendo la selección explícita del usuario hasta confirmar.
 
 **Aceptación:** una visita aparece en diario, feed y estadísticas; una foto inválida no se persiste; una falla de media permite guardar sin foto; una edición propia persiste y una edición ajena responde 404.
 
