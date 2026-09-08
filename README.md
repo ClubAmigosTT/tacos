@@ -27,6 +27,8 @@ La app móvil funciona con fixtures si no existe `DATABASE_URL`. La API local qu
 
 Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por la IP LAN de la computadora que ejecuta la API (por ejemplo `http://192.168.1.70:4000`). En producción debe ser la URL HTTPS de Render.
 
+En el emulador Android usa `http://10.0.2.2:4000`; el emulador redirige esa dirección hacia el host local. El simulador iOS y el preview web pueden usar `http://localhost:4000`.
+
 ## Flujo implementado
 
 1. Inicio y mapa con filtros visuales (`Pastor`, `Abierto ahora`, `Barato`, `Para mí`).
