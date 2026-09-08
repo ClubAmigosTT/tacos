@@ -97,6 +97,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 66. Buscar en esta zona: al mover el mapa nativo aparece una acción explícita que consulta el nuevo centro sin perder la ubicación del usuario.
 67. Desarrollo local: `pnpm dev:local` levanta el API y el preview web en paralelo para probar el producto con un solo comando.
 68. Horarios confiables: el filtro “Abierto ahora” distingue negocios diurnos de cierres de madrugada y rechaza horas malformadas.
+69. Estados vacíos accionables: el mapa explica cuando una combinación no tiene resultados y permite limpiar la búsqueda y los filtros en un toque.
 
 ## Verificación
 
