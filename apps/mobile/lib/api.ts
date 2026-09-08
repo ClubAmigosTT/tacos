@@ -60,6 +60,10 @@ export async function createVisit(input: { placeId: string; tacoIds: string[]; r
   return request('/v1/visits', { method: 'POST', body: JSON.stringify(input) }, token);
 }
 
+export async function uploadImage(input: { base64: string; contentType: 'image/jpeg' | 'image/png' | 'image/webp' }, token: string) {
+  return request<{ key: string; url: string }>('/v1/media/images', { method: 'POST', body: JSON.stringify(input) }, token);
+}
+
 export async function register(input: { email: string; password: string; displayName: string }) {
   return request<{ user: AuthUser; token: string }>('/v1/auth/register', { method: 'POST', body: JSON.stringify(input) });
 }

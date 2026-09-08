@@ -31,6 +31,13 @@ const config: ExpoConfig = {
       }
     ],
     [
+      'expo-image-picker',
+      {
+        photosPermission: 'Usamos tus fotos para guardar recuerdos de tus visitas.',
+        cameraPermission: 'Usamos la cámara para fotografiar tus tacos.'
+      }
+    ],
+    [
       'react-native-maps',
       {
         androidGoogleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ?? ''

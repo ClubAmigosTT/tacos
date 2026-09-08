@@ -3,8 +3,9 @@ import cors from '@fastify/cors';
 import { z } from 'zod';
 import { addListItemForUser, authenticateUser, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getDiary, getFeed, getLists, getRecommendations, registerUser, searchUsers, unfollowUser, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
+import { uploadVisitImage } from './storage.js';
 
-const app = Fastify({ logger: true });
+const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 });
 await app.register(cors, { origin: true });
 
 app.setErrorHandler((error, request, reply) => {
@@ -85,6 +86,19 @@ app.post('/v1/visits', async (request, reply) => {
   const place = await findPlace(body.placeId);
   if (!place) return reply.code(404).send({ error: 'BRANCH_NOT_FOUND' });
   return reply.code(201).send(await createVisitForUser(body, user.id));
+});
+
+app.post('/v1/media/images', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const body = z.object({ base64: z.string().min(1).max(10_000_000), contentType: z.enum(['image/jpeg', 'image/png', 'image/webp']) }).parse(request.body);
+  try {
+    return await uploadVisitImage({ userId: user.id, ...body });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'STORAGE_NOT_CONFIGURED') return reply.code(503).send({ error: 'STORAGE_NOT_CONFIGURED' });
+    if (error instanceof Error && error.message === 'IMAGE_TOO_LARGE') return reply.code(413).send({ error: 'IMAGE_TOO_LARGE' });
+    throw error;
+  }
 });
 
 app.get('/v1/diary', async (request, reply) => {
