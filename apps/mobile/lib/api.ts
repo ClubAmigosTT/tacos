@@ -8,6 +8,7 @@ export type ApiTaqueria = { id: string; name: string; slug: string; description:
 export type FeedItem = { id: string; visited_at: string; rating: number; user_id: string; display_name: string; place_id: string; place_name: string; neighborhood: string; image_url: string; tacos: string };
 export type TasteProfile = { title: string; description: string; tags: string[]; profile: { intensity: number; spicy: number; traditional: number; texture: number; value: number } };
 export type AdminReport = { id: string; visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string; reporter: { id: string; displayName: string }; author: { id: string; displayName: string }; place: { id: string; name: string }; rating: number; visitedAt: string };
+export type UserProfile = { user: { id: string; displayName: string }; stats: { visits: number; averageRating: number | null; listCount: number }; taste: TasteProfile; lists: ApiList[] };
 
 const configuredUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
 const API_URL = configuredUrl?.replace(/\/$/, '');
@@ -147,6 +148,10 @@ export async function searchUsers(query: string, token?: string) {
   } catch {
     return { users: [] as AuthUser[] };
   }
+}
+
+export async function userProfile(userId: string, token?: string) {
+  return request<UserProfile>(`/v1/users/${encodeURIComponent(userId)}/profile`, undefined, token);
 }
 
 export async function followUser(userId: string, token: string) {

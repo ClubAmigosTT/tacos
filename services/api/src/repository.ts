@@ -324,6 +324,21 @@ export async function findUserById(id: string): Promise<PublicUser | undefined> 
   return user ? publicUser(user) : undefined;
 }
 
+export async function getUserProfile(userId: string, viewerId?: string) {
+  const user = await findUserById(userId);
+  if (!user) return undefined;
+  const entries = await getDiary(userId);
+  const ratings = entries.map((entry) => Number(entry.rating)).filter(Number.isFinite);
+  const allLists = await getLists(viewerId === userId ? userId : viewerId);
+  const lists = allLists.filter((list) => list.owner.id === userId && (list.visibility !== 'private' || viewerId === userId));
+  return {
+    user: { id: user.id, displayName: user.displayName },
+    stats: { visits: entries.length, averageRating: ratings.length ? Number((ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length).toFixed(2)) : null, listCount: lists.length },
+    taste: await getTasteProfile(userId),
+    lists
+  };
+}
+
 export async function getDiary(userId: string) {
   if (pool) {
     const result = await pool.query(`

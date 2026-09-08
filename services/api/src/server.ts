@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListItemForUser, authenticateUser, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getAdminReports, getDiary, getFeed, getListDetails, getLists, getRecommendations, getTaqueria, getTasteProfile, registerUser, removeListItemForUser, reportVisitForUser, reviewAdminReport, searchUsers, unfollowUser, type PublicUser } from './repository.js';
+import { addListItemForUser, authenticateUser, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getAdminReports, getDiary, getFeed, getListDetails, getLists, getRecommendations, getTaqueria, getTasteProfile, getUserProfile, registerUser, removeListItemForUser, reportVisitForUser, reviewAdminReport, searchUsers, unfollowUser, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
 import { uploadVisitImage } from './storage.js';
 
@@ -180,6 +180,14 @@ app.get('/v1/users/search', async (request) => {
   const user = await resolveUser(request);
   const query = z.object({ q: z.string().min(2).max(60) }).parse(request.query);
   return { users: await searchUsers(query.q, user?.id) };
+});
+
+app.get('/v1/users/:id/profile', async (request, reply) => {
+  const viewer = await resolveUser(request);
+  const params = z.object({ id: z.string() }).parse(request.params);
+  const profile = await getUserProfile(params.id, viewer?.id);
+  if (!profile) return reply.code(404).send({ error: 'USER_NOT_FOUND' });
+  return profile;
 });
 
 app.post('/v1/users/:id/follow', async (request, reply) => {
