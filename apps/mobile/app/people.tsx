@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -12,6 +12,7 @@ export default function PeopleScreen() {
   const [query, setQuery] = useState('');
   const [following, setFollowing] = useState<string[]>([]);
   const { data, isFetching } = useQuery({ queryKey: ['people', query], queryFn: () => searchUsers(query, token), enabled: query.trim().length >= 2 });
+  useEffect(() => { if (data?.users) setFollowing(data.users.filter((person) => person.following).map((person) => person.id)); }, [data]);
   const followMutation = useMutation({ mutationFn: (userId: string) => followUser(userId, token!), onSuccess: (_, userId) => setFollowing((current) => [...current, userId]) });
   const unfollowMutation = useMutation({ mutationFn: (userId: string) => unfollowUser(userId, token!), onSuccess: (_, userId) => setFollowing((current) => current.filter((id) => id !== userId)) });
   return <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">

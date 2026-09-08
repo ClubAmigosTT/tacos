@@ -54,6 +54,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 24. Gestión de listas: el propietario puede quitar lugares desde el detalle; la API valida la propiedad y actualiza el progreso.
 25. Integridad de visitas: se rechazan tacos de otra sucursal, selecciones duplicadas y ratings de tacos no seleccionados.
 26. Perfiles públicos: el grafo social abre un perfil con Taste ID, estadísticas y listas públicas sin exponer el correo fuera de la búsqueda.
+27. Estado social persistente: la búsqueda indica quién ya te sigue para mantener los controles correctos después de recargar la pantalla.
 
 ## Verificación
 

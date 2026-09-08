@@ -31,6 +31,8 @@ const taqueria = await request('/v1/taquerias/vilsito');
 if (taqueria.branches?.[0]?.taqueriaId !== 'vilsito') throw new Error('Taqueria parent relation missing');
 
 await request(`/v1/users/${bob.user.id}/follow`, { method: 'POST', body: JSON.stringify({}), token: alice.token });
+const peopleSearch = await request('/v1/users/search?q=Beto', { token: alice.token });
+if (peopleSearch.users?.[0]?.following !== true) throw new Error('Following state was not returned by people search');
 await request('/v1/visits', {
   method: 'POST',
   body: JSON.stringify({ placeId: 'vilsito', tacoIds: ['oriente-suadero'], rating: 5 }),
@@ -78,5 +80,7 @@ await request(`/v1/lists/${privateList.id}`, { token: alice.token }, 404);
 const privateDetail = await request(`/v1/lists/${privateList.id}`, { token: bob.token });
 if (privateDetail.visibility !== 'private') throw new Error('Private list visibility was not preserved');
 await request(`/v1/users/${bob.user.id}/follow`, { method: 'DELETE', token: alice.token });
+const peopleAfterUnfollow = await request('/v1/users/search?q=Beto', { token: alice.token });
+if (peopleAfterUnfollow.users?.[0]?.following !== false) throw new Error('Unfollow state was not persisted');
 
 console.log(`API smoke passed: ${baseUrl}`);

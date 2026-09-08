@@ -9,7 +9,7 @@ const pool = process.env.DATABASE_URL
 type DiscoverQuery = { q?: string; lat?: number; lng?: number; limit: number };
 type VisitInput = { placeId: string; tacoIds: string[]; rating: number; tacoRatings?: Record<string, number>; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number };
 type ReportInput = { visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details?: string };
-export type PublicUser = { id: string; email: string; displayName: string; role: 'user' | 'admin' };
+export type PublicUser = { id: string; email: string; displayName: string; role: 'user' | 'admin'; following?: boolean };
 export type AdminReport = { id: string; visitId: string; reason: ReportInput['reason']; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string; reporter: { id: string; displayName: string }; author: { id: string; displayName: string }; place: { id: string; name: string }; rating: number; visitedAt: string };
 
 type LocalUser = PublicUser & { passwordHash: string };
@@ -502,13 +502,15 @@ export async function searchUsers(query: string, currentUserId?: string): Promis
   if (!normalized) return [];
   if (pool) {
     const result = await pool.query(`
-      SELECT id, email, display_name, role FROM users
-      WHERE is_active = true AND id <> $1 AND (display_name ILIKE $2 OR email ILIKE $2)
+      SELECT u.id, u.email, u.display_name, u.role,
+        EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followed_id = u.id) AS following
+      FROM users u
+      WHERE u.is_active = true AND u.id <> $1 AND (u.display_name ILIKE $2 OR u.email ILIKE $2)
       ORDER BY display_name LIMIT 20
     `, [currentUserId ?? '', `%${normalized}%`]);
-    return result.rows.map((row) => ({ id: row.id, email: row.email, displayName: row.display_name, role: row.role }));
+    return result.rows.map((row) => ({ id: row.id, email: row.email, displayName: row.display_name, role: row.role, following: Boolean(row.following) }));
   }
-  return [...localUsers.values()].filter((user) => user.id !== currentUserId && `${user.displayName} ${user.email}`.toLowerCase().includes(normalized)).slice(0, 20).map(publicUser);
+  return [...localUsers.values()].filter((user) => user.id !== currentUserId && `${user.displayName} ${user.email}`.toLowerCase().includes(normalized)).slice(0, 20).map((user) => ({ ...publicUser(user), following: currentUserId ? localFollows.has(`${currentUserId}:${user.id}`) : false }));
 }
 
 export async function followUser(followerId: string, followedId: string): Promise<'ok' | 'not_found' | 'self'> {
