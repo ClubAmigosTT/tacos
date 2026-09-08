@@ -9,6 +9,7 @@ export type FeedItem = { id: string; visited_at: string; rating: number; note?: 
 export type VisitComment = { id: string; body: string; createdAt: string; author: { id: string; displayName: string }; own: boolean };
 export type TasteProfile = { title: string; description: string; tags: string[]; profile: { intensity: number; spicy: number; traditional: number; texture: number; value: number } };
 export type AdminReport = { id: string; visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string; reporter: { id: string; displayName: string }; author: { id: string; displayName: string }; place: { id: string; name: string }; rating: number; visitedAt: string };
+export type AdminComment = { id: string; visitId: string; body: string; visibility: 'visible' | 'hidden'; createdAt: string; author: { id: string; displayName: string }; place: { id: string; name: string } };
 export type UserProfile = { user: { id: string; displayName: string }; stats: { visits: number; averageRating: number | null; listCount: number }; taste: TasteProfile; lists: ApiList[] };
 
 const configuredUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
@@ -225,4 +226,12 @@ export async function adminReports(token: string, status: 'open' | 'reviewed' | 
 
 export async function reviewReport(reportId: string, action: 'hide' | 'dismiss', token: string) {
   return request<{ status: string; reportId: string }>(`/v1/admin/reports/${reportId}`, { method: 'PATCH', body: JSON.stringify({ action }) }, token);
+}
+
+export async function adminComments(token: string, visibility: 'visible' | 'hidden' | 'all' = 'visible') {
+  return request<{ comments: AdminComment[] }>(`/v1/admin/comments?visibility=${visibility}`, undefined, token);
+}
+
+export async function reviewComment(commentId: string, action: 'hide' | 'restore', token: string) {
+  return request<{ status: string; commentId: string }>(`/v1/admin/comments/${encodeURIComponent(commentId)}`, { method: 'PATCH', body: JSON.stringify({ action }) }, token);
 }

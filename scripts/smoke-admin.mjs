@@ -35,6 +35,18 @@ if (feedBefore.items?.length !== 1) throw new Error('Admin smoke did not create 
 const recommendationsBefore = await request('/v1/recommendations', { token: viewer.token });
 if (typeof recommendationsBefore.places?.find((place) => place.id === 'vilsito')?.socialMatch !== 'number') throw new Error('Visible social signal was not calculated');
 await request('/v1/admin/reports', { token: viewer.token }, 403);
+const comment = await request(`/v1/visits/${visit.id}/comments`, { method: 'POST', body: JSON.stringify({ body: 'Comentario moderable' }), token: viewer.token }, 201);
+const commentQueue = await request('/v1/admin/comments', { token: admin.token });
+if (!commentQueue.comments?.some((item) => item.id === comment.id && item.visibility === 'visible')) throw new Error('Admin comment queue did not include the comment');
+await request('/v1/admin/comments', { token: viewer.token }, 403);
+const hiddenComment = await request(`/v1/admin/comments/${comment.id}`, { method: 'PATCH', body: JSON.stringify({ action: 'hide' }), token: admin.token });
+if (hiddenComment.status !== 'hidden') throw new Error('Admin comment hide action failed');
+const commentsAfterHide = await request(`/v1/visits/${visit.id}/comments`, { token: viewer.token });
+if (commentsAfterHide.comments?.length !== 0) throw new Error('Hidden comment still appeared in conversation');
+const restoredComment = await request(`/v1/admin/comments/${comment.id}`, { method: 'PATCH', body: JSON.stringify({ action: 'restore' }), token: admin.token });
+if (restoredComment.status !== 'visible') throw new Error('Admin comment restore action failed');
+const commentsAfterRestore = await request(`/v1/visits/${visit.id}/comments`, { token: viewer.token });
+if (commentsAfterRestore.comments?.length !== 1) throw new Error('Restored comment did not return to conversation');
 const report = await request('/v1/reports', { method: 'POST', body: JSON.stringify({ visitId: visit.id, reason: 'other' }), token: viewer.token }, 201);
 const queue = await request('/v1/admin/reports', { token: admin.token });
 const queuedReport = queue.reports?.find((item) => item.visitId === report.visitId && item.status === 'open');

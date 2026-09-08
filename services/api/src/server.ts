@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitComment, createVisitForUser, deleteVisitComment, discoverPlaces, findPlace, findUserById, followUser, getAdminReports, getDiary, getFeed, getHealth, getListDetails, getLists, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, getVisitComments, registerUser, removeListItemForUser, reportVisitForUser, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateVisitForUser, type PublicUser } from './repository.js';
+import { addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitComment, createVisitForUser, deleteVisitComment, discoverPlaces, findPlace, findUserById, followUser, getAdminComments, getAdminReports, getDiary, getFeed, getHealth, getListDetails, getLists, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, getVisitComments, registerUser, removeListItemForUser, reportVisitForUser, reviewAdminComment, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateVisitForUser, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
 import { uploadVisitImage } from './storage.js';
 
@@ -328,6 +328,23 @@ app.patch('/v1/admin/reports/:id', async (request, reply) => {
   const updated = await reviewAdminReport(params.id, body.action);
   if (!updated) return reply.code(404).send({ error: 'REPORT_NOT_FOUND' });
   return { status: body.action === 'hide' ? 'hidden' : 'dismissed', reportId: params.id };
+});
+
+app.get('/v1/admin/comments', async (request, reply) => {
+  const user = await requireAdmin(request, reply);
+  if (!user) return;
+  const query = z.object({ visibility: z.enum(['visible', 'hidden', 'all']).default('visible') }).parse(request.query);
+  return { comments: await getAdminComments(query.visibility) };
+});
+
+app.patch('/v1/admin/comments/:id', async (request, reply) => {
+  const user = await requireAdmin(request, reply);
+  if (!user) return;
+  const params = z.object({ id: z.string().uuid() }).parse(request.params);
+  const body = z.object({ action: z.enum(['hide', 'restore']) }).parse(request.body);
+  const updated = await reviewAdminComment(params.id, body.action);
+  if (!updated) return reply.code(404).send({ error: 'COMMENT_NOT_FOUND' });
+  return { status: body.action === 'hide' ? 'hidden' : 'visible', commentId: params.id };
 });
 
 const port = Number(process.env.PORT ?? 4000);

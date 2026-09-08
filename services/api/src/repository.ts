@@ -697,6 +697,7 @@ export async function getFeed(userId: string) {
 }
 
 type VisitComment = { id: string; body: string; createdAt: string; author: { id: string; displayName: string }; own: boolean };
+export type AdminComment = { id: string; visitId: string; body: string; visibility: 'visible' | 'hidden'; createdAt: string; author: { id: string; displayName: string }; place: { id: string; name: string } };
 
 async function canViewVisitComments(visitId: string, userId: string) {
   if (pool) {
@@ -751,6 +752,43 @@ export async function deleteVisitComment(commentId: string, userId: string): Pro
   const comment = localComments.get(commentId);
   if (!comment || comment.authorId !== userId) return false;
   localComments.delete(commentId);
+  return true;
+}
+
+export async function getAdminComments(visibility: 'visible' | 'hidden' | 'all' = 'visible'): Promise<AdminComment[]> {
+  if (pool) {
+    const result = await pool.query(`
+      SELECT c.id, c.visit_id, c.body, c.visibility, c.created_at,
+        u.id AS author_id, u.display_name AS author_name,
+        b.id AS place_id, b.name AS place_name
+      FROM visit_comments c
+      JOIN users u ON u.id = c.author_id
+      JOIN visits v ON v.id = c.visit_id
+      JOIN branches b ON b.id = v.branch_id
+      ${visibility === 'all' ? '' : 'WHERE c.visibility = $1'}
+      ORDER BY c.created_at DESC LIMIT 100
+    `, visibility === 'all' ? [] : [visibility]);
+    return result.rows.map((row) => ({ id: row.id, visitId: row.visit_id, body: row.body, visibility: row.visibility, createdAt: row.created_at, author: { id: row.author_id, displayName: row.author_name }, place: { id: row.place_id, name: row.place_name } }));
+  }
+  return [...localComments.values()]
+    .filter((comment) => visibility === 'all' || comment.visibility === visibility)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((comment) => {
+      const visit = localVisits.get(comment.visitId);
+      const place = visit ? places.find((item) => item.id === visit.placeId) : undefined;
+      const author = localUsers.get(comment.authorId);
+      return { id: comment.id, visitId: comment.visitId, body: comment.body, visibility: comment.visibility, createdAt: comment.createdAt, author: { id: comment.authorId, displayName: author?.displayName ?? 'Cuenta eliminada' }, place: { id: place?.id ?? visit?.placeId ?? '', name: place?.name ?? 'Lugar desconocido' } } satisfies AdminComment;
+    });
+}
+
+export async function reviewAdminComment(commentId: string, action: 'hide' | 'restore'): Promise<boolean> {
+  if (pool) {
+    const result = await pool.query('UPDATE visit_comments SET visibility = $2 WHERE id = $1 RETURNING id', [commentId, action === 'hide' ? 'hidden' : 'visible']);
+    return Boolean(result.rowCount);
+  }
+  const comment = localComments.get(commentId);
+  if (!comment) return false;
+  comment.visibility = action === 'hide' ? 'hidden' : 'visible';
   return true;
 }
 
