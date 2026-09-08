@@ -29,6 +29,20 @@ const defaultTaste: TasteProfile = {
   profile: { intensity: 86, spicy: 72, traditional: 94, texture: 88, value: 78 }
 };
 
+export async function getHealth() {
+  if (!pool) return { status: 'ok' as const, database: 'memory' as const };
+  try {
+    await pool.query('SELECT 1');
+    return { status: 'ok' as const, database: 'postgres' as const };
+  } catch {
+    return { status: 'degraded' as const, database: 'unavailable' as const };
+  }
+}
+
+export async function closeRepository() {
+  if (pool) await pool.end();
+}
+
 function publicUser(user: LocalUser): PublicUser {
   return { id: user.id, email: user.email, displayName: user.displayName, role: user.role };
 }

@@ -21,7 +21,7 @@ const createUser = (name, prefix) => request('/v1/auth/register', {
 }, 201);
 
 const health = await request('/health');
-if (health.status !== 'ok') throw new Error('Health check did not return ok');
+if (health.status !== 'ok' || !['memory', 'postgres'].includes(health.database)) throw new Error('Health check did not return a usable database status');
 
 const alice = await createUser('Ana Smoke', 'ana');
 const bob = await createUser('Beto Smoke', 'beto');
