@@ -47,6 +47,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 17. Recomendaciones con señal social: ratings y visitas de personas seguidas se combinan con el gusto propio y la calidad global.
 18. Registro contextual: detecta ubicación, prioriza los tres lugares más cercanos y guarda coordenadas de la visita.
 19. Radar de tacos: controles de distancia, precio y antojo que reordenan el mapa en tiempo real.
+20. Recomendaciones por perfil de sabor: compara el historial del usuario con la firma de cada sucursal y expone `tasteMatch` junto al score combinado.
 
 ## Verificación
 
