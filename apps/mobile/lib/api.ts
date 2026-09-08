@@ -82,7 +82,14 @@ export async function getPlace(id: string): Promise<Place> {
 }
 
 export async function getTaqueria(id: string) {
-  return request<ApiTaqueria>(`/v1/taquerias/${id}`);
+  try {
+    return await request<ApiTaqueria>(`/v1/taquerias/${id}`);
+  } catch {
+    const branches = places.filter((place) => (place.taqueriaId ?? place.id) === id);
+    if (!branches.length) throw new Error('Taquería no encontrada');
+    const first = branches[0];
+    return { id, name: first.taqueriaName ?? first.name, slug: id, description: `${first.name} y sus sucursales.`, branchCount: branches.length, branches } satisfies ApiTaqueria;
+  }
 }
 
 export async function createVisit(input: { placeId: string; tacoIds: string[]; rating: number; tacoRatings?: Record<string, number>; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number }, token: string) {
