@@ -57,6 +57,8 @@ pnpm build:api
 pnpm --filter @tacos/mobile exec expo export --platform web
 ```
 
+Cada push y pull request a `main` o `master` ejecuta los mismos tres checks en GitHub Actions (`.github/workflows/ci.yml`). Render sólo debería desplegar commits que pasen esta verificación.
+
 ## Deploy
 
 ### API en Render
