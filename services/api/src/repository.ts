@@ -659,13 +659,22 @@ export async function updateUserProfileForUser(userId: string, input: { displayN
 export async function getUserProfile(userId: string, viewerId?: string) {
   const user = await findUserById(userId);
   if (!user) return undefined;
+  let following = false;
+  if (viewerId && viewerId !== userId) {
+    if (pool) {
+      const relation = await pool.query('SELECT 1 FROM follows WHERE follower_id = $1 AND followed_id = $2', [viewerId, userId]);
+      following = Boolean(relation.rowCount);
+    } else {
+      following = localFollows.has(`${viewerId}:${userId}`);
+    }
+  }
   // Public profile aggregates must not count content hidden by moderation.
   const entries = await getDiary(userId, false);
   const ratings = entries.map((entry) => Number(entry.rating)).filter(Number.isFinite);
   const allLists = await getLists(viewerId === userId ? userId : viewerId);
   const lists = allLists.filter((list) => list.owner.id === userId && (list.visibility !== 'private' || viewerId === userId));
   return {
-    user: { id: user.id, displayName: user.displayName },
+    user: { id: user.id, displayName: user.displayName, following },
     stats: { visits: entries.length, averageRating: ratings.length ? Number((ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length).toFixed(2)) : null, listCount: lists.length },
     taste: await getTasteProfile(userId),
     lists

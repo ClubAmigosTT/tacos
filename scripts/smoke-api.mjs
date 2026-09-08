@@ -150,7 +150,7 @@ await request(`/v1/lists/${list.id}/items`, {
 const listDetail = await request(`/v1/lists/${list.id}`, { token: alice.token });
 if (listDetail.items?.[0]?.branchId !== 'vilsito') throw new Error('Public list detail did not include its place');
 const bobProfile = await request(`/v1/users/${bob.user.id}/profile`, { token: alice.token });
-if (bobProfile.user?.displayName !== 'Beto Smoke' || bobProfile.lists?.some((item) => item.visibility === 'private')) throw new Error('Public user profile leaked private data or is incomplete');
+if (bobProfile.user?.displayName !== 'Beto Smoke' || bobProfile.user?.following !== true || bobProfile.lists?.some((item) => item.visibility === 'private')) throw new Error('Public user profile leaked private data or is incomplete');
 const publicLists = await request('/v1/lists');
 if (!publicLists.lists?.some((item) => item.id === list.id) || publicLists.lists?.some((item) => item.visibility === 'private')) throw new Error('Public list discovery leaked or omitted a list');
 await request(`/v1/lists/${list.id}/items/vilsito`, { method: 'DELETE', token: bob.token });
@@ -220,5 +220,7 @@ if (privateDetail.visibility !== 'private') throw new Error('Private list visibi
 await request(`/v1/users/${bob.user.id}/follow`, { method: 'DELETE', token: alice.token });
 const peopleAfterUnfollow = await request('/v1/users/search?q=Beto', { token: alice.token });
 if (peopleAfterUnfollow.users?.[0]?.following !== false) throw new Error('Unfollow state was not persisted');
+const profileAfterUnfollow = await request(`/v1/users/${bob.user.id}/profile`, { token: alice.token });
+if (profileAfterUnfollow.user?.following !== false) throw new Error('Profile follow state was not refreshed after unfollow');
 
 console.log(`API smoke passed: ${baseUrl}`);

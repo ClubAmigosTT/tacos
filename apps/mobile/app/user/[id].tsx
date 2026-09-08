@@ -1,21 +1,29 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { userProfile } from '@/lib/api';
+import { followUser, unfollowUser, userProfile } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const queryClient = useQueryClient();
+  const [following, setFollowing] = useState(false);
   const { data: profile, isLoading, isError } = useQuery({ queryKey: ['user-profile', id, token], queryFn: () => userProfile(id, token), enabled: Boolean(id) });
+  useEffect(() => { if (profile) setFollowing(Boolean(profile.user.following)); }, [profile]);
+  const followMutation = useMutation({
+    mutationFn: () => following ? unfollowUser(id, token!) : followUser(id, token!),
+    onSuccess: () => { setFollowing((value) => !value); void queryClient.invalidateQueries({ queryKey: ['user-profile', id] }); void queryClient.invalidateQueries({ queryKey: ['people'] }); void queryClient.invalidateQueries({ queryKey: ['feed'] }); void queryClient.invalidateQueries({ queryKey: ['recommendations'] }); }
+  });
   if (isLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando perfil…</Text></View>;
   if (isError || !profile) return <View style={styles.center}><Text style={styles.title}>Perfil no disponible</Text><Text style={styles.muted}>Puede que esta cuenta ya no esté activa.</Text><Pressable style={styles.backButton} onPress={() => router.back()}><Text style={styles.backText}>Volver</Text></Pressable></View>;
   const average = profile.stats.averageRating == null ? '—' : profile.stats.averageRating.toFixed(2);
   return <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
     <View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable><Text style={styles.eyebrow}>IDENTIDAD GASTRONÓMICA</Text><Ionicons name="person-circle-outline" size={22} color={colors.accent} /></View>
-    <View style={styles.identity}><View style={styles.avatar}><Text style={styles.avatarText}>{profile.user.displayName.slice(0, 1).toUpperCase()}</Text></View><Text style={styles.name}>{profile.user.displayName}</Text><Text style={styles.subtitle}>Una mirada al gusto detrás de sus listas.</Text></View>
+    <View style={styles.identity}><View style={styles.avatar}><Text style={styles.avatarText}>{profile.user.displayName.slice(0, 1).toUpperCase()}</Text></View><Text style={styles.name}>{profile.user.displayName}</Text><Text style={styles.subtitle}>Una mirada al gusto detrás de sus listas.</Text>{user?.id === profile.user.id ? null : token ? <Pressable style={[styles.followButton, following && styles.followingButton]} disabled={followMutation.isPending} onPress={() => followMutation.mutate()}><Ionicons name={following ? 'checkmark' : 'person-add-outline'} size={15} color={following ? colors.muted : colors.background} /><Text style={[styles.followText, following && styles.followingText]}>{following ? 'Siguiendo' : 'Seguir'}</Text></Pressable> : <Pressable style={styles.followButton} onPress={() => router.push({ pathname: '/auth', params: { returnTo: `/user/${profile.user.id}` } })}><Ionicons name="person-add-outline" size={15} color={colors.background} /><Text style={styles.followText}>Entra para seguir</Text></Pressable>}</View>
     <View style={styles.taste}><Text style={styles.tasteEyebrow}>TASTE ID</Text><Text style={styles.tasteTitle}>{profile.taste.title}</Text><Text style={styles.tasteDescription}>{profile.taste.description}</Text><View style={styles.tags}>{profile.taste.tags.map((tag) => <Text style={styles.tag} key={tag}>{tag}</Text>)}</View></View>
     <View style={styles.stats}><Metric label="VISITAS" value={String(profile.stats.visits)} /><Metric label="LISTAS" value={String(profile.stats.listCount)} /><Metric label="PROMEDIO" value={average} /></View>
     <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Listas públicas</Text><Text style={styles.count}>{profile.lists.length}</Text></View>
@@ -39,6 +47,10 @@ const styles = StyleSheet.create({
   avatarText: { color: colors.background, fontSize: 31, fontWeight: '900' },
   name: { color: colors.ink, fontSize: 29, fontWeight: '900', letterSpacing: -0.8 },
   subtitle: { color: colors.muted, fontSize: 12, marginTop: 5 },
+  followButton: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.accent, borderRadius: radii.pill, paddingHorizontal: 14, paddingVertical: 9, marginTop: spacing.md },
+  followingButton: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  followText: { color: colors.background, fontSize: 11, fontWeight: '900' },
+  followingText: { color: colors.muted },
   taste: { backgroundColor: colors.surfaceRaised, borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.md },
   tasteEyebrow: { color: colors.accent, fontSize: 9, fontWeight: '900', letterSpacing: 1.4 },
   tasteTitle: { color: colors.ink, fontSize: 25, fontWeight: '900', marginTop: 13 },

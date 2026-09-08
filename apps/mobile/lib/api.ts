@@ -14,7 +14,7 @@ export type TasteProfile = { title: string; description: string; tags: string[];
 export type AdminReport = { id: string; visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string; reporter: { id: string; displayName: string }; author: { id: string; displayName: string }; place: { id: string; name: string }; rating: number; visitedAt: string };
 export type AdminComment = { id: string; visitId: string; body: string; visibility: 'visible' | 'hidden'; createdAt: string; author: { id: string; displayName: string }; place: { id: string; name: string } };
 export type AdminAnalytics = { days: number; totalEvents: number; uniqueAudiences: number; byEvent: Array<{ eventName: string; count: number }> };
-export type UserProfile = { user: { id: string; displayName: string }; stats: { visits: number; averageRating: number | null; listCount: number }; taste: TasteProfile; lists: ApiList[] };
+export type UserProfile = { user: { id: string; displayName: string; following?: boolean }; stats: { visits: number; averageRating: number | null; listCount: number }; taste: TasteProfile; lists: ApiList[] };
 
 const configuredUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
 const API_URL = configuredUrl?.replace(/\/$/, '');
