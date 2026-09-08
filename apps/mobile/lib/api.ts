@@ -73,7 +73,7 @@ export async function me(token: string) {
 }
 
 export async function diary(token: string) {
-  return request<{ entries: Array<{ id: string; visited_at: string; rating: number; place_name: string; neighborhood: string; tacos: string; image_url: string }> }>('/v1/diary', undefined, token);
+  return request<{ entries: Array<{ id: string; visited_at: string; rating: number; place_name: string; neighborhood: string; tacos: string; taco_ratings?: Record<string, number | null>; image_url: string }> }>('/v1/diary', undefined, token);
 }
 
 export async function lists(token?: string) {

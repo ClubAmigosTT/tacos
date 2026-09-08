@@ -186,7 +186,9 @@ export async function getDiary(userId: string) {
   if (pool) {
     const result = await pool.query(`
       SELECT v.id, v.visited_at, v.rating, b.name AS place_name, b.neighborhood,
-        COALESCE(string_agg(m.name, ', ' ORDER BY m.name), '') AS tacos, b.image_url
+        COALESCE(string_agg(m.name, ', ' ORDER BY m.name), '') AS tacos,
+        COALESCE(json_object_agg(m.id, vi.rating) FILTER (WHERE m.id IS NOT NULL), '{}'::json) AS taco_ratings,
+        b.image_url
       FROM visits v JOIN branches b ON b.id = v.branch_id
       LEFT JOIN visit_items vi ON vi.visit_id = v.id
       LEFT JOIN menu_items m ON m.id = vi.menu_item_id
@@ -198,7 +200,7 @@ export async function getDiary(userId: string) {
   return [...localVisits.entries()].filter(([, visit]) => visit.userId === userId).sort(([, a], [, b]) => b.createdAt.localeCompare(a.createdAt)).map(([id, visit]) => {
     const place = places.find((item) => item.id === visit.placeId);
     const tacoNames = visit.tacoIds.map((tacoId) => place?.tacos.find((taco) => taco.id === tacoId)?.name ?? tacoId).join(', ');
-    return { id, visited_at: visit.createdAt, rating: visit.rating, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', tacos: tacoNames, image_url: place?.image ?? '' };
+    return { id, visited_at: visit.createdAt, rating: visit.rating, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', tacos: tacoNames, taco_ratings: visit.tacoRatings ?? {}, image_url: place?.image ?? '' };
   });
 }
 
