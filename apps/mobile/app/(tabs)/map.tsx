@@ -11,6 +11,9 @@ import { RatingBadge } from '@/components/RatingBadge';
 import { MapCanvas } from '@/components/MapCanvas';
 
 const filters = ['Pastor', 'Abierto ahora', 'Barato', '92% para mí'];
+const radarDistances = ['Cerca', 'En la zona', 'Toda la ciudad'] as const;
+const radarPrices = ['Barato', 'Medio', 'Cualquier precio'] as const;
+const radarMoods = ['Clásico', 'Aventura', 'Alta calidad'] as const;
 
 function isOpenNow(openUntil: string) {
   const [hours, minutes] = openUntil.split(':').map(Number);
@@ -20,11 +23,24 @@ function isOpenNow(openUntil: string) {
   return closing < 6 * 60 ? current >= 18 * 60 || current <= closing : current <= closing;
 }
 
+function distanceKm(distance: string) {
+  const value = Number.parseFloat(distance.replace(',', '.'));
+  return Number.isFinite(value) ? value : Number.POSITIVE_INFINITY;
+}
+
+function lowestPrice(place: (typeof places)[number]) {
+  return Math.min(...place.tacos.map((taco) => taco.price), Number.POSITIVE_INFINITY);
+}
+
 export default function MapScreen() {
   const [active, setActive] = useState('Pastor');
   const [search, setSearch] = useState('');
   const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number }>();
   const [locationDenied, setLocationDenied] = useState(false);
+  const [radarOpen, setRadarOpen] = useState(false);
+  const [radarDistance, setRadarDistance] = useState<(typeof radarDistances)[number]>('En la zona');
+  const [radarPrice, setRadarPrice] = useState<(typeof radarPrices)[number]>('Cualquier precio');
+  const [radarMood, setRadarMood] = useState<(typeof radarMoods)[number]>('Alta calidad');
   async function loadLocation() {
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
@@ -37,12 +53,22 @@ export default function MapScreen() {
   const { data = places } = useQuery({ queryKey: ['discover', 'map', search, coordinates?.latitude, coordinates?.longitude], queryFn: () => discover({ q: search, lat: coordinates?.latitude, lng: coordinates?.longitude }), placeholderData: places });
   const sorted = useMemo(() => {
     const source = [...data];
-    if (active === 'Barato') return source.sort((a, b) => (Math.min(...a.tacos.map((taco) => taco.price), Infinity) - Math.min(...b.tacos.map((taco) => taco.price), Infinity)));
-    if (active === '92% para mí') return source.sort((a, b) => b.match - a.match);
-    if (active === 'Pastor') return source.sort((a, b) => (b.tacos.find((taco) => taco.name === 'Pastor')?.rating ?? b.rating) - (a.tacos.find((taco) => taco.name === 'Pastor')?.rating ?? a.rating));
-    if (active === 'Abierto ahora') return source.filter((place) => isOpenNow(place.openUntil));
-    return source;
-  }, [active, data]);
+    const distanceLimit = radarDistance === 'Cerca' ? 2 : radarDistance === 'En la zona' ? 5 : Number.POSITIVE_INFINITY;
+    const radarFiltered = source.filter((place) => {
+      if (distanceKm(place.distance) > distanceLimit) return false;
+      if (radarPrice === 'Barato' && lowestPrice(place) > 24) return false;
+      if (radarPrice === 'Medio' && (lowestPrice(place) < 24 || lowestPrice(place) > 32)) return false;
+      return true;
+    });
+    const radarSource = radarFiltered.length > 0 ? radarFiltered : source;
+    if (active === 'Barato') return radarSource.sort((a, b) => (Math.min(...a.tacos.map((taco) => taco.price), Infinity) - Math.min(...b.tacos.map((taco) => taco.price), Infinity)));
+    if (active === '92% para mí') return radarSource.sort((a, b) => b.match - a.match);
+    if (active === 'Pastor') return radarSource.sort((a, b) => (b.tacos.find((taco) => taco.name === 'Pastor')?.rating ?? b.rating) - (a.tacos.find((taco) => taco.name === 'Pastor')?.rating ?? a.rating));
+    if (active === 'Abierto ahora') return radarSource.filter((place) => isOpenNow(place.openUntil));
+    if (radarMood === 'Clásico') return radarSource.sort((a, b) => b.flavorProfile.traditional - a.flavorProfile.traditional);
+    if (radarMood === 'Aventura') return radarSource.sort((a, b) => (b.flavorProfile.intensity + (100 - b.flavorProfile.traditional)) - (a.flavorProfile.intensity + (100 - a.flavorProfile.traditional)));
+    return radarSource.sort((a, b) => b.rating - a.rating);
+  }, [active, data, radarDistance, radarMood, radarPrice]);
   const suggestion = sorted[0] ?? data[0];
 
   return (
@@ -50,7 +76,8 @@ export default function MapScreen() {
       <MapCanvas places={sorted} active={active} onSelect={(id) => router.push(`/place/${id}`)} userCoordinates={coordinates} />
       <View style={styles.topOverlay}><Pressable style={styles.backButton} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable><View style={styles.mapTitle}><Text style={styles.mapKicker}>EXPLORAR</Text><Text style={styles.mapHeading}>Tu mapa</Text></View><Pressable style={[styles.locate, coordinates && styles.locateActive]} onPress={() => void loadLocation()}><Ionicons name="navigate" size={18} color={coordinates ? colors.background : colors.ink} /></Pressable></View>
       <View style={styles.searchBar}><Ionicons name="search" size={17} color={colors.muted} /><TextInput value={search} onChangeText={setSearch} placeholder="Pastor, suadero, Roma…" placeholderTextColor={colors.muted} style={styles.searchInput} returnKeyType="search" /></View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters} contentContainerStyle={styles.filterContent}>{filters.map((filter) => <Pressable key={filter} onPress={() => setActive(filter)} style={[styles.filter, filter === active && styles.filterActive]}><Text style={[styles.filterText, filter === active && styles.filterTextActive]}>{filter}</Text></Pressable>)}</ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters} contentContainerStyle={styles.filterContent}>{filters.map((filter) => <Pressable key={filter} onPress={() => setActive(filter)} style={[styles.filter, filter === active && styles.filterActive]}><Text style={[styles.filterText, filter === active && styles.filterTextActive]}>{filter}</Text></Pressable>)}<Pressable onPress={() => setRadarOpen((value) => !value)} style={[styles.filter, radarOpen && styles.filterActive]}><Ionicons name="options-outline" size={13} color={radarOpen ? colors.background : colors.ink} /><Text style={[styles.filterText, radarOpen && styles.filterTextActive]}>Radar</Text></Pressable></ScrollView>
+      {radarOpen ? <View style={styles.radarPanel}><View style={styles.radarHeader}><View><Text style={styles.radarEyebrow}>RADAR DE TACOS</Text><Text style={styles.radarTitle}>Encuentra algo para ti</Text></View><Pressable onPress={() => setRadarOpen(false)}><Ionicons name="close" size={19} color={colors.muted} /></Pressable></View><Text style={styles.radarLabel}>DISTANCIA</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radarOptions}>{radarDistances.map((option) => <Pressable key={option} onPress={() => setRadarDistance(option)} style={[styles.radarOption, radarDistance === option && styles.radarOptionActive]}><Text style={[styles.radarOptionText, radarDistance === option && styles.radarOptionTextActive]}>{option}</Text></Pressable>)}</ScrollView><Text style={styles.radarLabel}>PRECIO</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radarOptions}>{radarPrices.map((option) => <Pressable key={option} onPress={() => setRadarPrice(option)} style={[styles.radarOption, radarPrice === option && styles.radarOptionActive]}><Text style={[styles.radarOptionText, radarPrice === option && styles.radarOptionTextActive]}>{option}</Text></Pressable>)}</ScrollView><Text style={styles.radarLabel}>ANTOJO</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radarOptions}>{radarMoods.map((option) => <Pressable key={option} onPress={() => setRadarMood(option)} style={[styles.radarOption, radarMood === option && styles.radarOptionActive]}><Text style={[styles.radarOptionText, radarMood === option && styles.radarOptionTextActive]}>{option}</Text></Pressable>)}</ScrollView></View> : null}
       <View style={styles.sheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><View><Text style={styles.sheetEyebrow}>{sorted.length} LUGARES EN ESTA ZONA</Text><Text style={styles.sheetTitle}>{active === 'Pastor' ? 'Pastor que vale la pena' : active}</Text></View><Pressable style={styles.magicButton} disabled={!suggestion} onPress={() => suggestion && router.push(`/place/${suggestion.id}`)}><Ionicons name="sparkles-outline" size={14} color={colors.background} /><Text style={styles.magicText}>Para mí</Text></Pressable></View><ScrollView horizontal showsHorizontalScrollIndicator={false}>{sorted.map((place) => <Pressable key={place.id} style={styles.resultCard} onPress={() => router.push(`/place/${place.id}`)}><View style={styles.resultTop}><Text style={styles.resultName} numberOfLines={1}>{place.name}</Text><RatingBadge rating={active === 'Pastor' ? place.tacos.find((taco) => taco.name === 'Pastor')?.rating ?? place.rating : place.rating} /></View><Text style={styles.resultMeta}>{place.neighborhood} · {place.distance}</Text><Text style={styles.resultStyle}>{place.style}</Text></Pressable>)}</ScrollView></View>
       {locationDenied ? <Pressable style={styles.locationHint} onPress={() => void loadLocation()}><Ionicons name="location-outline" size={14} color={colors.warm} /><Text style={styles.locationHintText}>Activa ubicación para calcular distancias reales</Text></Pressable> : null}
     </View>
@@ -74,6 +101,16 @@ const styles = StyleSheet.create({
   filterActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   filterText: { color: colors.ink, fontSize: 12, fontWeight: '800' },
   filterTextActive: { color: colors.background },
+  radarPanel: { position: 'absolute', top: 220, left: spacing.lg, right: spacing.lg, backgroundColor: 'rgba(20,24,22,0.98)', borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, padding: spacing.md, zIndex: 5 },
+  radarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm },
+  radarEyebrow: { color: colors.accent, fontSize: 9, letterSpacing: 1.4, fontWeight: '900' },
+  radarTitle: { color: colors.ink, fontSize: 17, fontWeight: '900', marginTop: 3 },
+  radarLabel: { color: colors.dim, fontSize: 9, letterSpacing: 1.2, fontWeight: '900', marginTop: spacing.sm, marginBottom: 7 },
+  radarOptions: { gap: 7 },
+  radarOption: { paddingHorizontal: 11, paddingVertical: 8, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised },
+  radarOptionActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  radarOptionText: { color: colors.ink, fontSize: 11, fontWeight: '800' },
+  radarOptionTextActive: { color: colors.background },
   pin: { minWidth: 44, height: 32, borderRadius: 18, paddingHorizontal: 8, backgroundColor: colors.surface, borderWidth: 2, borderColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
   pinAccent: { backgroundColor: colors.accent, borderColor: colors.background },
   pinText: { color: colors.ink, fontSize: 12, fontWeight: '900' },
