@@ -15,6 +15,7 @@ const filters = ['Pastor', 'Abierto ahora', 'Barato', '92% para mí'];
 const radarDistances = ['Cerca', 'En la zona', 'Toda la ciudad'] as const;
 const radarPrices = ['Barato', 'Medio', 'Cualquier precio'] as const;
 const radarMoods = ['Clásico', 'Aventura', 'Alta calidad'] as const;
+const defaultMapCenter = { latitude: 19.402, longitude: -99.163 };
 
 function isOpenNow(openUntil: string) {
   const [hours, minutes] = openUntil.split(':').map(Number);
@@ -40,6 +41,9 @@ export default function MapScreen() {
   const [search, setSearch] = useState(initialQuery ?? '');
   const [searchQuery, setSearchQuery] = useState(initialQuery ?? '');
   const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number }>();
+  const [searchCenter, setSearchCenter] = useState<{ latitude: number; longitude: number }>();
+  const [pendingMapCenter, setPendingMapCenter] = useState<{ latitude: number; longitude: number }>();
+  const [mapMoved, setMapMoved] = useState(false);
   const [locationDenied, setLocationDenied] = useState(false);
   const [radarOpen, setRadarOpen] = useState(false);
   const [radarDistance, setRadarDistance] = useState<(typeof radarDistances)[number]>('En la zona');
@@ -56,10 +60,20 @@ export default function MapScreen() {
       if (permission.status !== Location.PermissionStatus.GRANTED) { setLocationDenied(true); return; }
       const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       setCoordinates({ latitude: current.coords.latitude, longitude: current.coords.longitude });
+      setSearchCenter(undefined);
+      setPendingMapCenter(undefined);
+      setMapMoved(false);
     } catch { setLocationDenied(true); }
   }
   useEffect(() => { if (Platform.OS !== 'web') void loadLocation(); }, []);
-  const { data = places } = useQuery({ queryKey: ['discover', 'map', searchQuery, coordinates?.latitude, coordinates?.longitude], queryFn: () => discover({ q: searchQuery, lat: coordinates?.latitude, lng: coordinates?.longitude }), placeholderData: places });
+  const searchCoordinates = searchCenter ?? coordinates;
+  const handleMapRegionChange = (next: { latitude: number; longitude: number }) => {
+    const baseline = searchCoordinates ?? defaultMapCenter;
+    const moved = Math.abs(next.latitude - baseline.latitude) > 0.002 || Math.abs(next.longitude - baseline.longitude) > 0.002;
+    if (moved) { setPendingMapCenter(next); setMapMoved(true); }
+    else { setPendingMapCenter(undefined); setMapMoved(false); }
+  };
+  const { data = places } = useQuery({ queryKey: ['discover', 'map', searchQuery, searchCoordinates?.latitude, searchCoordinates?.longitude], queryFn: () => discover({ q: searchQuery, lat: searchCoordinates?.latitude, lng: searchCoordinates?.longitude }), placeholderData: places });
   const sorted = useMemo(() => {
     const source = [...data];
     const distanceLimit = radarDistance === 'Cerca' ? 2 : radarDistance === 'En la zona' ? 5 : Number.POSITIVE_INFINITY;
@@ -82,11 +96,12 @@ export default function MapScreen() {
 
   return (
     <View style={styles.screen}>
-      <MapCanvas places={sorted} active={active} onSelect={(id) => router.push(`/place/${id}`)} userCoordinates={coordinates} />
+      <MapCanvas places={sorted} active={active} onSelect={(id) => router.push(`/place/${id}`)} userCoordinates={coordinates} onRegionChangeComplete={handleMapRegionChange} />
       <View style={styles.topOverlay}><Pressable style={styles.backButton} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable><View style={styles.mapTitle}><Text style={styles.mapKicker}>EXPLORAR</Text><Text style={styles.mapHeading}>Tu mapa</Text></View><Pressable style={[styles.locate, coordinates && styles.locateActive]} onPress={() => void loadLocation()}><Ionicons name="navigate" size={18} color={coordinates ? colors.background : colors.ink} /></Pressable></View>
       <View style={styles.searchBar}><Ionicons name="search" size={17} color={colors.muted} /><TextInput value={search} onChangeText={setSearch} onSubmitEditing={() => { setSearchQuery(search.trim()); void trackEvent('map_search', { query_length: search.trim().length }, token); }} placeholder="Pastor, suadero, Roma…" placeholderTextColor={colors.muted} style={styles.searchInput} returnKeyType="search" /></View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters} contentContainerStyle={styles.filterContent}>{filters.map((filter) => <Pressable key={filter} onPress={() => { setActive(filter); void trackEvent('map_filter', { filter }, token); }} style={[styles.filter, filter === active && styles.filterActive]}><Text style={[styles.filterText, filter === active && styles.filterTextActive]}>{filter}</Text></Pressable>)}<Pressable onPress={() => { setRadarOpen((value) => !value); void trackEvent('radar_filter', { filter: 'open' }, token); }} style={[styles.filter, radarOpen && styles.filterActive]}><Ionicons name="options-outline" size={13} color={radarOpen ? colors.background : colors.ink} /><Text style={[styles.filterText, radarOpen && styles.filterTextActive]}>Radar</Text></Pressable></ScrollView>
       {radarOpen ? <View style={styles.radarPanel}><View style={styles.radarHeader}><View><Text style={styles.radarEyebrow}>RADAR DE TACOS</Text><Text style={styles.radarTitle}>Encuentra algo para ti</Text></View><Pressable onPress={() => setRadarOpen(false)}><Ionicons name="close" size={19} color={colors.muted} /></Pressable></View><Text style={styles.radarLabel}>DISTANCIA</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radarOptions}>{radarDistances.map((option) => <Pressable key={option} onPress={() => { setRadarDistance(option); void trackEvent('radar_filter', { filter: `distance:${option}` }, token); }} style={[styles.radarOption, radarDistance === option && styles.radarOptionActive]}><Text style={[styles.radarOptionText, radarDistance === option && styles.radarOptionTextActive]}>{option}</Text></Pressable>)}</ScrollView><Text style={styles.radarLabel}>PRECIO</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radarOptions}>{radarPrices.map((option) => <Pressable key={option} onPress={() => { setRadarPrice(option); void trackEvent('radar_filter', { filter: `price:${option}` }, token); }} style={[styles.radarOption, radarPrice === option && styles.radarOptionActive]}><Text style={[styles.radarOptionText, radarPrice === option && styles.radarOptionTextActive]}>{option}</Text></Pressable>)}</ScrollView><Text style={styles.radarLabel}>ANTOJO</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radarOptions}>{radarMoods.map((option) => <Pressable key={option} onPress={() => { setRadarMood(option); void trackEvent('radar_filter', { filter: `mood:${option}` }, token); }} style={[styles.radarOption, radarMood === option && styles.radarOptionActive]}><Text style={[styles.radarOptionText, radarMood === option && styles.radarOptionTextActive]}>{option}</Text></Pressable>)}</ScrollView></View> : null}
+      {mapMoved && pendingMapCenter ? <Pressable style={styles.searchAreaButton} onPress={() => { setSearchCenter(pendingMapCenter); setPendingMapCenter(undefined); setMapMoved(false); void trackEvent('map_filter', { filter: 'search_area' }, token); }}><Ionicons name="search" size={14} color={colors.background} /><Text style={styles.searchAreaText}>Buscar en esta zona</Text></Pressable> : null}
       <View style={styles.sheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><View><Text style={styles.sheetEyebrow}>{sorted.length} LUGARES EN ESTA ZONA</Text><Text style={styles.sheetTitle}>{active === 'Pastor' ? 'Pastor que vale la pena' : active}</Text></View><Pressable style={styles.magicButton} disabled={!suggestion} onPress={() => suggestion && router.push(`/place/${suggestion.id}`)}><Ionicons name="sparkles-outline" size={14} color={colors.background} /><Text style={styles.magicText}>Para mí</Text></Pressable></View><ScrollView horizontal showsHorizontalScrollIndicator={false}>{sorted.map((place) => <Pressable key={place.id} style={styles.resultCard} onPress={() => router.push(`/place/${place.id}`)}><View style={styles.resultTop}><Text style={styles.resultName} numberOfLines={1}>{place.name}</Text><RatingBadge rating={active === 'Pastor' ? place.tacos.find((taco) => taco.name === 'Pastor')?.rating ?? place.rating : place.rating} /></View><Text style={styles.resultMeta}>{place.neighborhood} · {place.distance}</Text><Text style={styles.resultStyle}>{place.style}</Text></Pressable>)}</ScrollView></View>
       {locationDenied ? <Pressable style={styles.locationHint} onPress={() => void loadLocation()}><Ionicons name="location-outline" size={14} color={colors.warm} /><Text style={styles.locationHintText}>Activa ubicación para calcular distancias reales</Text></Pressable> : null}
     </View>
@@ -120,6 +135,8 @@ const styles = StyleSheet.create({
   radarOptionActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   radarOptionText: { color: colors.ink, fontSize: 11, fontWeight: '800' },
   radarOptionTextActive: { color: colors.background },
+  searchAreaButton: { position: 'absolute', top: 220, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.accent, borderRadius: radii.pill, paddingHorizontal: 14, paddingVertical: 9, zIndex: 6 },
+  searchAreaText: { color: colors.background, fontSize: 11, fontWeight: '900' },
   pin: { minWidth: 44, height: 32, borderRadius: 18, paddingHorizontal: 8, backgroundColor: colors.surface, borderWidth: 2, borderColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
   pinAccent: { backgroundColor: colors.accent, borderColor: colors.background },
   pinText: { color: colors.ink, fontSize: 12, fontWeight: '900' },

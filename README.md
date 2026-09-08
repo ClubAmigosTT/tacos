@@ -93,6 +93,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 63. Deep links compartibles: fichas, listas y Wrapped generan URLs `tacos://...` para abrir directamente el contenido compartido en la app.
 64. Diario temporal: el periodo del Diario y el año de Wrapped se calculan desde datos reales o el año actual, sin fechas hardcodeadas.
 65. Búsqueda eficiente: el mapa espera 250 ms después de la última tecla antes de consultar el API y permite confirmar la búsqueda con Enter.
+66. Buscar en esta zona: al mover el mapa nativo aparece una acción explícita que consulta el nuevo centro sin perder la ubicación del usuario.
 
 ## Verificación
 
