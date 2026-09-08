@@ -36,6 +36,7 @@ export type List = {
   itemCount: number;
   visitedCount: number;
   coverImage: string;
+  visibility?: 'public' | 'private';
 };
 
 export const places: Place[] = [

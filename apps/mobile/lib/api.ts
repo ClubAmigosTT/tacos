@@ -2,7 +2,7 @@ import Constants from 'expo-constants';
 import { places, type Place } from '@/data/fixtures';
 
 export type AuthUser = { id: string; email: string; displayName: string; role?: 'user' | 'admin' };
-export type ApiList = { id: string; title: string; description: string; owner: { id: string; displayName: string }; itemCount: number; visitedCount: number; coverImage: string };
+export type ApiList = { id: string; title: string; description: string; owner: { id: string; displayName: string }; itemCount: number; visitedCount: number; coverImage: string; visibility?: 'public' | 'private' };
 export type ApiListDetail = ApiList & { items: Array<{ branchId: string; note: string; position: number; place: Place }> };
 export type ApiTaqueria = { id: string; name: string; slug: string; description: string; branchCount: number; branches: Place[] };
 export type FeedItem = { id: string; visited_at: string; rating: number; user_id: string; display_name: string; place_id: string; place_name: string; neighborhood: string; image_url: string; tacos: string };

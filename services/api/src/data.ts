@@ -33,6 +33,7 @@ export type ApiList = {
   itemCount: number;
   visitedCount: number;
   coverImage: string;
+  visibility?: 'public' | 'private';
 };
 export type ApiListDetail = ApiList & { items: Array<{ branchId: string; note: string; position: number; place: ApiPlace }> };
 

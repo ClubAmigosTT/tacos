@@ -354,14 +354,15 @@ function normalizeList(row: any): ApiList {
     owner: { id: row.owner_id, displayName: row.owner_name },
     itemCount: Number(row.item_count ?? 0),
     visitedCount: Number(row.visited_count ?? 0),
-    coverImage: row.cover_image_url ?? places[0].image
+    coverImage: row.cover_image_url ?? places[0].image,
+    visibility: row.visibility ?? 'public'
   };
 }
 
 export async function getLists(userId?: string): Promise<ApiList[]> {
   if (pool) {
     const result = await pool.query(`
-      SELECT l.id, l.title, l.description, l.owner_id, u.display_name AS owner_name,
+      SELECT l.id, l.title, l.description, l.visibility, l.owner_id, u.display_name AS owner_name,
         COUNT(li.branch_id)::int AS item_count,
         COALESCE(SUM(CASE WHEN EXISTS (
           SELECT 1 FROM visits vv WHERE vv.user_id = $1 AND vv.branch_id = li.branch_id
@@ -376,12 +377,13 @@ export async function getLists(userId?: string): Promise<ApiList[]> {
     `, [userId ?? null]);
     return result.rows.map(normalizeList);
   }
-  const own = userId ? [...localLists.values()].filter((list) => list.ownerId === userId && list.visibility === 'private') : [];
-  const userLists = [...localLists.values()].filter((list) => list.ownerId === userId && list.visibility === 'public');
-  const mapped = [...userLists, ...own].map((list) => {
+  // Keep the in-memory fallback aligned with PostgreSQL: every public list is
+  // discoverable, while private lists are only returned to their owner.
+  const visible = [...localLists.values()].filter((list) => list.visibility === 'public' || list.ownerId === userId);
+  const mapped = visible.map((list) => {
     const owner = localUsers.get(list.ownerId);
     const visitedCount = list.placeIds.filter((placeId) => [...localVisits.values()].some((visit) => visit.userId === userId && visit.placeId === placeId)).length;
-    return { id: list.id, title: list.title, description: list.description, owner: { id: list.ownerId, displayName: owner?.displayName ?? 'Tacos' }, itemCount: list.placeIds.length, visitedCount, coverImage: list.coverImage } satisfies ApiList;
+    return { id: list.id, title: list.title, description: list.description, owner: { id: list.ownerId, displayName: owner?.displayName ?? 'Tacos' }, itemCount: list.placeIds.length, visitedCount, coverImage: list.coverImage, visibility: list.visibility } satisfies ApiList;
   });
   return [...fixtureLists, ...mapped];
 }
@@ -389,7 +391,7 @@ export async function getLists(userId?: string): Promise<ApiList[]> {
 export async function getListDetails(listId: string, userId?: string): Promise<ApiListDetail | undefined> {
   if (pool) {
     const listResult = await pool.query(`
-      SELECT l.id, l.title, l.description, l.owner_id, u.display_name AS owner_name,
+        SELECT l.id, l.title, l.description, l.visibility, l.owner_id, u.display_name AS owner_name,
         COUNT(li.branch_id)::int AS item_count,
         COALESCE(SUM(CASE WHEN EXISTS (
           SELECT 1 FROM visits vv WHERE vv.user_id = $2 AND vv.branch_id = li.branch_id
@@ -418,6 +420,7 @@ export async function getListDetails(listId: string, userId?: string): Promise<A
       itemCount: local.placeIds.length,
       visitedCount,
       coverImage: local.coverImage,
+      visibility: local.visibility,
       items: local.placeIds.map((placeId, position) => { const place = places.find((item) => item.id === placeId); return place ? { branchId: placeId, note: '', position, place } : undefined; }).filter((item): item is { branchId: string; note: string; position: number; place: ApiPlace } => Boolean(item))
     };
   }
@@ -433,7 +436,7 @@ export async function createListForUser(input: { title: string; description?: st
   if (pool) {
     await pool.query('INSERT INTO lists (id, owner_id, title, description, visibility) VALUES ($1, $2, $3, $4, $5)', [id, userId, title, description, visibility]);
     const created = await pool.query(`
-      SELECT l.id, l.title, l.description, l.owner_id, u.display_name AS owner_name,
+      SELECT l.id, l.title, l.description, l.visibility, l.owner_id, u.display_name AS owner_name,
         0::int AS item_count, 0::int AS visited_count, NULL::text AS cover_image_url
       FROM lists l JOIN users u ON u.id = l.owner_id WHERE l.id = $1
     `, [id]);
@@ -442,7 +445,7 @@ export async function createListForUser(input: { title: string; description?: st
   const createdAt = new Date().toISOString();
   localLists.set(id, { id, ownerId: userId, title, description, visibility, coverImage: places[0].image, placeIds: [], createdAt });
   const owner = localUsers.get(userId);
-  return { id, title, description, owner: { id: userId, displayName: owner?.displayName ?? 'Tacos' }, itemCount: 0, visitedCount: 0, coverImage: places[0].image };
+  return { id, title, description, owner: { id: userId, displayName: owner?.displayName ?? 'Tacos' }, itemCount: 0, visitedCount: 0, coverImage: places[0].image, visibility };
 }
 
 export async function addListItemForUser(listId: string, placeId: string, userId: string, note = ''): Promise<boolean> {
