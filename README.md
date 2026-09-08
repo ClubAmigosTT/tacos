@@ -78,6 +78,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 48. Identidad editable: el usuario puede cambiar su nombre público desde Ajustes y la sesión se actualiza sin volver a iniciar sesión.
 49. Registro asistido por cámara: después de tomar una foto, la app propone la taquería más cercana por ubicación y exige confirmación manual antes de cambiar el registro.
 50. Búsqueda universal: la barra de inicio acepta el antojo y abre el mapa con la consulta ya aplicada, mientras que el módulo social del inicio lee actividad real del feed autenticado.
+51. Migración segura de catálogo: los padres de taquería se crean antes de la llave foránea, incluso para sucursales importadas fuera del catálogo de ejemplo.
 
 ## Verificación
 

@@ -35,6 +35,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 2. Crear índices PostGIS para ubicación, trigramas para búsqueda y claves únicas para follows, reportes y guardados.
 3. Sembrar datos de ejemplo sólo como datos iniciales idempotentes.
 4. Probar las migraciones en una base PostgreSQL limpia antes del primer deploy.
+5. Backfillear padres de taquería antes de aplicar la llave foránea para no romper catálogos existentes.
 
 **Aceptación:** `pnpm --filter @tacos/api migrate` termina sin errores y una consulta de sucursal devuelve su taquería padre, tacos y perfil de sabor.
 
