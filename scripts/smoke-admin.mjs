@@ -47,5 +47,7 @@ const recommendationsAfter = await request('/v1/recommendations', { token: viewe
 if (recommendationsAfter.places?.some((place) => typeof place.socialMatch === 'number')) throw new Error('Hidden visit still contributes a social recommendation signal');
 const diary = await request('/v1/diary', { token: author.token });
 if (diary.entries?.length !== 1) throw new Error('Hidden visit was removed from the author diary');
+const publicProfile = await request(`/v1/users/${author.user.id}/profile`, { token: viewer.token });
+if (publicProfile.stats?.visits !== 0) throw new Error('Hidden visit still contributes to public profile stats');
 
 console.log(`Admin smoke passed: ${baseUrl}`);

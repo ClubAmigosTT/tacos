@@ -360,7 +360,8 @@ export async function findUserById(id: string): Promise<PublicUser | undefined> 
 export async function getUserProfile(userId: string, viewerId?: string) {
   const user = await findUserById(userId);
   if (!user) return undefined;
-  const entries = await getDiary(userId);
+  // Public profile aggregates must not count content hidden by moderation.
+  const entries = await getDiary(userId, false);
   const ratings = entries.map((entry) => Number(entry.rating)).filter(Number.isFinite);
   const allLists = await getLists(viewerId === userId ? userId : viewerId);
   const lists = allLists.filter((list) => list.owner.id === userId && (list.visibility !== 'private' || viewerId === userId));
@@ -372,8 +373,9 @@ export async function getUserProfile(userId: string, viewerId?: string) {
   };
 }
 
-export async function getDiary(userId: string) {
+export async function getDiary(userId: string, includeHidden = true) {
   if (pool) {
+    const visibilityFilter = includeHidden ? '' : " AND v.visibility = 'visible'";
     const result = await pool.query(`
       SELECT v.id, v.visited_at, v.rating, v.price, v.note, v.photo_url, b.name AS place_name, b.neighborhood,
         COALESCE(string_agg(m.name, ', ' ORDER BY m.name), '') AS tacos,
@@ -382,12 +384,12 @@ export async function getDiary(userId: string) {
       FROM visits v JOIN branches b ON b.id = v.branch_id
       LEFT JOIN visit_items vi ON vi.visit_id = v.id
       LEFT JOIN menu_items m ON m.id = vi.menu_item_id
-      WHERE v.user_id = $1 GROUP BY v.id, v.price, v.note, v.photo_url, b.name, b.neighborhood, b.image_url
+      WHERE v.user_id = $1${visibilityFilter} GROUP BY v.id, v.price, v.note, v.photo_url, b.name, b.neighborhood, b.image_url
       ORDER BY v.visited_at DESC LIMIT 100
     `, [userId]);
     return result.rows;
   }
-  return [...localVisits.entries()].filter(([, visit]) => visit.userId === userId).sort(([, a], [, b]) => b.createdAt.localeCompare(a.createdAt)).map(([id, visit]) => {
+  return [...localVisits.entries()].filter(([, visit]) => visit.userId === userId && (includeHidden || visit.visibility === 'visible')).sort(([, a], [, b]) => b.createdAt.localeCompare(a.createdAt)).map(([id, visit]) => {
     const place = places.find((item) => item.id === visit.placeId);
     const tacoNames = visit.tacoIds.map((tacoId) => place?.tacos.find((taco) => taco.id === tacoId)?.name ?? tacoId).join(', ');
     return { id, visited_at: visit.createdAt, rating: visit.rating, price: visit.price ?? null, note: visit.note ?? '', photo_url: visit.photoUrl ?? null, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', tacos: tacoNames, taco_ratings: visit.tacoRatings ?? {}, image_url: visit.photoUrl ?? place?.image ?? '' };

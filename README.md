@@ -60,6 +60,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 30. Radar personal: cada sucursal puede marcarse como “Quiero ir”; la selección persiste en PostgreSQL y se refleja como “En mi radar”.
 31. Radar navegable: Perfil abre todos los lugares pendientes con sus fichas y conserva el fallback offline.
 32. Migración tolerante: `011_backfill_taquerias.sql` conserva sucursales existentes aunque no pertenezcan al seed inicial.
+33. Reputación moderable: visitas ocultas ya no afectan score global, Taste ID, recomendaciones ni estadísticas públicas; el autor conserva su diario.
 
 ## Verificación
 
