@@ -2,11 +2,12 @@ const baseUrl = (process.env.TACOS_API_URL ?? 'http://127.0.0.1:4000').replace(/
 const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 async function request(path, options = {}, expectedStatus = 200) {
+  const { token, ...init } = options;
   const response = await fetch(`${baseUrl}${path}`, {
-    ...options,
+    ...init,
     headers: {
-      ...(options.body ? { 'content-type': 'application/json' } : {}),
-      ...(options.token ? { authorization: `Bearer ${options.token}` } : {})
+      ...(init.body ? { 'content-type': 'application/json' } : {}),
+      ...(token ? { authorization: `Bearer ${token}` } : {})
     }
   });
   const body = await response.json().catch(() => ({}));
