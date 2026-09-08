@@ -1,20 +1,26 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { listDetails } from '@/lib/api';
+import { listDetails, removeListItem } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 import { PlaceCard } from '@/components/PlaceCard';
 
 export default function ListDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const queryClient = useQueryClient();
   const { data: list, isLoading, isError } = useQuery({ queryKey: ['list', id, token], queryFn: () => listDetails(id, token), enabled: Boolean(id) });
+  const removeMutation = useMutation({
+    mutationFn: (branchId: string) => removeListItem(id, branchId, token!),
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['list', id] }); void queryClient.invalidateQueries({ queryKey: ['lists'] }); }
+  });
   if (isLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando lista…</Text></View>;
   if (isError || !list) return <View style={styles.center}><Text style={styles.title}>Lista no disponible</Text><Text style={styles.muted}>Puede que sea privada o haya sido eliminada.</Text><Pressable style={styles.backButton} onPress={() => router.back()}><Text style={styles.backText}>Volver</Text></Pressable></View>;
   const progress = list.itemCount ? Math.round((list.visitedCount / list.itemCount) * 100) : 0;
-  return <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable><Text style={styles.eyebrow}>LISTA CURADA</Text><Ionicons name="bookmark" size={20} color={colors.accent} /></View><Text style={styles.title}>{list.title}</Text><Text style={styles.description}>{list.description}</Text><View style={styles.metaRow}><Text style={styles.owner}>por @{list.owner.displayName.toLowerCase().replace(/\s+/g, '')}</Text><Text style={styles.progress}>{list.visitedCount}/{list.itemCount} VISITADOS · {progress}%</Text></View><View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${progress}%` }]} /></View><View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Lugares</Text><Text style={styles.count}>{list.items.length}</Text></View>{list.items.length ? list.items.map((item) => <View key={item.branchId} style={styles.item}><PlaceCard place={item.place} compact />{item.note ? <Text style={styles.note}>{item.note}</Text> : null}</View>) : <View style={styles.empty}><Ionicons name="map-outline" size={28} color={colors.dim} /><Text style={styles.emptyTitle}>Todavía no hay lugares</Text><Text style={styles.muted}>Guarda taquerías desde sus fichas para empezar esta ruta.</Text></View>}</ScrollView>;
+  const isOwner = Boolean(user && user.id === list.owner.id && token);
+  return <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable><Text style={styles.eyebrow}>LISTA CURADA</Text><Ionicons name={list.visibility === 'private' ? 'lock-closed' : 'bookmark'} size={20} color={colors.accent} /></View><Text style={styles.title}>{list.title}</Text><Text style={styles.description}>{list.description}</Text><View style={styles.metaRow}><Text style={styles.owner}>por @{list.owner.displayName.toLowerCase().replace(/\s+/g, '')}</Text><Text style={styles.progress}>{list.visitedCount}/{list.itemCount} VISITADOS · {progress}%</Text></View><View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${progress}%` }]} /></View><View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Lugares</Text><Text style={styles.count}>{list.items.length}</Text></View>{removeMutation.isError ? <Text style={styles.error}>No pudimos quitar ese lugar. Inténtalo de nuevo.</Text> : null}{list.items.length ? list.items.map((item) => <View key={item.branchId} style={styles.item}><PlaceCard place={item.place} compact />{item.note ? <Text style={styles.note}>{item.note}</Text> : null}{isOwner ? <Pressable style={styles.remove} disabled={removeMutation.isPending} onPress={() => removeMutation.mutate(item.branchId)}><Ionicons name="remove-circle-outline" size={15} color={colors.warm} /><Text style={styles.removeText}>{removeMutation.isPending ? 'Quitando…' : 'Quitar de la lista'}</Text></Pressable> : null}</View>) : <View style={styles.empty}><Ionicons name="map-outline" size={28} color={colors.dim} /><Text style={styles.emptyTitle}>Todavía no hay lugares</Text><Text style={styles.muted}>Guarda taquerías desde sus fichas para empezar esta ruta.</Text></View>}</ScrollView>;
 }
 
 const styles = StyleSheet.create({
@@ -36,6 +42,9 @@ const styles = StyleSheet.create({
   count: { color: colors.muted, fontSize: 12, fontWeight: '900' },
   item: { marginBottom: spacing.sm },
   note: { color: colors.warm, fontSize: 11, marginTop: -4, marginBottom: spacing.sm, paddingHorizontal: spacing.sm },
+  remove: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: 6 },
+  removeText: { color: colors.warm, fontSize: 11, fontWeight: '800' },
+  error: { color: '#F08A8A', fontSize: 12, marginBottom: spacing.sm },
   empty: { alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.xl, gap: 8 },
   emptyTitle: { color: colors.ink, fontSize: 17, fontWeight: '900' },
   muted: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 7 },

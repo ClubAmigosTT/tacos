@@ -137,6 +137,10 @@ export async function addListItem(listId: string, input: { branchId: string; not
   return request<{ status: string; listId: string; branchId: string }>(`/v1/lists/${listId}/items`, { method: 'POST', body: JSON.stringify(input) }, token);
 }
 
+export async function removeListItem(listId: string, branchId: string, token: string) {
+  return request<{ status: string; listId: string; branchId: string }>(`/v1/lists/${listId}/items/${encodeURIComponent(branchId)}`, { method: 'DELETE' }, token);
+}
+
 export async function searchUsers(query: string, token?: string) {
   try {
     return await request<{ users: AuthUser[] }>(`/v1/users/search?q=${encodeURIComponent(query)}`, undefined, token);

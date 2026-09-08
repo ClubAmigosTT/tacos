@@ -68,6 +68,9 @@ const listDetail = await request(`/v1/lists/${list.id}`, { token: alice.token })
 if (listDetail.items?.[0]?.branchId !== 'vilsito') throw new Error('Public list detail did not include its place');
 const publicLists = await request('/v1/lists');
 if (!publicLists.lists?.some((item) => item.id === list.id) || publicLists.lists?.some((item) => item.visibility === 'private')) throw new Error('Public list discovery leaked or omitted a list');
+await request(`/v1/lists/${list.id}/items/vilsito`, { method: 'DELETE', token: bob.token });
+const emptyListDetail = await request(`/v1/lists/${list.id}`, { token: bob.token });
+if (emptyListDetail.items?.length !== 0) throw new Error('List item was not removed');
 const privateList = await request('/v1/lists', { method: 'POST', body: JSON.stringify({ title: 'Private route', visibility: 'private' }), token: bob.token }, 201);
 await request(`/v1/lists/${privateList.id}`, { token: alice.token }, 404);
 const privateDetail = await request(`/v1/lists/${privateList.id}`, { token: bob.token });

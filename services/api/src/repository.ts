@@ -466,6 +466,22 @@ export async function addListItemForUser(listId: string, placeId: string, userId
   return true;
 }
 
+export async function removeListItemForUser(listId: string, placeId: string, userId: string): Promise<boolean> {
+  if (pool) {
+    const owned = await pool.query('SELECT 1 FROM lists WHERE id = $1 AND owner_id = $2', [listId, userId]);
+    if (!owned.rowCount) return false;
+    const removed = await pool.query('DELETE FROM list_items WHERE list_id = $1 AND branch_id = $2', [listId, placeId]);
+    if (removed.rowCount) await pool.query('UPDATE lists SET updated_at = now() WHERE id = $1', [listId]);
+    return Boolean(removed.rowCount);
+  }
+  const list = localLists.get(listId);
+  if (!list || list.ownerId !== userId) return false;
+  const index = list.placeIds.indexOf(placeId);
+  if (index === -1) return false;
+  list.placeIds.splice(index, 1);
+  return true;
+}
+
 export async function searchUsers(query: string, currentUserId?: string): Promise<PublicUser[]> {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return [];

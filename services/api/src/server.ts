@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListItemForUser, authenticateUser, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getAdminReports, getDiary, getFeed, getListDetails, getLists, getRecommendations, getTaqueria, getTasteProfile, registerUser, reportVisitForUser, reviewAdminReport, searchUsers, unfollowUser, type PublicUser } from './repository.js';
+import { addListItemForUser, authenticateUser, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getAdminReports, getDiary, getFeed, getListDetails, getLists, getRecommendations, getTaqueria, getTasteProfile, registerUser, removeListItemForUser, reportVisitForUser, reviewAdminReport, searchUsers, unfollowUser, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
 import { uploadVisitImage } from './storage.js';
 
@@ -165,6 +165,15 @@ app.post('/v1/lists/:id/items', async (request, reply) => {
   const added = await addListItemForUser(params.id, body.branchId, user.id, body.note);
   if (!added) return reply.code(404).send({ error: 'LIST_OR_BRANCH_NOT_FOUND' });
   return { status: 'saved', listId: params.id, branchId: body.branchId };
+});
+
+app.delete('/v1/lists/:id/items/:branchId', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const params = z.object({ id: z.string(), branchId: z.string() }).parse(request.params);
+  const removed = await removeListItemForUser(params.id, params.branchId, user.id);
+  if (!removed) return reply.code(404).send({ error: 'LIST_OR_ITEM_NOT_FOUND' });
+  return { status: 'removed', listId: params.id, branchId: params.branchId };
 });
 
 app.get('/v1/users/search', async (request) => {

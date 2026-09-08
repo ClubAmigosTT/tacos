@@ -51,6 +51,8 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 21. Detalle de listas públicas/privadas: una lista se puede abrir, ver sus lugares, notas y progreso; su contenido se valida en API según visibilidad y propietario.
 22. Moderación inicial: reportes únicos por usuario/visita y estado de visibilidad preparado para que un futuro panel de revisión pueda ocultar contenido del feed.
 23. Modelo normalizado `taquería → sucursal → taco`: migración, endpoint y pantalla de taquería con sus sucursales.
+24. Gestión de listas: el propietario puede quitar lugares desde el detalle; la API valida la propiedad y actualiza el progreso.
+25. Integridad de visitas: se rechazan tacos de otra sucursal, selecciones duplicadas y ratings de tacos no seleccionados.
 
 ## Verificación
 
