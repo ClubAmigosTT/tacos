@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import bcrypt from 'bcryptjs';
 import { places, type ApiPlace } from './data.js';
 
 const pool = process.env.DATABASE_URL
@@ -7,6 +8,15 @@ const pool = process.env.DATABASE_URL
 
 type DiscoverQuery = { q?: string; lat?: number; lng?: number; limit: number };
 type VisitInput = { placeId: string; tacoIds: string[]; rating: number };
+export type PublicUser = { id: string; email: string; displayName: string };
+
+type LocalUser = PublicUser & { passwordHash: string };
+const localUsers = new Map<string, LocalUser>();
+const localVisits = new Map<string, { userId: string; placeId: string; tacoIds: string[]; rating: number; createdAt: string }>();
+
+function publicUser(user: LocalUser): PublicUser {
+  return { id: user.id, email: user.email, displayName: user.displayName };
+}
 
 function normalizePlace(row: any): ApiPlace {
   return {
@@ -73,11 +83,15 @@ export async function findPlace(id: string): Promise<ApiPlace | undefined> {
 }
 
 export async function createVisit(input: VisitInput) {
+  return createVisitForUser(input, 'demo-user');
+}
+
+export async function createVisitForUser(input: VisitInput, userId: string) {
   const id = crypto.randomUUID();
   if (pool) {
     await pool.query('BEGIN');
     try {
-      await pool.query('INSERT INTO visits (id, branch_id, rating) VALUES ($1, $2, $3)', [id, input.placeId, input.rating]);
+      await pool.query('INSERT INTO visits (id, user_id, branch_id, rating) VALUES ($1, $2, $3, $4)', [id, userId, input.placeId, input.rating]);
       for (const tacoId of input.tacoIds) await pool.query('INSERT INTO visit_items (visit_id, menu_item_id) VALUES ($1, $2)', [id, tacoId]);
       await pool.query('COMMIT');
     } catch (error) {
@@ -85,5 +99,67 @@ export async function createVisit(input: VisitInput) {
       throw error;
     }
   }
-  return { id, ...input, createdAt: new Date().toISOString(), status: 'recorded' };
+  const createdAt = new Date().toISOString();
+  localVisits.set(id, { userId, ...input, createdAt });
+  return { id, ...input, createdAt, status: 'recorded' };
+}
+
+export async function registerUser(input: { email: string; password: string; displayName: string }): Promise<PublicUser> {
+  const email = input.email.trim().toLowerCase();
+  const displayName = input.displayName.trim();
+  if (pool) {
+    const existing = await pool.query('SELECT id FROM users WHERE email_lower = $1', [email]);
+    if (existing.rowCount) throw new Error('EMAIL_TAKEN');
+    const id = crypto.randomUUID();
+    const passwordHash = await bcrypt.hash(input.password, 12);
+    const result = await pool.query('INSERT INTO users (id, email, email_lower, password_hash, display_name) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, display_name', [id, input.email.trim(), email, passwordHash, displayName]);
+    return { id: result.rows[0].id, email: result.rows[0].email, displayName: result.rows[0].display_name };
+  }
+  if ([...localUsers.values()].some((user) => user.email === email)) throw new Error('EMAIL_TAKEN');
+  const user: LocalUser = { id: crypto.randomUUID(), email, displayName, passwordHash: await bcrypt.hash(input.password, 10) };
+  localUsers.set(user.id, user);
+  return publicUser(user);
+}
+
+export async function authenticateUser(input: { email: string; password: string }): Promise<PublicUser | undefined> {
+  const email = input.email.trim().toLowerCase();
+  if (pool) {
+    const result = await pool.query('SELECT id, email, display_name, password_hash FROM users WHERE email_lower = $1 AND is_active = true', [email]);
+    const row = result.rows[0];
+    if (!row || !(await bcrypt.compare(input.password, row.password_hash))) return undefined;
+    return { id: row.id, email: row.email, displayName: row.display_name };
+  }
+  const user = [...localUsers.values()].find((item) => item.email === email);
+  if (!user || !(await bcrypt.compare(input.password, user.passwordHash))) return undefined;
+  return publicUser(user);
+}
+
+export async function findUserById(id: string): Promise<PublicUser | undefined> {
+  if (pool) {
+    const result = await pool.query('SELECT id, email, display_name FROM users WHERE id = $1 AND is_active = true', [id]);
+    const row = result.rows[0];
+    return row ? { id: row.id, email: row.email, displayName: row.display_name } : undefined;
+  }
+  const user = localUsers.get(id);
+  return user ? publicUser(user) : undefined;
+}
+
+export async function getDiary(userId: string) {
+  if (pool) {
+    const result = await pool.query(`
+      SELECT v.id, v.visited_at, v.rating, b.name AS place_name, b.neighborhood,
+        COALESCE(string_agg(m.name, ', ' ORDER BY m.name), '') AS tacos, b.image_url
+      FROM visits v JOIN branches b ON b.id = v.branch_id
+      LEFT JOIN visit_items vi ON vi.visit_id = v.id
+      LEFT JOIN menu_items m ON m.id = vi.menu_item_id
+      WHERE v.user_id = $1 GROUP BY v.id, b.name, b.neighborhood, b.image_url
+      ORDER BY v.visited_at DESC LIMIT 100
+    `, [userId]);
+    return result.rows;
+  }
+  return [...localVisits.entries()].filter(([, visit]) => visit.userId === userId).sort(([, a], [, b]) => b.createdAt.localeCompare(a.createdAt)).map(([id, visit]) => {
+    const place = places.find((item) => item.id === visit.placeId);
+    const tacoNames = visit.tacoIds.map((tacoId) => place?.tacos.find((taco) => taco.id === tacoId)?.name ?? tacoId).join(', ');
+    return { id, visited_at: visit.createdAt, rating: visit.rating, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', tacos: tacoNames, image_url: place?.image ?? '' };
+  });
 }

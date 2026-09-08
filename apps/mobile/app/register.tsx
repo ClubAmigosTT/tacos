@@ -3,15 +3,19 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createVisit } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { places } from '@/data/fixtures';
 import { colors, radii, spacing } from '@/theme';
 
 export default function RegisterScreen() {
+  const { token } = useAuth();
   const [placeId, setPlaceId] = useState(places[0].id);
   const [tacoIds, setTacoIds] = useState<string[]>([places[0].tacos[0].id]);
   const [rating, setRating] = useState(5);
   const [saved, setSaved] = useState(false);
   const place = places.find((item) => item.id === placeId) ?? places[0];
+
+  if (!token) return <View style={styles.authRequired}><View style={styles.successIcon}><Ionicons name="person" size={26} color={colors.background} /></View><Text style={styles.successTitle}>Tu diario necesita una cuenta</Text><Text style={styles.successText}>Crea tu identidad para guardar esta visita y verla después en tu historial.</Text><Pressable style={styles.primary} onPress={() => router.push({ pathname: '/auth', params: { returnTo: '/register' } })}><Text style={styles.primaryText}>Entrar o crear cuenta</Text><Ionicons name="arrow-forward" size={18} color={colors.background} /></Pressable><Pressable onPress={() => router.back()}><Text style={styles.cancelText}>Ahora no</Text></Pressable></View>;
 
   function selectPlace(id: string) {
     setPlaceId(id);
@@ -23,7 +27,8 @@ export default function RegisterScreen() {
   }
 
   async function save() {
-    try { await createVisit({ placeId, tacoIds, rating }); } catch { /* Demo mode remains usable without the API. */ }
+    if (!token) return;
+    try { await createVisit({ placeId, tacoIds, rating }, token); } catch { /* Demo mode remains usable without the API. */ }
     setSaved(true);
   }
 
@@ -64,7 +69,9 @@ const styles = StyleSheet.create({
   primaryText: { color: colors.background, fontSize: 14, fontWeight: '900' },
   disabled: { opacity: 0.35 },
   success: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  authRequired: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   successIcon: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg },
   successTitle: { color: colors.ink, fontSize: 28, fontWeight: '900' },
   successText: { color: colors.muted, fontSize: 14, textAlign: 'center', marginTop: 8 },
+  cancelText: { color: colors.muted, fontSize: 12, fontWeight: '800', marginTop: spacing.lg },
 });

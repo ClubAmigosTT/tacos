@@ -1,11 +1,15 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radii, spacing } from '@/theme';
+import { useAuth } from '@/lib/auth';
+import { router } from 'expo-router';
 
 export default function ProfileScreen() {
+  const { user, signOut } = useAuth();
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <View style={styles.top}><View style={styles.avatar}><Text style={styles.avatarText}>M</Text></View><View style={styles.topCopy}><Text style={styles.name}>Marcelo</Text><Text style={styles.location}>Ciudad de México · 2026</Text></View><Ionicons name="settings-outline" size={21} color={colors.muted} /></View>
+      <View style={styles.top}><View style={styles.avatar}><Text style={styles.avatarText}>{(user?.displayName ?? 'M').slice(0, 1).toUpperCase()}</Text></View><View style={styles.topCopy}><Text style={styles.name}>{user?.displayName ?? 'Marcelo'}</Text><Text style={styles.location}>{user?.email ?? 'Ciudad de México · 2026'}</Text></View><Ionicons name="settings-outline" size={21} color={colors.muted} /></View>
+      {!user ? <Pressable style={styles.loginCard} onPress={() => router.push('/auth')}><View style={styles.loginIcon}><Ionicons name="person-add-outline" size={18} color={colors.background} /></View><View style={{ flex: 1 }}><Text style={styles.loginTitle}>Guarda tu historia</Text><Text style={styles.loginDetail}>Entra para registrar visitas y crear listas.</Text></View><Ionicons name="chevron-forward" size={17} color={colors.muted} /></Pressable> : <Pressable style={styles.logout} onPress={() => void signOut()}><Text style={styles.logoutText}>Cerrar sesión</Text></Pressable>}
       <View style={styles.taste}><Text style={styles.tasteEyebrow}>TU TASTE ID</Text><Text style={styles.tasteTitle}>Pastor nocturno</Text><Text style={styles.tasteDescription}>Picante alto · precio sensible · explorador de lugares callejeros</Text><View style={styles.tags}><Text style={styles.tag}>PASTOR 92%</Text><Text style={styles.tag}>PICANTE 84%</Text><Text style={styles.tag}>NOCHE 78%</Text></View></View>
       <View style={styles.stats}><View><Text style={styles.statNumber}>17</Text><Text style={styles.statLabel}>VISITAS</Text></View><View><Text style={styles.statNumber}>12</Text><Text style={styles.statLabel}>LISTAS</Text></View><View><Text style={styles.statNumber}>4.21</Text><Text style={styles.statLabel}>PROMEDIO</Text></View></View>
       <Text style={styles.sectionTitle}>Tu identidad gastronómica</Text>
@@ -42,5 +46,11 @@ const styles = StyleSheet.create({
   menuBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
   menuIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.surfaceRaised, alignItems: 'center', justifyContent: 'center' },
   menuTitle: { color: colors.ink, fontSize: 14, fontWeight: '900' },
-  menuDetail: { color: colors.muted, fontSize: 11, marginTop: 3 }
+  menuDetail: { color: colors.muted, fontSize: 11, marginTop: 3 },
+  loginCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.accent, borderRadius: radii.md, padding: spacing.md, marginBottom: spacing.md },
+  loginIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
+  loginTitle: { color: colors.background, fontSize: 14, fontWeight: '900' },
+  loginDetail: { color: colors.background, opacity: 0.7, fontSize: 11, marginTop: 3 },
+  logout: { alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.border, borderRadius: radii.pill, paddingHorizontal: 13, paddingVertical: 8, marginBottom: spacing.lg },
+  logoutText: { color: colors.muted, fontSize: 11, fontWeight: '800' }
 });

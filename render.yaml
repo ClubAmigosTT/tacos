@@ -15,6 +15,8 @@ services:
         fromDatabase:
           name: tacos-postgres
           property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
       - key: REDIS_URL
         fromService:
           type: keyvalue
@@ -34,6 +36,11 @@ services:
         fromDatabase:
           name: tacos-postgres
           property: connectionString
+      - key: JWT_SECRET
+        fromService:
+          type: web
+          name: tacos-api
+          envVarKey: JWT_SECRET
       - key: REDIS_URL
         fromService:
           type: keyvalue
