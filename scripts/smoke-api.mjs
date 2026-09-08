@@ -139,6 +139,11 @@ await request(`/v1/lists/${list.id}/items`, {
   body: JSON.stringify({ branchId: 'vilsito', note: 'Pedir pastor' }),
   token: bob.token
 });
+await request(`/v1/lists/${list.id}/items`, {
+  method: 'POST',
+  body: JSON.stringify({ branchId: 'branch-does-not-exist' }),
+  token: bob.token
+}, 404);
 const listDetail = await request(`/v1/lists/${list.id}`, { token: alice.token });
 if (listDetail.items?.[0]?.branchId !== 'vilsito') throw new Error('Public list detail did not include its place');
 const bobProfile = await request(`/v1/users/${bob.user.id}/profile`, { token: alice.token });

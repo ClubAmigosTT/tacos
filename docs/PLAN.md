@@ -71,6 +71,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 7. Añadir conversaciones por visita con comentarios visibles, borrado por autor y límites de longitud.
 8. Moderar comentarios desde una cola admin con ocultar/restaurar y preservación de evidencia.
 9. Compartir listas con colaboradores editor/lector y permitir que los editores gestionen lugares sin apropiarse de la curaduría.
+10. Rechazar sucursales inexistentes y excluir visitas ocultas del progreso mostrado en listas.
 10. Registrar eventos de producto anónimos y acotados para medir descubrimiento, conversión a visita y uso social sin almacenar búsquedas ni PII; usar un identificador aleatorio persistido localmente para medir recurrencia.
 11. Permitir eliminar una visita propia con confirmación y limpiar sus señales derivadas sin afectar entradas ajenas.
 12. Proponer la sucursal más cercana después de usar la cámara, manteniendo la selección explícita del usuario hasta confirmar.

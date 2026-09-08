@@ -657,7 +657,7 @@ export async function getLists(userId?: string): Promise<ApiList[]> {
         (SELECT COUNT(*)::int FROM list_collaborators all_collaborators WHERE all_collaborators.list_id = l.id) AS collaborator_count,
         (l.owner_id = $1 OR EXISTS (SELECT 1 FROM list_collaborators me WHERE me.list_id = l.id AND me.user_id = $1 AND me.role = 'editor')) AS can_edit,
         COUNT(DISTINCT li.branch_id) FILTER (WHERE EXISTS (
-          SELECT 1 FROM visits vv WHERE vv.user_id = $1 AND vv.branch_id = li.branch_id
+          SELECT 1 FROM visits vv WHERE vv.user_id = $1 AND vv.branch_id = li.branch_id AND vv.visibility = 'visible'
         ))::int AS visited_count,
         COALESCE(l.cover_image_url, MIN(b.image_url)) AS cover_image_url
       FROM lists l JOIN users u ON u.id = l.owner_id
@@ -674,7 +674,7 @@ export async function getLists(userId?: string): Promise<ApiList[]> {
   const visible = [...localLists.values()].filter((list) => list.visibility === 'public' || list.ownerId === userId || (userId ? localListCollaborators.has(`${list.id}:${userId}`) : false));
   const mapped = visible.map((list) => {
     const owner = localUsers.get(list.ownerId);
-    const visitedCount = list.placeIds.filter((placeId) => [...localVisits.values()].some((visit) => visit.userId === userId && visit.placeId === placeId)).length;
+    const visitedCount = list.placeIds.filter((placeId) => [...localVisits.values()].some((visit) => visit.userId === userId && visit.placeId === placeId && visit.visibility === 'visible')).length;
     const collaboratorCount = [...localListCollaborators.values()].filter((collaborator) => collaborator.listId === list.id).length;
     const canEdit = list.ownerId === userId || [...localListCollaborators.values()].some((collaborator) => collaborator.listId === list.id && collaborator.userId === userId && collaborator.role === 'editor');
     return { id: list.id, title: list.title, description: list.description, owner: { id: list.ownerId, displayName: owner?.displayName ?? 'Tacos' }, itemCount: list.placeIds.length, visitedCount, coverImage: list.coverImage, visibility: list.visibility, collaboratorCount, canEdit } satisfies ApiList;
@@ -690,7 +690,7 @@ export async function getListDetails(listId: string, userId?: string): Promise<A
         (SELECT COUNT(*)::int FROM list_collaborators all_collaborators WHERE all_collaborators.list_id = l.id) AS collaborator_count,
         (l.owner_id = $2 OR EXISTS (SELECT 1 FROM list_collaborators me WHERE me.list_id = l.id AND me.user_id = $2 AND me.role = 'editor')) AS can_edit,
         COALESCE(SUM(CASE WHEN EXISTS (
-          SELECT 1 FROM visits vv WHERE vv.user_id = $2 AND vv.branch_id = li.branch_id
+          SELECT 1 FROM visits vv WHERE vv.user_id = $2 AND vv.branch_id = li.branch_id AND vv.visibility = 'visible'
         ) THEN 1 ELSE 0 END), 0)::int AS visited_count,
         COALESCE(l.cover_image_url, MIN(b.image_url)) AS cover_image_url
       FROM lists l JOIN users u ON u.id = l.owner_id
@@ -707,7 +707,7 @@ export async function getListDetails(listId: string, userId?: string): Promise<A
   const local = localLists.get(listId);
   if (local && (local.visibility === 'public' || local.ownerId === userId || (userId ? localListCollaborators.has(`${local.id}:${userId}`) : false))) {
     const owner = localUsers.get(local.ownerId);
-    const visitedCount = local.placeIds.filter((placeId) => [...localVisits.values()].some((visit) => visit.userId === userId && visit.placeId === placeId)).length;
+    const visitedCount = local.placeIds.filter((placeId) => [...localVisits.values()].some((visit) => visit.userId === userId && visit.placeId === placeId && visit.visibility === 'visible')).length;
     const collaborators = await getListCollaborators(local.id);
     const canEdit = local.ownerId === userId || collaborators.some((collaborator) => collaborator.id === userId && collaborator.role === 'editor');
     return {
@@ -823,6 +823,8 @@ export async function addListItemForUser(listId: string, placeId: string, userId
   if (pool) {
     const role = await getListRole(listId, userId);
     if (role !== 'owner' && role !== 'editor') return false;
+    const branch = await pool.query('SELECT 1 FROM branches WHERE id = $1 AND is_active = true', [placeId]);
+    if (!branch.rowCount) return false;
     await pool.query(`
       INSERT INTO list_items (list_id, branch_id, position, note)
       VALUES ($1, $2, COALESCE((SELECT MAX(position) + 1 FROM list_items WHERE list_id = $1), 0), $3)
