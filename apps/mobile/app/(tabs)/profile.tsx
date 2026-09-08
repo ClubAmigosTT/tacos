@@ -1,0 +1,46 @@
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, radii, spacing } from '@/theme';
+
+export default function ProfileScreen() {
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <View style={styles.top}><View style={styles.avatar}><Text style={styles.avatarText}>M</Text></View><View style={styles.topCopy}><Text style={styles.name}>Marcelo</Text><Text style={styles.location}>Ciudad de México · 2026</Text></View><Ionicons name="settings-outline" size={21} color={colors.muted} /></View>
+      <View style={styles.taste}><Text style={styles.tasteEyebrow}>TU TASTE ID</Text><Text style={styles.tasteTitle}>Pastor nocturno</Text><Text style={styles.tasteDescription}>Picante alto · precio sensible · explorador de lugares callejeros</Text><View style={styles.tags}><Text style={styles.tag}>PASTOR 92%</Text><Text style={styles.tag}>PICANTE 84%</Text><Text style={styles.tag}>NOCHE 78%</Text></View></View>
+      <View style={styles.stats}><View><Text style={styles.statNumber}>17</Text><Text style={styles.statLabel}>VISITAS</Text></View><View><Text style={styles.statNumber}>12</Text><Text style={styles.statLabel}>LISTAS</Text></View><View><Text style={styles.statNumber}>4.21</Text><Text style={styles.statLabel}>PROMEDIO</Text></View></View>
+      <Text style={styles.sectionTitle}>Tu identidad gastronómica</Text>
+      <View style={styles.menu}><MenuRow icon="book-outline" title="Diario" detail="17 taquerías registradas" /><MenuRow icon="list-outline" title="Listas" detail="12 listas públicas" /><MenuRow icon="map-outline" title="Mapa personal" detail="3 colonias exploradas" /><MenuRow icon="shield-checkmark-outline" title="Privacidad" detail="Controla tus datos" last /></View>
+    </ScrollView>
+  );
+}
+
+function MenuRow({ icon, title, detail, last = false }: { icon: keyof typeof Ionicons.glyphMap; title: string; detail: string; last?: boolean }) {
+  return <View style={[styles.menuRow, !last && styles.menuBorder]}><View style={styles.menuIcon}><Ionicons name={icon} size={18} color={colors.accent} /></View><View style={{ flex: 1 }}><Text style={styles.menuTitle}>{title}</Text><Text style={styles.menuDetail}>{detail}</Text></View><Ionicons name="chevron-forward" size={17} color={colors.dim} /></View>;
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+  content: { padding: spacing.lg, paddingTop: 66, paddingBottom: 115 },
+  top: { flexDirection: 'row', alignItems: 'center', gap: 13, marginBottom: spacing.xl },
+  avatar: { width: 62, height: 62, borderRadius: 31, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: colors.background, fontSize: 25, fontWeight: '900' },
+  topCopy: { flex: 1 },
+  name: { color: colors.ink, fontSize: 27, fontWeight: '900', letterSpacing: -0.7 },
+  location: { color: colors.muted, fontSize: 12, marginTop: 3 },
+  taste: { backgroundColor: colors.surfaceRaised, borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.md },
+  tasteEyebrow: { color: colors.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
+  tasteTitle: { color: colors.ink, fontSize: 27, fontWeight: '900', letterSpacing: -0.8, marginTop: 15 },
+  tasteDescription: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 5, maxWidth: 270 },
+  tags: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 18 },
+  tag: { color: colors.background, backgroundColor: colors.accent, borderRadius: radii.pill, paddingHorizontal: 9, paddingVertical: 6, fontSize: 9, fontWeight: '900' },
+  stats: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: colors.surface, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginBottom: spacing.xl },
+  statNumber: { color: colors.ink, fontSize: 24, fontWeight: '900' },
+  statLabel: { color: colors.muted, fontSize: 9, fontWeight: '900', letterSpacing: 1, marginTop: 4 },
+  sectionTitle: { color: colors.ink, fontSize: 20, fontWeight: '900', marginBottom: spacing.md },
+  menu: { backgroundColor: colors.surface, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md },
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: spacing.md },
+  menuBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  menuIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.surfaceRaised, alignItems: 'center', justifyContent: 'center' },
+  menuTitle: { color: colors.ink, fontSize: 14, fontWeight: '900' },
+  menuDetail: { color: colors.muted, fontSize: 11, marginTop: 3 }
+});

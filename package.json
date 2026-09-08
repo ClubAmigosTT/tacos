@@ -1,0 +1,11 @@
+{
+  "name": "tacos",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "dev:mobile": "pnpm --filter @tacos/mobile start",
+    "dev:api": "pnpm --filter @tacos/api dev",
+    "typecheck": "pnpm -r typecheck",
+    "build:api": "pnpm --filter @tacos/api build"
+  }
+}

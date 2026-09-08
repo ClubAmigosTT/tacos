@@ -1,0 +1,65 @@
+services:
+  - type: web
+    name: tacos-api
+    runtime: node
+    region: ohio
+    plan: 0.5c-512mb
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @tacos/api build
+    startCommand: pnpm --filter @tacos/api start
+    preDeployCommand: pnpm --filter @tacos/api migrate
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tacos-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: tacos-keyvalue
+          property: connectionString
+      - key: STORAGE_BUCKET_URL
+        sync: false
+  - type: worker
+    name: tacos-worker
+    runtime: node
+    region: ohio
+    plan: 0.5c-512mb
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @tacos/api build
+    startCommand: pnpm --filter @tacos/api worker
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tacos-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: tacos-keyvalue
+          property: connectionString
+  - type: cron
+    name: tacos-nightly
+    runtime: node
+    region: ohio
+    plan: 0.5c-512mb
+    schedule: "0 8 * * *"
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @tacos/api build
+    startCommand: pnpm --filter @tacos/api nightly
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tacos-postgres
+          property: connectionString
+  - type: keyvalue
+    name: tacos-keyvalue
+    region: ohio
+    plan: 256mb
+    ipAllowList: []
+databases:
+  - name: tacos-postgres
+    region: ohio
+    plan: 0.5c-1g
+    postgresMajorVersion: "18"
+    diskSizeGB: 15
