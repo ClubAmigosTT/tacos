@@ -21,6 +21,7 @@ export type Place = {
   tacos: Taco[];
   tags: string[];
   flavorProfile: { intensity: number; spicy: number; traditional: number; texture: number; value: number };
+  tasteMatch?: number;
   socialMatch?: number;
   friendCount?: number;
 };

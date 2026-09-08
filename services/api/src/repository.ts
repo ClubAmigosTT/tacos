@@ -111,16 +111,27 @@ export async function getRecommendations(userId?: string): Promise<ApiPlace[]> {
   if (!userId) return candidates;
 
   const preferenceTokens = new Set<string>();
+  const tasteSums: FlavorProfile = { intensity: 0, spicy: 0, traditional: 0, texture: 0, value: 0 };
+  let tasteSamples = 0;
   const socialSignals = new Map<string, { average: number; friendCount: number }>();
   if (pool) {
     const history = await pool.query(`
-      SELECT v.rating, b.name, b.style, b.tags, m.name AS taco_name
+      SELECT v.id AS visit_id, v.rating, b.name, b.style, b.tags, b.flavor_profile, m.name AS taco_name
       FROM visits v JOIN branches b ON b.id = v.branch_id
       LEFT JOIN visit_items vi ON vi.visit_id = v.id
       LEFT JOIN menu_items m ON m.id = vi.menu_item_id
       WHERE v.user_id = $1 AND v.rating >= 4
     `, [userId]);
+    const seenVisits = new Set<string>();
     for (const row of history.rows) {
+      if (!seenVisits.has(row.visit_id)) {
+        seenVisits.add(row.visit_id);
+        const profile = row.flavor_profile as Partial<FlavorProfile> | null;
+        if (profile) {
+          tasteSamples += 1;
+          for (const key of Object.keys(tasteSums) as Array<keyof FlavorProfile>) tasteSums[key] += Number(profile[key] ?? 50);
+        }
+      }
       for (const value of [row.name, row.style, row.taco_name, ...(row.tags ?? [])]) for (const token of tokenise(String(value ?? ''))) preferenceTokens.add(token);
     }
     const social = await pool.query(`
@@ -135,6 +146,10 @@ export async function getRecommendations(userId?: string): Promise<ApiPlace[]> {
     for (const visit of localVisits.values()) {
       if (visit.userId === userId && visit.rating >= 4) {
         const place = places.find((item) => item.id === visit.placeId);
+        if (place) {
+          tasteSamples += 1;
+          for (const key of Object.keys(tasteSums) as Array<keyof FlavorProfile>) tasteSums[key] += place.flavorProfile[key];
+        }
         for (const value of [place?.name, place?.style, ...(place?.tags ?? []), ...visit.tacoIds.map((id) => place?.tacos.find((taco) => taco.id === id)?.name)]) for (const token of tokenise(String(value ?? ''))) preferenceTokens.add(token);
       }
       if (followedIds.includes(visit.userId)) {
@@ -151,11 +166,12 @@ export async function getRecommendations(userId?: string): Promise<ApiPlace[]> {
   return candidates.map((place) => {
     const placeTokens = new Set(tokenise([place.name, place.style, ...place.tags, ...place.tacos.map((taco) => taco.name)].join(' ')));
     const overlap = [...placeTokens].filter((token) => preferenceTokens.has(token)).length;
-    const personalMatch = Math.min(99, Math.round(place.match + Math.min(15, overlap * 4)));
+    const tasteMatch = tasteSamples ? Math.max(0, Math.min(99, Math.round(100 - (Object.keys(tasteSums) as Array<keyof FlavorProfile>).reduce((sum, key) => sum + Math.abs(place.flavorProfile[key] - tasteSums[key] / tasteSamples), 0) / 5))) : undefined;
+    const personalMatch = Math.min(99, Math.round(place.match * 0.7 + (tasteMatch ?? place.match) * 0.3 + Math.min(12, overlap * 3)));
     const social = socialSignals.get(place.id);
     const socialMatch = social ? Math.min(99, Math.round(social.average * 20)) : undefined;
     const match = socialMatch == null ? personalMatch : Math.min(99, Math.round(personalMatch * 0.75 + socialMatch * 0.25));
-    return { ...place, match, socialMatch, friendCount: social?.friendCount };
+    return { ...place, match, tasteMatch, socialMatch, friendCount: social?.friendCount };
   }).sort((a, b) => b.match - a.match || b.rating - a.rating);
 }
 
