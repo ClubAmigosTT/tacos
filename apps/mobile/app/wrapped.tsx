@@ -1,4 +1,5 @@
 import { Share, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as Linking from 'expo-linking';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -17,7 +18,7 @@ export default function WrappedScreen() {
   const neighborhoods = new Set(entries.map((entry) => entry.neighborhood).filter(Boolean));
 
   async function share() {
-    try { await Share.share({ message: `Mi año en tacos: ${tacos.length} tacos, ${entries.length} visitas y promedio ${average}. Mi favorito: ${best?.place_name ?? 'todavía por descubrir'}.` }); } catch { /* Sharing is optional on platforms without a native share sheet. */ }
+    try { await Share.share({ message: `Mi año en tacos: ${tacos.length} tacos, ${entries.length} visitas y promedio ${average}. Mi favorito: ${best?.place_name ?? 'todavía por descubrir'}.\n${Linking.createURL('/wrapped')}` }); } catch { /* Sharing is optional on platforms without a native share sheet. */ }
   }
 
   return (

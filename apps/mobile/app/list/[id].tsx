@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { Share } from 'react-native';
+import * as Linking from 'expo-linking';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -21,15 +23,19 @@ export default function ListDetailScreen() {
   });
   if (isLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando lista…</Text></View>;
   if (isError || !list) return <View style={styles.center}><Text style={styles.title}>Lista no disponible</Text><Text style={styles.muted}>Puede que sea privada o haya sido eliminada.</Text><Pressable style={styles.backButton} onPress={() => router.back()}><Text style={styles.backText}>Volver</Text></Pressable></View>;
+  const currentList = list;
   const progress = list.itemCount ? Math.round((list.visitedCount / list.itemCount) * 100) : 0;
   const isOwner = Boolean(user && user.id === list.owner.id && token);
   const canEdit = Boolean(list.canEdit || isOwner);
+  async function shareList() {
+    try { await Share.share({ message: `${currentList.title} · ${currentList.itemCount} lugares en Tacos\n${Linking.createURL(`/list/${currentList.id}`)}` }); } catch { /* Compartir es opcional en plataformas sin hoja nativa. */ }
+  }
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable>
         <Text style={styles.eyebrow}>LISTA CURADA</Text>
-        {isOwner ? <View style={styles.headerActions}><Pressable style={styles.edit} onPress={() => router.push({ pathname: '/list-collaborators', params: { id: list.id } })}><Ionicons name="people-outline" size={19} color={colors.accent} /></Pressable><Pressable style={styles.edit} onPress={() => router.push({ pathname: '/list-edit', params: { id: list.id } })}><Ionicons name="create-outline" size={19} color={colors.accent} /></Pressable></View> : <Ionicons name={list.visibility === 'private' ? 'lock-closed' : 'bookmark'} size={20} color={colors.accent} />}
+        {isOwner ? <View style={styles.headerActions}><Pressable style={styles.edit} onPress={() => void shareList()}><Ionicons name="share-outline" size={19} color={colors.accent} /></Pressable><Pressable style={styles.edit} onPress={() => router.push({ pathname: '/list-collaborators', params: { id: list.id } })}><Ionicons name="people-outline" size={19} color={colors.accent} /></Pressable><Pressable style={styles.edit} onPress={() => router.push({ pathname: '/list-edit', params: { id: list.id } })}><Ionicons name="create-outline" size={19} color={colors.accent} /></Pressable></View> : <View style={styles.headerActions}><Pressable style={styles.edit} onPress={() => void shareList()}><Ionicons name="share-outline" size={19} color={colors.accent} /></Pressable><Ionicons name={list.visibility === 'private' ? 'lock-closed' : 'bookmark'} size={20} color={colors.accent} /></View>}
       </View>
       <Text style={styles.title}>{list.title}</Text>
       <Text style={styles.description}>{list.description}</Text>
