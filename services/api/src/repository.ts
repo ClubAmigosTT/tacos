@@ -7,12 +7,12 @@ const pool = process.env.DATABASE_URL
   : null;
 
 type DiscoverQuery = { q?: string; lat?: number; lng?: number; limit: number };
-type VisitInput = { placeId: string; tacoIds: string[]; rating: number };
+type VisitInput = { placeId: string; tacoIds: string[]; rating: number; tacoRatings?: Record<string, number> };
 export type PublicUser = { id: string; email: string; displayName: string };
 
 type LocalUser = PublicUser & { passwordHash: string };
 const localUsers = new Map<string, LocalUser>();
-const localVisits = new Map<string, { userId: string; placeId: string; tacoIds: string[]; rating: number; createdAt: string }>();
+const localVisits = new Map<string, { userId: string; placeId: string; tacoIds: string[]; tacoRatings?: Record<string, number>; rating: number; createdAt: string }>();
 const localFollows = new Set<string>();
 const localLists = new Map<string, { id: string; ownerId: string; title: string; description: string; visibility: 'public' | 'private'; coverImage: string; placeIds: string[]; createdAt: string }>();
 
@@ -130,7 +130,7 @@ export async function createVisitForUser(input: VisitInput, userId: string) {
     await pool.query('BEGIN');
     try {
       await pool.query('INSERT INTO visits (id, user_id, branch_id, rating) VALUES ($1, $2, $3, $4)', [id, userId, input.placeId, input.rating]);
-      for (const tacoId of input.tacoIds) await pool.query('INSERT INTO visit_items (visit_id, menu_item_id) VALUES ($1, $2)', [id, tacoId]);
+      for (const tacoId of input.tacoIds) await pool.query('INSERT INTO visit_items (visit_id, menu_item_id, rating) VALUES ($1, $2, $3)', [id, tacoId, input.tacoRatings?.[tacoId] ?? null]);
       await pool.query('COMMIT');
     } catch (error) {
       await pool.query('ROLLBACK');

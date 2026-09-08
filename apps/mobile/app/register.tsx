@@ -11,6 +11,7 @@ export default function RegisterScreen() {
   const { token } = useAuth();
   const [placeId, setPlaceId] = useState(places[0].id);
   const [tacoIds, setTacoIds] = useState<string[]>([places[0].tacos[0].id]);
+  const [tacoRatings, setTacoRatings] = useState<Record<string, number>>({ [places[0].tacos[0].id]: 5 });
   const [rating, setRating] = useState(5);
   const [saved, setSaved] = useState(false);
   const place = places.find((item) => item.id === placeId) ?? places[0];
@@ -20,21 +21,28 @@ export default function RegisterScreen() {
   function selectPlace(id: string) {
     setPlaceId(id);
     setTacoIds([]);
+    setTacoRatings({});
   }
 
   function toggleTaco(id: string) {
     setTacoIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+    setTacoRatings((current) => {
+      const next = { ...current };
+      if (next[id]) delete next[id];
+      else next[id] = rating;
+      return next;
+    });
   }
 
   async function save() {
     if (!token) return;
-    try { await createVisit({ placeId, tacoIds, rating }, token); } catch { /* Demo mode remains usable without the API. */ }
+    try { await createVisit({ placeId, tacoIds, rating, tacoRatings }, token); } catch { /* Demo mode remains usable without the API. */ }
     setSaved(true);
   }
 
   if (saved) return <View style={styles.success}><View style={styles.successIcon}><Ionicons name="checkmark" size={34} color={colors.background} /></View><Text style={styles.successTitle}>Visita registrada</Text><Text style={styles.successText}>Tu diario acaba de ganar una nueva historia.</Text><Pressable style={styles.primary} onPress={() => router.back()}><Text style={styles.primaryText}>Volver al mapa</Text></Pressable></View>;
 
-  return <ScrollView style={styles.screen} contentContainerStyle={styles.content}><View style={styles.header}><Pressable onPress={() => router.back()}><Ionicons name="close" size={25} color={colors.ink} /></Pressable><View style={styles.headerTitle}><Text style={styles.kicker}>NUEVA ENTRADA</Text><Text style={styles.title}>Registrar visita</Text></View><View style={{ width: 25 }} /></View><Text style={styles.question}>¿Dónde comiste?</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.placeRow}>{places.map((item) => <Pressable key={item.id} onPress={() => selectPlace(item.id)} style={[styles.placePill, item.id === placeId && styles.placePillActive]}><Text style={[styles.placePillText, item.id === placeId && styles.placePillTextActive]}>{item.name}</Text><Text style={[styles.placePillMeta, item.id === placeId && styles.placePillTextActive]}>{item.neighborhood}</Text></Pressable>)}</ScrollView><Text style={styles.question}>¿Qué comiste?</Text><View style={styles.tacos}>{place.tacos.map((taco) => <Pressable key={taco.id} onPress={() => toggleTaco(taco.id)} style={[styles.taco, tacoIds.includes(taco.id) && styles.tacoActive]}><View><Text style={[styles.tacoName, tacoIds.includes(taco.id) && styles.tacoNameActive]}>{taco.name}</Text><Text style={[styles.tacoNote, tacoIds.includes(taco.id) && styles.tacoNameActive]}>{taco.note}</Text></View><View style={[styles.checkbox, tacoIds.includes(taco.id) && styles.checkboxActive]}>{tacoIds.includes(taco.id) ? <Ionicons name="checkmark" color={colors.background} size={15} /> : null}</View></Pressable>)}</View><Text style={styles.question}>¿Qué tal estuvo?</Text><View style={styles.ratingRow}>{[1, 2, 3, 4, 5].map((value) => <Pressable key={value} onPress={() => setRating(value)} style={[styles.rating, value <= rating && styles.ratingActive]}><Text style={[styles.ratingValue, value <= rating && styles.ratingValueActive]}>{value}</Text></Pressable>)}</View><Text style={styles.ratingHint}>{rating === 5 ? 'Lo defenderías contra tus amigos.' : rating >= 4 ? 'Volverías por otro.' : 'Buena información para tu futuro yo.'}</Text><Pressable style={[styles.primary, tacoIds.length === 0 && styles.disabled]} disabled={tacoIds.length === 0} onPress={save}><Text style={styles.primaryText}>Guardar en mi diario</Text><Ionicons name="arrow-forward" size={18} color={colors.background} /></Pressable></ScrollView>;
+  return <ScrollView style={styles.screen} contentContainerStyle={styles.content}><View style={styles.header}><Pressable onPress={() => router.back()}><Ionicons name="close" size={25} color={colors.ink} /></Pressable><View style={styles.headerTitle}><Text style={styles.kicker}>NUEVA ENTRADA</Text><Text style={styles.title}>Registrar visita</Text></View><View style={{ width: 25 }} /></View><Text style={styles.question}>¿Dónde comiste?</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.placeRow}>{places.map((item) => <Pressable key={item.id} onPress={() => selectPlace(item.id)} style={[styles.placePill, item.id === placeId && styles.placePillActive]}><Text style={[styles.placePillText, item.id === placeId && styles.placePillTextActive]}>{item.name}</Text><Text style={[styles.placePillMeta, item.id === placeId && styles.placePillTextActive]}>{item.neighborhood}</Text></Pressable>)}</ScrollView><Text style={styles.question}>¿Qué comiste?</Text><View style={styles.tacos}>{place.tacos.map((taco) => { const selected = tacoIds.includes(taco.id); return <Pressable key={taco.id} onPress={() => toggleTaco(taco.id)} style={[styles.taco, selected && styles.tacoActive]}><View style={styles.tacoCopy}><Text style={[styles.tacoName, selected && styles.tacoNameActive]}>{taco.name}</Text><Text style={[styles.tacoNote, selected && styles.tacoNameActive]}>{taco.note}</Text>{selected ? <View style={styles.tacoRatingRow}><Text style={styles.tacoRatingLabel}>Taco</Text>{[1, 2, 3, 4, 5].map((value) => <Pressable key={value} onPress={(event) => { event.stopPropagation(); setTacoRatings((current) => ({ ...current, [taco.id]: value })); }} style={[styles.tacoRating, value <= (tacoRatings[taco.id] ?? rating) && styles.tacoRatingActive]}><Text style={[styles.tacoRatingValue, value <= (tacoRatings[taco.id] ?? rating) && styles.tacoRatingValueActive]}>{value}</Text></Pressable>)}</View> : null}</View><View style={[styles.checkbox, selected && styles.checkboxActive]}>{selected ? <Ionicons name="checkmark" color={colors.background} size={15} /> : null}</View></Pressable>; })}</View><Text style={styles.question}>¿Qué tal estuvo?</Text><View style={styles.ratingRow}>{[1, 2, 3, 4, 5].map((value) => <Pressable key={value} onPress={() => setRating(value)} style={[styles.rating, value <= rating && styles.ratingActive]}><Text style={[styles.ratingValue, value <= rating && styles.ratingValueActive]}>{value}</Text></Pressable>)}</View><Text style={styles.ratingHint}>{rating === 5 ? 'Lo defenderías contra tus amigos.' : rating >= 4 ? 'Volverías por otro.' : 'Buena información para tu futuro yo.'}</Text><Pressable style={[styles.primary, tacoIds.length === 0 && styles.disabled]} disabled={tacoIds.length === 0} onPress={save}><Text style={styles.primaryText}>Guardar en mi diario</Text><Ionicons name="arrow-forward" size={18} color={colors.background} /></Pressable></ScrollView>;
 }
 
 const styles = StyleSheet.create({
@@ -54,11 +62,18 @@ const styles = StyleSheet.create({
   tacos: { gap: 8 },
   taco: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: radii.md, padding: spacing.md },
   tacoActive: { borderColor: colors.accent, backgroundColor: colors.surfaceRaised },
+  tacoCopy: { flex: 1, paddingRight: spacing.sm },
   tacoName: { color: colors.ink, fontSize: 15, fontWeight: '900' },
   tacoNameActive: { color: colors.accent },
   tacoNote: { color: colors.muted, fontSize: 11, marginTop: 4, maxWidth: 260 },
   checkbox: { width: 25, height: 25, borderRadius: 8, borderWidth: 1, borderColor: colors.dim, alignItems: 'center', justifyContent: 'center' },
   checkboxActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  tacoRatingRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 9 },
+  tacoRatingLabel: { color: colors.muted, fontSize: 10, fontWeight: '800', marginRight: 2 },
+  tacoRating: { width: 23, height: 23, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  tacoRatingActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  tacoRatingValue: { color: colors.muted, fontSize: 10, fontWeight: '900' },
+  tacoRatingValueActive: { color: colors.background },
   ratingRow: { flexDirection: 'row', gap: 8 },
   rating: { width: 49, height: 49, borderRadius: 25, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   ratingActive: { backgroundColor: colors.accent, borderColor: colors.accent },

@@ -56,7 +56,7 @@ export async function getPlace(id: string): Promise<Place> {
   }
 }
 
-export async function createVisit(input: { placeId: string; tacoIds: string[]; rating: number }, token: string) {
+export async function createVisit(input: { placeId: string; tacoIds: string[]; rating: number; tacoRatings?: Record<string, number> }, token: string) {
   return request('/v1/visits', { method: 'POST', body: JSON.stringify(input) }, token);
 }
 

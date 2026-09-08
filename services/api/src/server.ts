@@ -81,7 +81,7 @@ app.get('/v1/branches/:id', async (request, reply) => {
 app.post('/v1/visits', async (request, reply) => {
   const user = await requireUser(request, reply);
   if (!user) return;
-  const body = z.object({ placeId: z.string(), tacoIds: z.array(z.string()).min(1), rating: z.number().min(1).max(5) }).parse(request.body);
+  const body = z.object({ placeId: z.string(), tacoIds: z.array(z.string()).min(1), rating: z.number().min(1).max(5), tacoRatings: z.record(z.string(), z.number().min(1).max(5)).optional() }).parse(request.body);
   const place = await findPlace(body.placeId);
   if (!place) return reply.code(404).send({ error: 'BRANCH_NOT_FOUND' });
   return reply.code(201).send(await createVisitForUser(body, user.id));
