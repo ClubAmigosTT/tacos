@@ -60,13 +60,13 @@ El servicio ejecuta las migraciones antes de cada deploy mediante `preDeployComm
 Desde `apps/mobile` inicia sesión en Expo y crea el proyecto EAS una sola vez:
 
 ```bash
-npx expo login
-npx eas init
-eas env:set --name EXPO_PUBLIC_API_URL --value https://<tu-api>.onrender.com --environment production --visibility plaintext
-eas env:set --name GOOGLE_MAPS_API_KEY --value <tu-clave> --environment production --visibility sensitive
-eas build --platform all --profile production
-eas submit --platform ios --profile production
-eas submit --platform android --profile production
+npx eas-cli@latest login
+npx eas-cli@latest init
+npx eas-cli@latest env:set --name EXPO_PUBLIC_API_URL --value https://<tu-api>.onrender.com --environment production --visibility plaintext
+npx eas-cli@latest env:set --name GOOGLE_MAPS_API_KEY --value <tu-clave> --environment production --visibility sensitive
+npx eas-cli@latest build --platform all --profile production
+npx eas-cli@latest submit --platform ios --profile production
+npx eas-cli@latest submit --platform android --profile production
 ```
 
 Los builds ocurren en EAS, no en esta computadora. Para actualizaciones JavaScript posteriores puedes usar `eas update --channel production`.
