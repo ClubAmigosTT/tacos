@@ -22,6 +22,16 @@ export type Place = {
   tags: string[];
 };
 
+export type List = {
+  id: string;
+  title: string;
+  description: string;
+  owner: { id: string; displayName: string };
+  itemCount: number;
+  visitedCount: number;
+  coverImage: string;
+};
+
 export const places: Place[] = [
   {
     id: 'vilsito',
@@ -84,4 +94,8 @@ export const diaryEntries = [
   { id: '1', date: '18 AGO', place: 'El Vilsito', taco: 'Pastor', rating: 4.9, image: places[0].image },
   { id: '2', date: '12 AGO', place: 'Tacos Oriente', taco: 'Suadero', rating: 4.8, image: places[1].image },
   { id: '3', date: '04 AGO', place: 'Los Parados', taco: 'Carnitas', rating: 4.6, image: places[2].image }
+];
+
+export const lists: List[] = [
+  { id: 'editorial-pastor-midnight', title: 'Pastor después de medianoche', description: 'Siete lugares para cuando la ciudad baja el ritmo.', owner: { id: 'editorial', displayName: 'Comelocal' }, itemCount: 7, visitedCount: 0, coverImage: places[0].image }
 ];
