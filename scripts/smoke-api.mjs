@@ -161,6 +161,25 @@ await request(`/v1/lists/${list.id}`, {
 await request(`/v1/lists/${list.id}/items/oriente`, { method: 'DELETE', token: alice.token });
 const collaboratorLists = await request('/v1/lists', { token: alice.token });
 if (!collaboratorLists.lists?.some((item) => item.id === list.id && item.canEdit === true)) throw new Error('Collaborative list was not discoverable by editor');
+const viewerRole = await request(`/v1/lists/${list.id}/collaborators`, {
+  method: 'POST',
+  body: JSON.stringify({ userId: alice.user.id, role: 'viewer' }),
+  token: bob.token
+});
+if (viewerRole.status !== 'already' || viewerRole.role !== 'viewer') throw new Error('Collaborator role could not be changed');
+const viewerDetail = await request(`/v1/lists/${list.id}`, { token: alice.token });
+if (viewerDetail.canEdit !== false) throw new Error('Viewer retained editor permissions');
+await request(`/v1/lists/${list.id}/items`, {
+  method: 'POST',
+  body: JSON.stringify({ branchId: 'oriente' }),
+  token: alice.token
+}, 404);
+const restoredRole = await request(`/v1/lists/${list.id}/collaborators`, {
+  method: 'POST',
+  body: JSON.stringify({ userId: alice.user.id, role: 'editor' }),
+  token: bob.token
+});
+if (restoredRole.status !== 'already' || restoredRole.role !== 'editor') throw new Error('Collaborator editor role could not be restored');
 const removedCollaborator = await request(`/v1/lists/${list.id}/collaborators/${alice.user.id}`, { method: 'DELETE', token: bob.token });
 if (removedCollaborator.status !== 'removed') throw new Error('List collaborator was not removed');
 await request(`/v1/lists/${list.id}`, { token: alice.token }, 404);
