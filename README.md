@@ -74,6 +74,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 44. Moderación de comentarios: el panel admin lista comentarios visibles/ocultos y permite ocultarlos o restaurarlos sin borrar evidencia.
 45. Listas colaborativas: el propietario puede invitar editores o lectores; los editores gestionan lugares, mientras que el propietario conserva la edición editorial y el control de acceso.
 46. Analítica de producto sin PII: eventos acotados para aperturas, búsquedas, filtros, aperturas de fichas, registros y colaboración; fallar analítica nunca bloquea una acción.
+47. Control del diario: el autor puede eliminar una visita propia con confirmación; la API la retira también de recomendaciones, estadísticas y conversaciones asociadas.
 
 ## Verificación
 

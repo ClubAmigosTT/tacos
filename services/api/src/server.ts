@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListCollaborator, addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitComment, createVisitForUser, deleteVisitComment, discoverPlaces, findPlace, findUserById, followUser, getAdminAnalytics, getAdminComments, getAdminReports, getDiary, getFeed, getHealth, getListDetails, getLists, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, getVisitComments, recordProductEvent, registerUser, removeListCollaborator, removeListItemForUser, reportVisitForUser, reviewAdminComment, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateVisitForUser, type PublicUser } from './repository.js';
+import { addListCollaborator, addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitComment, createVisitForUser, deleteVisitComment, deleteVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getAdminAnalytics, getAdminComments, getAdminReports, getDiary, getFeed, getHealth, getListDetails, getLists, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, getVisitComments, recordProductEvent, registerUser, removeListCollaborator, removeListItemForUser, reportVisitForUser, reviewAdminComment, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateVisitForUser, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
 import { uploadVisitImage } from './storage.js';
 
@@ -51,7 +51,7 @@ app.get('/health', async (_request, reply) => {
   return reply.code(health.status === 'ok' ? 200 : 503).send({ ...health, service: 'tacos-api', timestamp: new Date().toISOString() });
 });
 
-const productEventNames = ['app_open', 'map_search', 'map_filter', 'radar_filter', 'place_open', 'visit_saved', 'list_open', 'list_created', 'list_collaborator_changed', 'profile_open', 'feed_open'] as const;
+const productEventNames = ['app_open', 'map_search', 'map_filter', 'radar_filter', 'place_open', 'visit_saved', 'visit_deleted', 'list_open', 'list_created', 'list_collaborator_changed', 'profile_open', 'feed_open'] as const;
 
 app.post('/v1/events', async (request, reply) => {
   const body = z.object({
@@ -180,6 +180,15 @@ app.patch('/v1/visits/:id', async (request, reply) => {
   if (updated === 'not_found') return reply.code(404).send({ error: 'VISIT_NOT_FOUND' });
   if (updated === 'invalid_taco') return reply.code(400).send({ error: 'TACO_RATING_NOT_SELECTED' });
   return updated;
+});
+
+app.delete('/v1/visits/:id', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const params = z.object({ id: z.string().uuid() }).parse(request.params);
+  const deleted = await deleteVisitForUser(params.id, user.id);
+  if (!deleted) return reply.code(404).send({ error: 'VISIT_NOT_FOUND' });
+  return { status: 'deleted', id: params.id };
 });
 
 app.post('/v1/media/images', async (request, reply) => {

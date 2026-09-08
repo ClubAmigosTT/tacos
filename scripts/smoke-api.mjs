@@ -102,6 +102,15 @@ await request(`/v1/visits/${visit.id}`, {
 }, 400);
 const editedDiary = await request('/v1/diary', { token: bob.token });
 if (editedDiary.entries?.[0]?.rating !== 4 || editedDiary.entries?.[0]?.price !== 52 || editedDiary.entries?.[0]?.note !== 'Edited smoke') throw new Error('Edited diary context was not persisted');
+const deletableVisit = await request('/v1/visits', {
+  method: 'POST',
+  body: JSON.stringify({ placeId: 'oriente', tacoIds: ['oriente-suadero'], tacoRatings: { 'oriente-suadero': 4 }, rating: 4 }),
+  token: bob.token
+}, 201);
+await request(`/v1/visits/${deletableVisit.id}`, { method: 'DELETE', token: alice.token }, 404);
+const deletedVisit = await request(`/v1/visits/${deletableVisit.id}`, { method: 'DELETE', token: bob.token });
+if (deletedVisit.status !== 'deleted') throw new Error('Visit owner could not delete the diary entry');
+await request(`/v1/visits/${deletableVisit.id}`, { method: 'DELETE', token: bob.token }, 404);
 const recommendations = await request('/v1/recommendations', { token: bob.token });
 if (typeof recommendations.places?.[0]?.tasteMatch !== 'number') throw new Error('Taste-aware recommendation score missing');
 const taste = await request('/v1/me/taste', { token: bob.token });

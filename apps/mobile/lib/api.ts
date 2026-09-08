@@ -18,7 +18,7 @@ const configuredUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
 const API_URL = configuredUrl?.replace(/\/$/, '');
 const REQUEST_TIMEOUT_MS = 15_000;
 export type ProductEventProperty = string | number | boolean | null;
-export type ProductEventName = 'app_open' | 'map_search' | 'map_filter' | 'radar_filter' | 'place_open' | 'visit_saved' | 'list_open' | 'list_created' | 'list_collaborator_changed' | 'profile_open' | 'feed_open';
+export type ProductEventName = 'app_open' | 'map_search' | 'map_filter' | 'radar_filter' | 'place_open' | 'visit_saved' | 'visit_deleted' | 'list_open' | 'list_created' | 'list_collaborator_changed' | 'profile_open' | 'feed_open';
 
 function haversineKm(from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }) {
   const earthRadiusKm = 6371;
@@ -139,6 +139,10 @@ export async function createVisit(input: { placeId: string; tacoIds: string[]; r
 
 export async function updateVisit(visitId: string, input: { rating?: number; tacoRatings?: Record<string, number>; price?: number | null; note?: string }, token: string) {
   return request<{ id: string; status: string }>(`/v1/visits/${encodeURIComponent(visitId)}`, { method: 'PATCH', body: JSON.stringify(input) }, token);
+}
+
+export async function deleteVisit(visitId: string, token: string) {
+  return request<{ id: string; status: string }>(`/v1/visits/${encodeURIComponent(visitId)}`, { method: 'DELETE' }, token);
 }
 
 export async function uploadImage(input: { base64: string; contentType: 'image/jpeg' | 'image/png' | 'image/webp' }, token: string) {

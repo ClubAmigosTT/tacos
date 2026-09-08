@@ -433,6 +433,19 @@ export async function updateVisitForUser(visitId: string, input: VisitUpdateInpu
   return { id: visitId, status: 'updated' };
 }
 
+export async function deleteVisitForUser(visitId: string, userId: string): Promise<boolean> {
+  if (pool) {
+    const result = await pool.query('DELETE FROM visits WHERE id = $1 AND user_id = $2', [visitId, userId]);
+    return Boolean(result.rowCount);
+  }
+  const visit = localVisits.get(visitId);
+  if (!visit || visit.userId !== userId) return false;
+  localVisits.delete(visitId);
+  for (const [commentId, comment] of localComments.entries()) if (comment.visitId === visitId) localComments.delete(commentId);
+  for (const [reportId, report] of localReports.entries()) if (report.visitId === visitId) localReports.delete(reportId);
+  return true;
+}
+
 export async function registerUser(input: { email: string; password: string; displayName: string }): Promise<PublicUser> {
   const email = input.email.trim().toLowerCase();
   const displayName = input.displayName.trim();
