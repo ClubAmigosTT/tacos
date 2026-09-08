@@ -13,12 +13,15 @@ export default function HomeScreen() {
   const { token, user } = useAuth();
   const { data = [] } = useQuery({ queryKey: ['recommendations', token], queryFn: () => recommendations(token) });
   const featured = data[0];
+  const featuredTaco = featured?.tacos.reduce((best, taco) => taco.rating > (best?.rating ?? 0) ? taco : best, featured.tacos[0]);
+  const hour = new Date().getHours();
+  const moment = hour >= 22 || hour < 4 ? 'DE MADRUGADA' : hour < 12 ? 'PARA DESAYUNAR' : 'AHORA';
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.kicker}>{user ? `PARA ${user.displayName.toUpperCase()} · CDMX` : 'CDMX · MARTES 23:48'}</Text>
+          <Text style={styles.kicker}>{user ? `PARA ${user.displayName.toUpperCase()} · CDMX` : `CDMX · ${moment}`}</Text>
           <Text style={styles.logo}>tacos<Text style={styles.logoDot}>.</Text></Text>
         </View>
         <Pressable style={styles.avatar} onPress={() => router.push('/(tabs)/profile')}><Text style={styles.avatarText}>M</Text></Pressable>
@@ -37,7 +40,7 @@ export default function HomeScreen() {
             <View style={styles.heroShade} />
             <View style={styles.heroContent}>
               <View style={styles.heroPill}><Text style={styles.heroPillText}>RECOMENDADO AHORA</Text></View>
-              <Text style={styles.heroTitle}>Pastor preciso{`\n`}cerca de ti.</Text>
+              <Text style={styles.heroTitle}>{featuredTaco?.name ?? 'Taco'} preciso{`\n`}cerca de ti.</Text>
               <View style={styles.heroMeta}><RatingBadge rating={featured.rating} accent /><Text style={styles.heroPlace}>{featured.name} · {featured.distance}</Text><Text style={styles.heroMatch}>{featured.match}%</Text></View>
             </View>
           </Pressable>
