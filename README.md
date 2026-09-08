@@ -41,7 +41,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 11. Taco Passport: progreso por colonias desbloqueadas a partir de las visitas del diario.
 12. Reputación bayesiana en consultas PostgreSQL: prior conservador para sucursal y taco, evitando que pocas reseñas perfectas dominen el ranking.
 13. Contexto de visita: precio, nota, foto opcional y coordenadas, más resumen anual compartible.
-14. Fotos opcionales desde cámara/galería: se suben por `/v1/media/images` a un bucket S3-compatible y nunca se escriben en el disco de Render.
+14. Fotos opcionales desde cámara/galería: se validan por firma y se suben por `/v1/media/images` a un bucket S3-compatible; nunca se escriben en el disco de Render.
 15. Perfil de sabor por sucursal (intensidad, picante, tradicional, textura y valor) servido desde PostgreSQL y renderizado dinámicamente en la ficha.
 16. Taste ID personalizado desde `/v1/me/taste`, calculado a partir de las sucursales visitadas y sus perfiles de sabor.
 17. Recomendaciones con señal social: ratings y visitas de personas seguidas se combinan con el gusto propio y la calidad global.
