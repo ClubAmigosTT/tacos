@@ -66,6 +66,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 10. Mostrar un estado vacío útil cuando no hay resultados y permitir restablecer búsqueda, filtros y centro del mapa sin recargar la app.
 11. Derivar las estadísticas de identidad del Perfil desde las visitas reales, conservando fixtures sólo para el modo anónimo de demostración.
 12. Aplicar `share_activity` también al cálculo de señales sociales de recomendaciones y cubrirlo en el smoke test.
+13. Invalidar las cachés de feed y recomendaciones cuando cambia la preferencia de actividad y reflejar que afecta visitas existentes.
 
 **Aceptación:** “Pastor”, “Abierto ahora”, “Barato” y “Para mí” producen resultados ordenados; negar ubicación no rompe el catálogo.
 

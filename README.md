@@ -102,6 +102,7 @@ En el emulador Android usa `http://10.0.2.2:4000`; el emulador redirige esa dire
 69. Estados vacíos accionables: el mapa explica cuando una combinación no tiene resultados y permite limpiar la búsqueda y los filtros en un toque.
 70. Perfil vivo: las colonias exploradas se calculan desde el Diario del usuario y no desde un número fijo.
 71. Privacidad completa: ocultar actividad también retira esa señal de las recomendaciones sociales, tanto en PostgreSQL como en el fallback local.
+72. Privacidad inmediata: el cliente invalida feed y recomendaciones al cambiar el ajuste, y la pantalla describe el alcance real del cambio.
 
 ## Verificación
 
