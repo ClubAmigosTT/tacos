@@ -52,6 +52,31 @@ export async function closeRepository() {
   if (pool) await pool.end();
 }
 
+export type MaintenanceResult = { database: 'postgres' | 'memory'; analyzed: boolean; purgedEvents: number };
+
+/**
+ * Keep the long-lived Render processes useful without coupling them to
+ * request handling. Product events have a finite retention window; user
+ * generated content is intentionally never touched by this job.
+ */
+export async function runNightlyMaintenance(): Promise<MaintenanceResult> {
+  const retentionDays = 180;
+  if (pool) {
+    await pool.query('ANALYZE branches, menu_items, visits, visit_items, product_events');
+    const purged = await pool.query("DELETE FROM product_events WHERE created_at < now() - ($1::int * interval '1 day')", [retentionDays]);
+    return { database: 'postgres', analyzed: true, purgedEvents: purged.rowCount ?? 0 };
+  }
+  const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+  let purgedEvents = 0;
+  for (let index = localProductEvents.length - 1; index >= 0; index -= 1) {
+    if (Date.parse(localProductEvents[index].createdAt) < cutoff) {
+      localProductEvents.splice(index, 1);
+      purgedEvents += 1;
+    }
+  }
+  return { database: 'memory', analyzed: false, purgedEvents };
+}
+
 const allowedEventPropertyKeys = new Set(['source', 'filter', 'query_length', 'place_id', 'list_id', 'duration_ms', 'role', 'visibility', 'result_count']);
 
 function sanitizeEventProperties(properties: Record<string, unknown> | undefined) {

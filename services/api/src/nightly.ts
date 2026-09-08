@@ -1,3 +1,8 @@
-// Nightly job placeholder. The first production version will refresh aggregates,
-// recompute Taste IDs and clean expired upload sessions.
-console.log(`tacos-nightly completed at ${new Date().toISOString()}`);
+import { closeRepository, runNightlyMaintenance } from './repository.js';
+
+try {
+  const result = await runNightlyMaintenance();
+  console.log(JSON.stringify({ job: 'tacos-nightly', ...result, completedAt: new Date().toISOString() }));
+} finally {
+  await closeRepository();
+}

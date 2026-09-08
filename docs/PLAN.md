@@ -93,6 +93,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 3. Arrancar el primer admin con `ADMIN_EMAILS` o SQL controlado en Render.
 4. Añadir límites de tamaño, logs estructurados y manejo de errores sin filtrar secretos.
 5. Configurar health checks y cierre graceful para que Render pueda reemplazar instancias sin conexiones huérfanas.
+6. Ejecutar mantenimiento periódico desde worker/cron: analizar tablas operativas y aplicar retención explícita sólo a eventos de producto.
 
 **Aceptación:** un reporte aparece en `/v1/admin/reports`, un admin puede ocultarlo, el feed deja de mostrarlo, el perfil público no lo cuenta y `pnpm smoke:admin` confirma que no contamina recomendaciones.
 
