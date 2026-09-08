@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,7 +11,8 @@ import { colors, radii, spacing } from '@/theme';
 
 export default function RegisterScreen() {
   const { token } = useAuth();
-  const [placeId, setPlaceId] = useState(places[0].id);
+  const { placeId: initialPlaceId } = useLocalSearchParams<{ placeId?: string }>();
+  const [placeId, setPlaceId] = useState(initialPlaceId ?? places[0].id);
   const [tacoIds, setTacoIds] = useState<string[]>([places[0].tacos[0].id]);
   const [tacoRatings, setTacoRatings] = useState<Record<string, number>>({ [places[0].tacos[0].id]: 5 });
   const [rating, setRating] = useState(5);
@@ -32,7 +33,7 @@ export default function RegisterScreen() {
     setTacoRatings(first.tacos[0] ? { [first.tacos[0].id]: rating } : {});
   }, [availablePlaces, placeId, rating]);
 
-  if (!token) return <View style={styles.authRequired}><View style={styles.successIcon}><Ionicons name="person" size={26} color={colors.background} /></View><Text style={styles.successTitle}>Tu diario necesita una cuenta</Text><Text style={styles.successText}>Crea tu identidad para guardar esta visita y verla después en tu historial.</Text><Pressable style={styles.primary} onPress={() => router.push({ pathname: '/auth', params: { returnTo: '/register' } })}><Text style={styles.primaryText}>Entrar o crear cuenta</Text><Ionicons name="arrow-forward" size={18} color={colors.background} /></Pressable><Pressable onPress={() => router.back()}><Text style={styles.cancelText}>Ahora no</Text></Pressable></View>;
+  if (!token) return <View style={styles.authRequired}><View style={styles.successIcon}><Ionicons name="person" size={26} color={colors.background} /></View><Text style={styles.successTitle}>Tu diario necesita una cuenta</Text><Text style={styles.successText}>Crea tu identidad para guardar esta visita y verla después en tu historial.</Text><Pressable style={styles.primary} onPress={() => router.push({ pathname: '/auth', params: { returnTo: '/register', placeId } })}><Text style={styles.primaryText}>Entrar o crear cuenta</Text><Ionicons name="arrow-forward" size={18} color={colors.background} /></Pressable><Pressable onPress={() => router.back()}><Text style={styles.cancelText}>Ahora no</Text></Pressable></View>;
 
   function selectPlace(id: string) {
     setPlaceId(id);

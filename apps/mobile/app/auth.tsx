@@ -22,7 +22,7 @@ export default function AuthScreen() {
     try {
       if (mode === 'register') await signUp({ email, password, displayName });
       else await signIn({ email, password });
-      if (returnTo === '/register') router.replace('/register');
+      if (returnTo === '/register') router.replace({ pathname: '/register', params: placeId ? { placeId } : undefined });
       else if (returnTo === '/lists') router.replace({ pathname: '/lists', params: placeId ? { placeId } : undefined });
       else router.replace('/(tabs)/profile');
     } catch (cause) {
