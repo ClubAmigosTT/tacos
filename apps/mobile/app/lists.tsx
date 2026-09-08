@@ -1,15 +1,16 @@
 import { useState } from 'react';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { lists as fixtureLists, type List } from '@/data/fixtures';
-import { createList, lists as listsRequest } from '@/lib/api';
+import { addListItem, createList, lists as listsRequest } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 
 export default function ListsScreen() {
   const { token, user } = useAuth();
+  const { placeId } = useLocalSearchParams<{ placeId?: string }>();
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: ['lists', token], queryFn: () => listsRequest(token), enabled: true });
   const [title, setTitle] = useState('');
@@ -18,21 +19,25 @@ export default function ListsScreen() {
     mutationFn: () => createList({ title, description }, token!),
     onSuccess: () => { setTitle(''); setDescription(''); void queryClient.invalidateQueries({ queryKey: ['lists'] }); }
   });
+  const saveMutation = useMutation({
+    mutationFn: (listId: string) => addListItem(listId, { branchId: placeId! }, token!),
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['lists'] }); }
+  });
   const apiLists = data?.lists ?? [];
   const visibleLists: List[] = apiLists.length ? apiLists : (!user ? fixtureLists : []);
 
   return <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
     <View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable><View style={styles.headerCopy}><Text style={styles.eyebrow}>CURADURÍA PERSONAL</Text><Text style={styles.title}>Tus listas</Text></View><Ionicons name="albums-outline" size={22} color={colors.accent} /></View>
-    <Text style={styles.intro}>Guarda lugares por antojo, colonia o estado de ánimo. Las listas convierten tus visitas en una forma de recomendar.</Text>
+    <Text style={styles.intro}>{placeId ? 'Elige una lista para guardar esta taquería. Después podrás volver a ella desde tu perfil.' : 'Guarda lugares por antojo, colonia o estado de ánimo. Las listas convierten tus visitas en una forma de recomendar.'}</Text>
     {user ? <View style={styles.createCard}><Text style={styles.createEyebrow}>NUEVA LISTA</Text><TextInput value={title} onChangeText={setTitle} placeholder="Ej. Pastor que sí defendería" placeholderTextColor={colors.dim} style={styles.input} maxLength={80} /><TextInput value={description} onChangeText={setDescription} placeholder="Una descripción breve (opcional)" placeholderTextColor={colors.dim} style={[styles.input, styles.descriptionInput]} maxLength={240} multiline /><Pressable style={[styles.createButton, (!title.trim() || mutation.isPending) && styles.disabled]} disabled={!title.trim() || mutation.isPending} onPress={() => mutation.mutate()}><Ionicons name="add" size={18} color={colors.background} /><Text style={styles.createButtonText}>{mutation.isPending ? 'Guardando…' : 'Crear lista'}</Text></Pressable></View> : <Pressable style={styles.loginCard} onPress={() => router.push('/auth')}><View style={styles.loginIcon}><Ionicons name="person-add-outline" size={18} color={colors.background} /></View><View style={{ flex: 1 }}><Text style={styles.loginTitle}>Crea listas públicas</Text><Text style={styles.loginDetail}>Entra para guardar lugares y compartir tu criterio.</Text></View><Ionicons name="chevron-forward" size={17} color={colors.muted} /></Pressable>}
     <View style={styles.listHeader}><Text style={styles.sectionTitle}>Selecciones</Text><Text style={styles.count}>{visibleLists.length} LISTAS</Text></View>
-    {visibleLists.length ? visibleLists.map((list) => <ListCard key={list.id} list={list} />) : <View style={styles.empty}><Ionicons name="bookmark-outline" size={25} color={colors.dim} /><Text style={styles.emptyTitle}>Todavía no tienes listas</Text><Text style={styles.emptyText}>Crea la primera y empieza a construir tu mapa de antojos.</Text></View>}
+    {visibleLists.length ? visibleLists.map((list) => <ListCard key={list.id} list={list} saveMode={Boolean(placeId)} saved={saveMutation.isSuccess && saveMutation.variables === list.id} onPress={placeId ? () => { if (user) saveMutation.mutate(list.id); else router.push({ pathname: '/auth', params: { returnTo: '/lists', placeId } }); } : undefined} />) : <View style={styles.empty}><Ionicons name="bookmark-outline" size={25} color={colors.dim} /><Text style={styles.emptyTitle}>Todavía no tienes listas</Text><Text style={styles.emptyText}>Crea la primera y empieza a construir tu mapa de antojos.</Text></View>}
   </ScrollView>;
 }
 
-function ListCard({ list }: { list: List }) {
+function ListCard({ list, saveMode, saved, onPress }: { list: List; saveMode?: boolean; saved?: boolean; onPress?: () => void }) {
   const progress = list.itemCount ? Math.round((list.visitedCount / list.itemCount) * 100) : 0;
-  return <Pressable style={({ pressed }) => [styles.card, pressed && styles.pressed]}><Image source={{ uri: list.coverImage }} style={styles.cover} /><View style={styles.cardShade} /><View style={styles.cardCopy}><Text style={styles.cardTitle}>{list.title}</Text><Text style={styles.cardDescription}>{list.description}</Text><View style={styles.cardMeta}><Text style={styles.owner}>por @{list.owner.displayName.toLowerCase().replace(/\s+/g, '')}</Text><Text style={styles.progress}>{list.visitedCount}/{list.itemCount} VISITADOS · {progress}%</Text></View></View></Pressable>;
+  return <Pressable style={({ pressed }) => [styles.card, pressed && styles.pressed]} onPress={onPress} disabled={!onPress}><Image source={{ uri: list.coverImage }} style={styles.cover} /><View style={styles.cardShade} /><View style={styles.cardCopy}><Text style={styles.cardTitle}>{list.title}</Text><Text style={styles.cardDescription}>{list.description}</Text><View style={styles.cardMeta}><Text style={styles.owner}>por @{list.owner.displayName.toLowerCase().replace(/\s+/g, '')}</Text><Text style={styles.progress}>{saveMode ? (saved ? 'GUARDADO ✓' : 'TOCA PARA GUARDAR') : `${list.visitedCount}/${list.itemCount} VISITADOS · ${progress}%`}</Text></View></View></Pressable>;
 }
 
 const styles = StyleSheet.create({

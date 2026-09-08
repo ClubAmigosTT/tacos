@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 
 export default function AuthScreen() {
-  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const { returnTo, placeId } = useLocalSearchParams<{ returnTo?: string; placeId?: string }>();
   const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [displayName, setDisplayName] = useState('');
@@ -22,7 +22,9 @@ export default function AuthScreen() {
     try {
       if (mode === 'register') await signUp({ email, password, displayName });
       else await signIn({ email, password });
-      router.replace(returnTo === '/register' ? '/register' : '/(tabs)/profile');
+      if (returnTo === '/register') router.replace('/register');
+      else if (returnTo === '/lists') router.replace({ pathname: '/lists', params: placeId ? { placeId } : undefined });
+      else router.replace('/(tabs)/profile');
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : '';
       setError(message.includes('409') ? 'Ese correo ya está registrado.' : 'No pudimos completar el acceso. Revisa tus datos.');
