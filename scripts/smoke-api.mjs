@@ -31,6 +31,11 @@ const taqueria = await request('/v1/taquerias/vilsito');
 if (taqueria.branches?.[0]?.taqueriaId !== 'vilsito') throw new Error('Taqueria parent relation missing');
 
 await request(`/v1/users/${bob.user.id}/follow`, { method: 'POST', body: JSON.stringify({}), token: alice.token });
+await request('/v1/visits', {
+  method: 'POST',
+  body: JSON.stringify({ placeId: 'vilsito', tacoIds: ['oriente-suadero'], rating: 5 }),
+  token: bob.token
+}, 400);
 const visit = await request('/v1/visits', {
   method: 'POST',
   body: JSON.stringify({ placeId: 'vilsito', tacoIds: ['vilsito-pastor'], tacoRatings: { 'vilsito-pastor': 5 }, rating: 5, price: 44, note: 'Smoke test' }),

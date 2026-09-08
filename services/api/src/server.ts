@@ -107,6 +107,13 @@ app.post('/v1/visits', async (request, reply) => {
   const body = z.object({ placeId: z.string(), tacoIds: z.array(z.string()).min(1), rating: z.number().min(1).max(5), tacoRatings: z.record(z.string(), z.number().min(1).max(5)).optional(), price: z.number().min(0).max(100000).optional(), note: z.string().max(500).optional(), photoUrl: z.string().url().max(2000).optional(), latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional() }).parse(request.body);
   const place = await findPlace(body.placeId);
   if (!place) return reply.code(404).send({ error: 'BRANCH_NOT_FOUND' });
+  const allowedTacos = new Set(place.tacos.map((taco) => taco.id));
+  if (new Set(body.tacoIds).size !== body.tacoIds.length || body.tacoIds.some((tacoId) => !allowedTacos.has(tacoId))) {
+    return reply.code(400).send({ error: 'INVALID_TACO' });
+  }
+  if (body.tacoRatings && Object.keys(body.tacoRatings).some((tacoId) => !body.tacoIds.includes(tacoId))) {
+    return reply.code(400).send({ error: 'TACO_RATING_NOT_SELECTED' });
+  }
   return reply.code(201).send(await createVisitForUser(body, user.id));
 });
 
