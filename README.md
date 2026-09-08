@@ -49,7 +49,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 19. Radar de tacos: controles de distancia, precio y antojo que reordenan el mapa en tiempo real.
 20. Recomendaciones por perfil de sabor: compara el historial del usuario con la firma de cada sucursal y expone `tasteMatch` junto al score combinado.
 21. Detalle de listas públicas/privadas: una lista se puede abrir, ver sus lugares, notas y progreso; su contenido se valida en API según visibilidad y propietario.
-22. Moderación inicial: reportes únicos por usuario/visita, estado de visibilidad para el feed y control para ocultar contenido reportado durante revisión.
+22. Moderación inicial: reportes únicos por usuario/visita y estado de visibilidad preparado para que un futuro panel de revisión pueda ocultar contenido del feed.
 
 ## Verificación
 
