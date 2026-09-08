@@ -88,6 +88,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 58. Índices de reputación: las consultas por sucursal y taco tienen índices parciales sobre visitas visibles y ratings de menú para sostener el crecimiento del diario en PostgreSQL.
 59. Migraciones seguras en Render: el pre-deploy usa un cliente dedicado y un lock advisory para impedir carreras entre deploys y garantizar transacciones reales por archivo.
 60. Deploy protegido: los servicios de Render esperan los checks de GitHub Actions antes de auto-desplegar (`autoDeployTrigger: checksPass`).
+61. Releases móviles reproducibles: cada perfil EAS fija su entorno y las actualizaciones OTA apuntan explícitamente a `production`.
 
 ## Verificación
 
@@ -117,7 +118,7 @@ El servicio ejecuta las migraciones antes de cada deploy mediante `preDeployComm
 
 ### Builds iOS y Android
 
-Desde `apps/mobile` inicia sesión en Expo y crea el proyecto EAS una sola vez:
+Desde `apps/mobile` inicia sesión en Expo y crea el proyecto EAS una sola vez. Los perfiles de `eas.json` fijan explícitamente los entornos `development`, `preview` y `production` para que la URL de Render no se mezcle entre builds:
 
 ```bash
 npx eas-cli@latest login
@@ -129,4 +130,4 @@ npx eas-cli@latest submit --platform ios --profile production
 npx eas-cli@latest submit --platform android --profile production
 ```
 
-Los builds ocurren en EAS, no en esta computadora. Para actualizaciones JavaScript posteriores puedes usar `eas update --channel production`.
+Los builds ocurren en EAS, no en esta computadora. Para actualizaciones JavaScript posteriores usa `eas update --channel production --environment production`.
