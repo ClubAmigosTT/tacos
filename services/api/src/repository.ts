@@ -244,11 +244,10 @@ const tacoReputationSelect = `(
         ) stats
       )`;
 
-function localReputation(place: ApiPlace): ApiPlace {
-  const reviews = [...localVisits.values()]
-    .filter((visit) => visit.placeId === place.id && visit.visibility === 'visible')
-    .map((visit) => ({ rating: visit.rating, userId: visit.userId, createdAt: visit.createdAt }));
-  if (!reviews.length) return place;
+type LocalReview = { rating: number; userId: string; createdAt: string };
+
+function localRobustScore(reviews: LocalReview[], priorStrength: number, fallback: number) {
+  if (!reviews.length) return fallback;
   const average = reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
   const variance = reviews.reduce((sum, review) => sum + (review.rating - average) ** 2, 0) / reviews.length;
   const dispersion = Math.sqrt(variance);
@@ -257,12 +256,24 @@ function localReputation(place: ApiPlace): ApiPlace {
   const weightTotal = weights.reduce((sum, weight) => sum + weight, 0);
   const recent = reviews.reduce((sum, review, index) => sum + review.rating * weights[index], 0) / weightTotal;
   const effectiveCount = Math.max(1, Math.min(reviews.length, Math.max(1, new Set(reviews.map((review) => review.userId)).size * 3)));
-  const score = Math.max(1, Math.min(5,
-    ((effectiveCount * (average * 0.65 + recent * 0.35)) + (10 * 4.2)) / (effectiveCount + 10)
+  return Math.max(1, Math.min(5,
+    ((effectiveCount * (average * 0.65 + recent * 0.35)) + (priorStrength * 4.2)) / (effectiveCount + priorStrength)
       - Math.min(0.25, dispersion * 0.08)
       + Math.min(0.08, Math.max(0, recent - average) * 0.12)
   ));
-  return { ...place, rating: Number(score.toFixed(2)), reviewCount: reviews.length };
+}
+
+function localReputation(place: ApiPlace): ApiPlace {
+  const visits = [...localVisits.values()].filter((visit) => visit.placeId === place.id && visit.visibility === 'visible');
+  const reviews = visits.map((visit) => ({ rating: visit.rating, userId: visit.userId, createdAt: visit.createdAt }));
+  const tacos = place.tacos.map((taco) => {
+    const tacoReviews = visits.flatMap((visit) => {
+      const rating = visit.tacoRatings?.[taco.id];
+      return rating == null ? [] : [{ rating, userId: visit.userId, createdAt: visit.createdAt }];
+    });
+    return { ...taco, rating: Number(localRobustScore(tacoReviews, 5, taco.rating).toFixed(2)) };
+  });
+  return { ...place, rating: Number(localRobustScore(reviews, 10, place.rating).toFixed(2)), tacos, ...(reviews.length ? { reviewCount: reviews.length } : {}) };
 }
 
 export async function discoverPlaces(query: DiscoverQuery): Promise<ApiPlace[]> {
