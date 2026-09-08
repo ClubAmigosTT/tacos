@@ -70,6 +70,11 @@ const list = await request('/v1/lists', {
   body: JSON.stringify({ title: 'Smoke route', description: 'Lista de prueba' }),
   token: bob.token
 }, 201);
+await request('/v1/lists', {
+  method: 'POST',
+  body: JSON.stringify({ title: '  ' }),
+  token: bob.token
+}, 400);
 await request(`/v1/lists/${list.id}/items`, {
   method: 'POST',
   body: JSON.stringify({ branchId: 'vilsito', note: 'Pedir pastor' }),

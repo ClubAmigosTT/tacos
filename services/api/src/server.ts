@@ -49,7 +49,7 @@ async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
 app.get('/health', async () => ({ status: 'ok', service: 'tacos-api', timestamp: new Date().toISOString() }));
 
 app.post('/v1/auth/register', async (request, reply) => {
-  const body = z.object({ email: z.string().email(), password: z.string().min(8), displayName: z.string().min(2).max(40) }).parse(request.body);
+  const body = z.object({ email: z.string().trim().email(), password: z.string().min(8), displayName: z.string().trim().min(2).max(40) }).parse(request.body);
   try {
     const user = await registerUser(body);
     return reply.code(201).send({ user, token: await issueToken(user) });
@@ -127,7 +127,7 @@ app.get('/v1/taquerias/:id', async (request, reply) => {
 app.post('/v1/visits', async (request, reply) => {
   const user = await requireUser(request, reply);
   if (!user) return;
-  const body = z.object({ placeId: z.string(), tacoIds: z.array(z.string()).min(1), rating: z.number().min(1).max(5), tacoRatings: z.record(z.string(), z.number().min(1).max(5)).optional(), price: z.number().min(0).max(100000).optional(), note: z.string().max(500).optional(), photoUrl: z.string().url().max(2000).optional(), latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional() }).parse(request.body);
+  const body = z.object({ placeId: z.string(), tacoIds: z.array(z.string()).min(1), rating: z.number().min(1).max(5), tacoRatings: z.record(z.string(), z.number().min(1).max(5)).optional(), price: z.number().min(0).max(100000).optional(), note: z.string().trim().max(500).optional(), photoUrl: z.string().url().max(2000).optional(), latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional() }).parse(request.body);
   const place = await findPlace(body.placeId);
   if (!place) return reply.code(404).send({ error: 'BRANCH_NOT_FOUND' });
   const allowedTacos = new Set(place.tacos.map((taco) => taco.id));
@@ -176,7 +176,7 @@ app.get('/v1/lists/:id', async (request, reply) => {
 app.post('/v1/lists', async (request, reply) => {
   const user = await requireUser(request, reply);
   if (!user) return;
-  const body = z.object({ title: z.string().min(2).max(80), description: z.string().max(240).optional(), visibility: z.enum(['public', 'private']).default('public') }).parse(request.body);
+  const body = z.object({ title: z.string().trim().min(2).max(80), description: z.string().trim().max(240).optional(), visibility: z.enum(['public', 'private']).default('public') }).parse(request.body);
   return reply.code(201).send(await createListForUser(body, user.id));
 });
 
