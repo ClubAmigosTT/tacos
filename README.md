@@ -82,6 +82,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 52. Audiencia anónima: la app conserva un identificador aleatorio local para medir recurrencia sin enviar correo, ubicación ni texto de búsqueda.
 53. Operación activa: el worker y el cron de Render ejecutan mantenimiento acotado, `ANALYZE` del catálogo/visitas y retención de eventos analíticos de 180 días sin borrar contenido de usuarios.
 54. Integridad de listas: sucursales inexistentes se rechazan con 404 y las visitas ocultas no inflan el progreso visitado.
+55. Privacidad del directorio: buscar personas requiere sesión y los eventos autenticados no mezclan un identificador anónimo con el usuario.
 
 ## Verificación
 

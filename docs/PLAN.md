@@ -81,9 +81,10 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 ### Fase 6 — Grafo social y recomendaciones (4–7 días)
 
 1. Buscar personas, seguir/dejar de seguir y persistir el estado del botón.
-2. Abrir perfiles públicos con Taste ID, estadísticas y listas públicas; no exponer correo en esa vista.
-3. Calcular reputación bayesiana y afinidad de sabor; combinarla con señales de personas seguidas.
-4. Mostrar notas de visitas en el feed y llevar al perfil desde avatar/nombre.
+2. Requerir autenticación para consultar el directorio social y no exponer correos a visitantes anónimos.
+3. Abrir perfiles públicos con Taste ID, estadísticas y listas públicas; no exponer correo en esa vista.
+4. Calcular reputación bayesiana y afinidad de sabor; combinarla con señales de personas seguidas.
+5. Mostrar notas de visitas en el feed y llevar al perfil desde avatar/nombre.
 
 **Aceptación:** el smoke test confirma follow, unfollow, feed con nota, perfil público, exclusión de listas privadas y edición autorizada de listas.
 

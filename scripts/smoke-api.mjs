@@ -22,6 +22,7 @@ const createUser = (name, prefix) => request('/v1/auth/register', {
 
 const health = await request('/health');
 if (health.status !== 'ok' || !['memory', 'postgres'].includes(health.database)) throw new Error('Health check did not return a usable database status');
+await request('/v1/users/search?q=Ana', {}, 401);
 await request('/v1/events', {
   method: 'POST',
   body: JSON.stringify({ eventName: 'map_filter', properties: { filter: 'Pastor', query_length: 6, email: 'must-not-be-stored' } })

@@ -60,7 +60,7 @@ app.post('/v1/events', async (request, reply) => {
     properties: z.record(z.string(), z.union([z.string().max(64), z.number(), z.boolean(), z.null()])).optional()
   }).refine((value) => Object.keys(value.properties ?? {}).length <= 20, { message: 'Too many event properties' }).parse(request.body);
   const user = await resolveUser(request);
-  await recordProductEvent({ eventName: body.eventName, userId: user?.id, anonymousId: body.anonymousId, properties: body.properties });
+  await recordProductEvent({ eventName: body.eventName, userId: user?.id, anonymousId: user ? undefined : body.anonymousId, properties: body.properties });
   return reply.code(202).send({ status: 'accepted' });
 });
 
@@ -291,10 +291,11 @@ app.delete('/v1/lists/:id/items/:branchId', async (request, reply) => {
   return { status: 'removed', listId: params.id, branchId: params.branchId };
 });
 
-app.get('/v1/users/search', async (request) => {
-  const user = await resolveUser(request);
+app.get('/v1/users/search', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
   const query = z.object({ q: z.string().min(2).max(60) }).parse(request.query);
-  return { users: await searchUsers(query.q, user?.id) };
+  return { users: await searchUsers(query.q, user.id) };
 });
 
 app.get('/v1/users/:id/profile', async (request, reply) => {
