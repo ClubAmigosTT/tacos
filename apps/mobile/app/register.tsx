@@ -15,6 +15,8 @@ export default function RegisterScreen() {
   const [tacoRatings, setTacoRatings] = useState<Record<string, number>>({ [places[0].tacos[0].id]: 5 });
   const [rating, setRating] = useState(5);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const { data: availablePlaces = places } = useQuery({ queryKey: ['discover', 'register'], queryFn: () => discover(), placeholderData: places });
   const place = availablePlaces.find((item) => item.id === placeId) ?? availablePlaces[0] ?? places[0];
 
@@ -46,13 +48,21 @@ export default function RegisterScreen() {
 
   async function save() {
     if (!token) return;
-    try { await createVisit({ placeId, tacoIds, rating, tacoRatings }, token); } catch { /* Demo mode remains usable without the API. */ }
-    setSaved(true);
+    setSaving(true);
+    setError('');
+    try {
+      await createVisit({ placeId, tacoIds, rating, tacoRatings }, token);
+      setSaved(true);
+    } catch {
+      setError('No pudimos guardar la visita. Revisa tu conexión e inténtalo de nuevo.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (saved) return <View style={styles.success}><View style={styles.successIcon}><Ionicons name="checkmark" size={34} color={colors.background} /></View><Text style={styles.successTitle}>Visita registrada</Text><Text style={styles.successText}>Tu diario acaba de ganar una nueva historia.</Text><Pressable style={styles.primary} onPress={() => router.back()}><Text style={styles.primaryText}>Volver al mapa</Text></Pressable></View>;
 
-  return <ScrollView style={styles.screen} contentContainerStyle={styles.content}><View style={styles.header}><Pressable onPress={() => router.back()}><Ionicons name="close" size={25} color={colors.ink} /></Pressable><View style={styles.headerTitle}><Text style={styles.kicker}>NUEVA ENTRADA</Text><Text style={styles.title}>Registrar visita</Text></View><View style={{ width: 25 }} /></View><Text style={styles.question}>¿Dónde comiste?</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.placeRow}>{availablePlaces.map((item) => <Pressable key={item.id} onPress={() => selectPlace(item.id)} style={[styles.placePill, item.id === placeId && styles.placePillActive]}><Text style={[styles.placePillText, item.id === placeId && styles.placePillTextActive]}>{item.name}</Text><Text style={[styles.placePillMeta, item.id === placeId && styles.placePillTextActive]}>{item.neighborhood}</Text></Pressable>)}</ScrollView><Text style={styles.question}>¿Qué comiste?</Text><View style={styles.tacos}>{place.tacos.map((taco) => { const selected = tacoIds.includes(taco.id); return <Pressable key={taco.id} onPress={() => toggleTaco(taco.id)} style={[styles.taco, selected && styles.tacoActive]}><View style={styles.tacoCopy}><Text style={[styles.tacoName, selected && styles.tacoNameActive]}>{taco.name}</Text><Text style={[styles.tacoNote, selected && styles.tacoNameActive]}>{taco.note}</Text>{selected ? <View style={styles.tacoRatingRow}><Text style={styles.tacoRatingLabel}>Taco</Text>{[1, 2, 3, 4, 5].map((value) => <Pressable key={value} onPress={(event) => { event.stopPropagation(); setTacoRatings((current) => ({ ...current, [taco.id]: value })); }} style={[styles.tacoRating, value <= (tacoRatings[taco.id] ?? rating) && styles.tacoRatingActive]}><Text style={[styles.tacoRatingValue, value <= (tacoRatings[taco.id] ?? rating) && styles.tacoRatingValueActive]}>{value}</Text></Pressable>)}</View> : null}</View><View style={[styles.checkbox, selected && styles.checkboxActive]}>{selected ? <Ionicons name="checkmark" color={colors.background} size={15} /> : null}</View></Pressable>; })}</View><Text style={styles.question}>¿Qué tal estuvo?</Text><View style={styles.ratingRow}>{[1, 2, 3, 4, 5].map((value) => <Pressable key={value} onPress={() => setRating(value)} style={[styles.rating, value <= rating && styles.ratingActive]}><Text style={[styles.ratingValue, value <= rating && styles.ratingValueActive]}>{value}</Text></Pressable>)}</View><Text style={styles.ratingHint}>{rating === 5 ? 'Lo defenderías contra tus amigos.' : rating >= 4 ? 'Volverías por otro.' : 'Buena información para tu futuro yo.'}</Text><Pressable style={[styles.primary, tacoIds.length === 0 && styles.disabled]} disabled={tacoIds.length === 0} onPress={save}><Text style={styles.primaryText}>Guardar en mi diario</Text><Ionicons name="arrow-forward" size={18} color={colors.background} /></Pressable></ScrollView>;
+  return <ScrollView style={styles.screen} contentContainerStyle={styles.content}><View style={styles.header}><Pressable onPress={() => router.back()}><Ionicons name="close" size={25} color={colors.ink} /></Pressable><View style={styles.headerTitle}><Text style={styles.kicker}>NUEVA ENTRADA</Text><Text style={styles.title}>Registrar visita</Text></View><View style={{ width: 25 }} /></View><Text style={styles.question}>¿Dónde comiste?</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.placeRow}>{availablePlaces.map((item) => <Pressable key={item.id} onPress={() => selectPlace(item.id)} style={[styles.placePill, item.id === placeId && styles.placePillActive]}><Text style={[styles.placePillText, item.id === placeId && styles.placePillTextActive]}>{item.name}</Text><Text style={[styles.placePillMeta, item.id === placeId && styles.placePillTextActive]}>{item.neighborhood}</Text></Pressable>)}</ScrollView><Text style={styles.question}>¿Qué comiste?</Text><View style={styles.tacos}>{place.tacos.map((taco) => { const selected = tacoIds.includes(taco.id); return <Pressable key={taco.id} onPress={() => toggleTaco(taco.id)} style={[styles.taco, selected && styles.tacoActive]}><View style={styles.tacoCopy}><Text style={[styles.tacoName, selected && styles.tacoNameActive]}>{taco.name}</Text><Text style={[styles.tacoNote, selected && styles.tacoNameActive]}>{taco.note}</Text>{selected ? <View style={styles.tacoRatingRow}><Text style={styles.tacoRatingLabel}>Taco</Text>{[1, 2, 3, 4, 5].map((value) => <Pressable key={value} onPress={(event) => { event.stopPropagation(); setTacoRatings((current) => ({ ...current, [taco.id]: value })); }} style={[styles.tacoRating, value <= (tacoRatings[taco.id] ?? rating) && styles.tacoRatingActive]}><Text style={[styles.tacoRatingValue, value <= (tacoRatings[taco.id] ?? rating) && styles.tacoRatingValueActive]}>{value}</Text></Pressable>)}</View> : null}</View><View style={[styles.checkbox, selected && styles.checkboxActive]}>{selected ? <Ionicons name="checkmark" color={colors.background} size={15} /> : null}</View></Pressable>; })}</View><Text style={styles.question}>¿Qué tal estuvo?</Text><View style={styles.ratingRow}>{[1, 2, 3, 4, 5].map((value) => <Pressable key={value} onPress={() => setRating(value)} style={[styles.rating, value <= rating && styles.ratingActive]}><Text style={[styles.ratingValue, value <= rating && styles.ratingValueActive]}>{value}</Text></Pressable>)}</View><Text style={styles.ratingHint}>{rating === 5 ? 'Lo defenderías contra tus amigos.' : rating >= 4 ? 'Volverías por otro.' : 'Buena información para tu futuro yo.'}</Text>{error ? <Text style={styles.error}>{error}</Text> : null}<Pressable style={[styles.primary, (tacoIds.length === 0 || saving) && styles.disabled]} disabled={tacoIds.length === 0 || saving} onPress={save}><Text style={styles.primaryText}>{saving ? 'Guardando…' : 'Guardar en mi diario'}</Text><Ionicons name="arrow-forward" size={18} color={colors.background} /></Pressable></ScrollView>;
 }
 
 const styles = StyleSheet.create({
@@ -90,6 +100,7 @@ const styles = StyleSheet.create({
   ratingValue: { color: colors.muted, fontSize: 17, fontWeight: '900' },
   ratingValueActive: { color: colors.background },
   ratingHint: { color: colors.muted, fontSize: 12, marginTop: 10 },
+  error: { color: '#F08A8A', fontSize: 12, lineHeight: 17, marginTop: 16 },
   primary: { marginTop: 30, backgroundColor: colors.accent, borderRadius: radii.md, minHeight: 54, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10 },
   primaryText: { color: colors.background, fontSize: 14, fontWeight: '900' },
   disabled: { opacity: 0.35 },
