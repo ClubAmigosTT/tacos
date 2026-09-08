@@ -62,9 +62,23 @@ export type MaintenanceResult = { database: 'postgres' | 'memory'; analyzed: boo
 export async function runNightlyMaintenance(): Promise<MaintenanceResult> {
   const retentionDays = 180;
   if (pool) {
-    await pool.query('ANALYZE branches, menu_items, visits, visit_items, product_events');
-    const purged = await pool.query("DELETE FROM product_events WHERE created_at < now() - ($1::int * interval '1 day')", [retentionDays]);
-    return { database: 'postgres', analyzed: true, purgedEvents: purged.rowCount ?? 0 };
+    let analyzed = false;
+    for (const table of ['branches', 'menu_items', 'visits', 'visit_items', 'product_events']) {
+      try {
+        await pool.query(`ANALYZE ${table}`);
+        analyzed = true;
+      } catch (error) {
+        if ((error as { code?: string }).code !== '42P01') throw error;
+      }
+    }
+    let purgedEvents = 0;
+    try {
+      const purged = await pool.query("DELETE FROM product_events WHERE created_at < now() - ($1::int * interval '1 day')", [retentionDays]);
+      purgedEvents = purged.rowCount ?? 0;
+    } catch (error) {
+      if ((error as { code?: string }).code !== '42P01') throw error;
+    }
+    return { database: 'postgres', analyzed, purgedEvents };
   }
   const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
   let purgedEvents = 0;
