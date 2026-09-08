@@ -64,6 +64,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 34. Validación normalizada: títulos, nombres, notas y correos se recortan y validan antes de escribir en la base.
 35. Operación Render: `/health` comprueba PostgreSQL y el API cierra conexiones limpiamente durante reinicios.
 36. Mapa responsive: la ubicación concedida después del montaje recentra el mapa nativo con una transición corta.
+37. Health con timeout: las comprobaciones de PostgreSQL fallan rápido para que Render pueda reemplazar una instancia degradada.
 
 ## Verificación
 

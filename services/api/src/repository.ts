@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { lists as fixtureLists, places, type ApiList, type ApiListDetail, type ApiPlace, type ApiTaqueria, type FlavorProfile, type TasteProfile } from './data.js';
 
 const pool = process.env.DATABASE_URL
-  ? new Pool({ connectionString: process.env.DATABASE_URL, max: 10, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined })
+  ? new Pool({ connectionString: process.env.DATABASE_URL, max: 10, connectionTimeoutMillis: 5_000, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined })
   : null;
 
 type DiscoverQuery = { q?: string; lat?: number; lng?: number; limit: number };
@@ -31,11 +31,17 @@ const defaultTaste: TasteProfile = {
 
 export async function getHealth() {
   if (!pool) return { status: 'ok' as const, database: 'memory' as const };
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    await pool.query('SELECT 1');
+    await Promise.race([
+      pool.query('SELECT 1'),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('HEALTH_TIMEOUT')), 3_000); })
+    ]);
     return { status: 'ok' as const, database: 'postgres' as const };
   } catch {
     return { status: 'degraded' as const, database: 'unavailable' as const };
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
