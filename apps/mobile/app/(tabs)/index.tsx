@@ -42,6 +42,7 @@ export default function HomeScreen() {
               <View style={styles.heroPill}><Text style={styles.heroPillText}>RECOMENDADO AHORA</Text></View>
               <Text style={styles.heroTitle}>{featuredTaco?.name ?? 'Taco'} preciso{`\n`}cerca de ti.</Text>
               <View style={styles.heroMeta}><RatingBadge rating={featured.rating} accent /><Text style={styles.heroPlace}>{featured.name} · {featured.distance}</Text><Text style={styles.heroMatch}>{featured.match}%</Text></View>
+              {featured.friendCount ? <Text style={styles.heroSocial}>{featured.socialMatch}% entre tus amigos · {featured.friendCount} personas</Text> : null}
             </View>
           </Pressable>
         </Link>
@@ -79,6 +80,7 @@ const styles = StyleSheet.create({
   heroMeta: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   heroPlace: { color: colors.ink, fontSize: 12, fontWeight: '700', flex: 1 },
   heroMatch: { color: colors.accent, fontSize: 13, fontWeight: '900' },
+  heroSocial: { color: colors.ink, opacity: 0.75, fontSize: 10, fontWeight: '800', marginTop: 8 },
   section: { marginBottom: spacing.xl },
   activity: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, gap: 12 },
   activityAvatars: { flexDirection: 'row', width: 66 },

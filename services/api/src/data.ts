@@ -16,6 +16,8 @@ export type ApiPlace = {
   tacos: ApiTaco[];
   tags: string[];
   flavorProfile: FlavorProfile;
+  socialMatch?: number;
+  friendCount?: number;
 };
 
 export type ApiList = {

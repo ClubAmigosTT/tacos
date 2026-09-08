@@ -96,6 +96,7 @@ export async function getRecommendations(userId?: string): Promise<ApiPlace[]> {
   if (!userId) return candidates;
 
   const preferenceTokens = new Set<string>();
+  const socialSignals = new Map<string, { average: number; friendCount: number }>();
   if (pool) {
     const history = await pool.query(`
       SELECT v.rating, b.name, b.style, b.tags, m.name AS taco_name
@@ -107,19 +108,39 @@ export async function getRecommendations(userId?: string): Promise<ApiPlace[]> {
     for (const row of history.rows) {
       for (const value of [row.name, row.style, row.taco_name, ...(row.tags ?? [])]) for (const token of tokenise(String(value ?? ''))) preferenceTokens.add(token);
     }
+    const social = await pool.query(`
+      SELECT v.branch_id, AVG(v.rating)::numeric AS average_rating, COUNT(DISTINCT v.user_id)::int AS friend_count
+      FROM follows f JOIN visits v ON v.user_id = f.followed_id
+      WHERE f.follower_id = $1 GROUP BY v.branch_id
+    `, [userId]);
+    for (const row of social.rows) socialSignals.set(row.branch_id, { average: Number(row.average_rating), friendCount: Number(row.friend_count) });
   } else {
+    const followedIds = [...localFollows].filter((key) => key.startsWith(`${userId}:`)).map((key) => key.slice(userId.length + 1));
+    const socialSums = new Map<string, { sum: number; count: number; users: Set<string> }>();
     for (const visit of localVisits.values()) {
-      if (visit.userId !== userId || visit.rating < 4) continue;
-      const place = places.find((item) => item.id === visit.placeId);
-      for (const value of [place?.name, place?.style, ...(place?.tags ?? []), ...visit.tacoIds.map((id) => place?.tacos.find((taco) => taco.id === id)?.name)]) for (const token of tokenise(String(value ?? ''))) preferenceTokens.add(token);
+      if (visit.userId === userId && visit.rating >= 4) {
+        const place = places.find((item) => item.id === visit.placeId);
+        for (const value of [place?.name, place?.style, ...(place?.tags ?? []), ...visit.tacoIds.map((id) => place?.tacos.find((taco) => taco.id === id)?.name)]) for (const token of tokenise(String(value ?? ''))) preferenceTokens.add(token);
+      }
+      if (followedIds.includes(visit.userId)) {
+        const current = socialSums.get(visit.placeId) ?? { sum: 0, count: 0, users: new Set<string>() };
+        current.sum += visit.rating;
+        current.count += 1;
+        current.users.add(visit.userId);
+        socialSums.set(visit.placeId, current);
+      }
     }
+    for (const [placeId, signal] of socialSums) socialSignals.set(placeId, { average: signal.sum / signal.count, friendCount: signal.users.size });
   }
-  if (!preferenceTokens.size) return candidates;
+  if (!preferenceTokens.size && !socialSignals.size) return candidates;
   return candidates.map((place) => {
     const placeTokens = new Set(tokenise([place.name, place.style, ...place.tags, ...place.tacos.map((taco) => taco.name)].join(' ')));
     const overlap = [...placeTokens].filter((token) => preferenceTokens.has(token)).length;
     const personalMatch = Math.min(99, Math.round(place.match + Math.min(15, overlap * 4)));
-    return { ...place, match: personalMatch };
+    const social = socialSignals.get(place.id);
+    const socialMatch = social ? Math.min(99, Math.round(social.average * 20)) : undefined;
+    const match = socialMatch == null ? personalMatch : Math.min(99, Math.round(personalMatch * 0.75 + socialMatch * 0.25));
+    return { ...place, match, socialMatch, friendCount: social?.friendCount };
   }).sort((a, b) => b.match - a.match || b.rating - a.rating);
 }
 
