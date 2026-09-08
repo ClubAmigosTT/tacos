@@ -7,12 +7,12 @@ const pool = process.env.DATABASE_URL
   : null;
 
 type DiscoverQuery = { q?: string; lat?: number; lng?: number; limit: number };
-type VisitInput = { placeId: string; tacoIds: string[]; rating: number; tacoRatings?: Record<string, number> };
+type VisitInput = { placeId: string; tacoIds: string[]; rating: number; tacoRatings?: Record<string, number>; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number };
 export type PublicUser = { id: string; email: string; displayName: string };
 
 type LocalUser = PublicUser & { passwordHash: string };
 const localUsers = new Map<string, LocalUser>();
-const localVisits = new Map<string, { userId: string; placeId: string; tacoIds: string[]; tacoRatings?: Record<string, number>; rating: number; createdAt: string }>();
+const localVisits = new Map<string, { userId: string; placeId: string; tacoIds: string[]; tacoRatings?: Record<string, number>; rating: number; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number; createdAt: string }>();
 const localFollows = new Set<string>();
 const localLists = new Map<string, { id: string; ownerId: string; title: string; description: string; visibility: 'public' | 'private'; coverImage: string; placeIds: string[]; createdAt: string }>();
 
@@ -147,7 +147,11 @@ export async function createVisitForUser(input: VisitInput, userId: string) {
   if (pool) {
     await pool.query('BEGIN');
     try {
-      await pool.query('INSERT INTO visits (id, user_id, branch_id, rating) VALUES ($1, $2, $3, $4)', [id, userId, input.placeId, input.rating]);
+      await pool.query(`INSERT INTO visits (id, user_id, branch_id, rating, price, note, photo_url, visit_location)
+        VALUES ($1, $2, $3, $4, $5, $6, $7,
+          CASE WHEN $8::numeric IS NULL OR $9::numeric IS NULL THEN NULL
+            ELSE ST_SetSRID(ST_MakePoint($9::numeric, $8::numeric), 4326)::geography END)`,
+        [id, userId, input.placeId, input.rating, input.price ?? null, input.note?.trim() ?? '', input.photoUrl ?? null, input.latitude ?? null, input.longitude ?? null]);
       for (const tacoId of input.tacoIds) await pool.query('INSERT INTO visit_items (visit_id, menu_item_id, rating) VALUES ($1, $2, $3)', [id, tacoId, input.tacoRatings?.[tacoId] ?? null]);
       await pool.query('COMMIT');
     } catch (error) {
@@ -203,7 +207,7 @@ export async function findUserById(id: string): Promise<PublicUser | undefined> 
 export async function getDiary(userId: string) {
   if (pool) {
     const result = await pool.query(`
-      SELECT v.id, v.visited_at, v.rating, b.name AS place_name, b.neighborhood,
+      SELECT v.id, v.visited_at, v.rating, v.price, v.note, v.photo_url, b.name AS place_name, b.neighborhood,
         COALESCE(string_agg(m.name, ', ' ORDER BY m.name), '') AS tacos,
         COALESCE(json_object_agg(m.id, vi.rating) FILTER (WHERE m.id IS NOT NULL), '{}'::json) AS taco_ratings,
         b.image_url
@@ -218,7 +222,7 @@ export async function getDiary(userId: string) {
   return [...localVisits.entries()].filter(([, visit]) => visit.userId === userId).sort(([, a], [, b]) => b.createdAt.localeCompare(a.createdAt)).map(([id, visit]) => {
     const place = places.find((item) => item.id === visit.placeId);
     const tacoNames = visit.tacoIds.map((tacoId) => place?.tacos.find((taco) => taco.id === tacoId)?.name ?? tacoId).join(', ');
-    return { id, visited_at: visit.createdAt, rating: visit.rating, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', tacos: tacoNames, taco_ratings: visit.tacoRatings ?? {}, image_url: place?.image ?? '' };
+    return { id, visited_at: visit.createdAt, rating: visit.rating, price: visit.price ?? null, note: visit.note ?? '', photo_url: visit.photoUrl ?? null, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', tacos: tacoNames, taco_ratings: visit.tacoRatings ?? {}, image_url: place?.image ?? '' };
   });
 }
 

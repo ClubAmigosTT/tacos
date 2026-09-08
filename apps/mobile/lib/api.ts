@@ -56,7 +56,7 @@ export async function getPlace(id: string): Promise<Place> {
   }
 }
 
-export async function createVisit(input: { placeId: string; tacoIds: string[]; rating: number; tacoRatings?: Record<string, number> }, token: string) {
+export async function createVisit(input: { placeId: string; tacoIds: string[]; rating: number; tacoRatings?: Record<string, number>; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number }, token: string) {
   return request('/v1/visits', { method: 'POST', body: JSON.stringify(input) }, token);
 }
 
@@ -73,7 +73,7 @@ export async function me(token: string) {
 }
 
 export async function diary(token: string) {
-  return request<{ entries: Array<{ id: string; visited_at: string; rating: number; place_name: string; neighborhood: string; tacos: string; taco_ratings?: Record<string, number | null>; image_url: string }> }>('/v1/diary', undefined, token);
+  return request<{ entries: Array<{ id: string; visited_at: string; rating: number; price?: number | null; note?: string; photo_url?: string | null; place_name: string; neighborhood: string; tacos: string; taco_ratings?: Record<string, number | null>; image_url: string }> }>('/v1/diary', undefined, token);
 }
 
 export async function lists(token?: string) {
