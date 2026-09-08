@@ -1,15 +1,17 @@
 import { router } from 'expo-router';
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { feed as feedRequest, reportVisit } from '@/lib/api';
+import { feed as feedRequest, reportVisit, trackEvent } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 import { RatingBadge } from '@/components/RatingBadge';
 
 export default function FeedScreen() {
   const { token, user } = useAuth();
+  useEffect(() => { void trackEvent('feed_open', {}, token); }, [token]);
   const { data } = useQuery({ queryKey: ['feed', token], queryFn: () => feedRequest(token!), enabled: Boolean(token) });
   const items = data?.items ?? [];
   const reportMutation = useMutation({ mutationFn: (visitId: string) => reportVisit({ visitId, reason: 'other' }, token!), onSuccess: () => Alert.alert('Gracias', 'Revisaremos este registro.'), onError: () => Alert.alert('No se pudo reportar', 'Inténtalo de nuevo más tarde.') });

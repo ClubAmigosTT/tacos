@@ -1,13 +1,15 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radii, spacing } from '@/theme';
 import { useAuth } from '@/lib/auth';
-import { diary as diaryRequest, lists as listsRequest, taste as tasteRequest } from '@/lib/api';
+import { diary as diaryRequest, lists as listsRequest, taste as tasteRequest, trackEvent } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 
 export default function ProfileScreen() {
   const { user, token, signOut } = useAuth();
+  useEffect(() => { void trackEvent('profile_open', {}, token); }, [token]);
   const { data } = useQuery({ queryKey: ['diary', 'profile', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
   const { data: listData } = useQuery({ queryKey: ['lists', 'profile', token], queryFn: () => listsRequest(token), enabled: true });
   const { data: tasteData } = useQuery({ queryKey: ['taste', token], queryFn: () => tasteRequest(token!), enabled: Boolean(token) });

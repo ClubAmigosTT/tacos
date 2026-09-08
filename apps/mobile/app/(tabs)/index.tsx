@@ -35,7 +35,7 @@ export default function HomeScreen() {
           <Text style={styles.kicker}>{user ? `PARA ${user.displayName.toUpperCase()} · CDMX` : `CDMX · ${moment}`}</Text>
           <Text style={styles.logo}>tacos<Text style={styles.logoDot}>.</Text></Text>
         </View>
-        <Pressable style={styles.avatar} onPress={() => router.push('/(tabs)/profile')}><Text style={styles.avatarText}>M</Text></Pressable>
+        <Pressable style={styles.avatar} onPress={() => router.push('/(tabs)/profile')}><Text style={styles.avatarText}>{user?.displayName.slice(0, 1).toUpperCase() ?? 'M'}</Text></Pressable>
       </View>
 
       <View style={styles.search}>
