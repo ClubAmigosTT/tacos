@@ -83,6 +83,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 53. Operación activa: el worker y el cron de Render ejecutan mantenimiento acotado, `ANALYZE` del catálogo/visitas y retención de eventos analíticos de 180 días sin borrar contenido de usuarios.
 54. Integridad de listas: sucursales inexistentes se rechazan con 404 y las visitas ocultas no inflan el progreso visitado.
 55. Privacidad del directorio: buscar personas requiere sesión y los eventos autenticados no mezclan un identificador anónimo con el usuario.
+56. Persistencia transaccional: visitas y moderaciones usan una conexión dedicada del pool para garantizar `BEGIN/COMMIT/ROLLBACK` atómicos en Render.
 
 ## Verificación
 

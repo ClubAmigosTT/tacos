@@ -409,22 +409,25 @@ export async function createVisit(input: VisitInput) {
 export async function createVisitForUser(input: VisitInput, userId: string) {
   const id = crypto.randomUUID();
   if (pool) {
-    await pool.query('BEGIN');
+    const client = await pool.connect();
     try {
-      await pool.query(`INSERT INTO visits (id, user_id, branch_id, rating, price, note, photo_url, visit_location)
+      await client.query('BEGIN');
+      await client.query(`INSERT INTO visits (id, user_id, branch_id, rating, price, note, photo_url, visit_location)
         VALUES ($1, $2, $3, $4, $5, $6, $7,
           CASE WHEN $8::numeric IS NULL OR $9::numeric IS NULL THEN NULL
             ELSE ST_SetSRID(ST_MakePoint($9::numeric, $8::numeric), 4326)::geography END)`,
         [id, userId, input.placeId, input.rating, input.price ?? null, input.note?.trim() ?? '', input.photoUrl ?? null, input.latitude ?? null, input.longitude ?? null]);
-      for (const tacoId of input.tacoIds) await pool.query('INSERT INTO visit_items (visit_id, menu_item_id, rating) VALUES ($1, $2, $3)', [id, tacoId, input.tacoRatings?.[tacoId] ?? null]);
-      await pool.query('COMMIT');
+      for (const tacoId of input.tacoIds) await client.query('INSERT INTO visit_items (visit_id, menu_item_id, rating) VALUES ($1, $2, $3)', [id, tacoId, input.tacoRatings?.[tacoId] ?? null]);
+      await client.query('COMMIT');
     } catch (error) {
-      await pool.query('ROLLBACK');
+      await client.query('ROLLBACK');
       throw error;
+    } finally {
+      client.release();
     }
   }
   const createdAt = new Date().toISOString();
-  localVisits.set(id, { userId, ...input, createdAt, visibility: 'visible' });
+  if (!pool) localVisits.set(id, { userId, ...input, createdAt, visibility: 'visible' });
   return { id, ...input, createdAt, status: 'recorded' };
 }
 
@@ -1075,15 +1078,18 @@ export async function getAdminReports(status: 'open' | 'reviewed' | 'dismissed' 
 
 export async function reviewAdminReport(reportId: string, action: 'hide' | 'dismiss'): Promise<boolean> {
   if (pool) {
-    await pool.query('BEGIN');
+    const client = await pool.connect();
     try {
-      if (action === 'hide') await pool.query("UPDATE visits SET visibility = 'hidden' WHERE id = (SELECT visit_id FROM reports WHERE id = $1)", [reportId]);
-      const result = await pool.query('UPDATE reports SET status = $2 WHERE id = $1 RETURNING id', [reportId, action === 'hide' ? 'reviewed' : 'dismissed']);
-      await pool.query('COMMIT');
+      await client.query('BEGIN');
+      if (action === 'hide') await client.query("UPDATE visits SET visibility = 'hidden' WHERE id = (SELECT visit_id FROM reports WHERE id = $1)", [reportId]);
+      const result = await client.query('UPDATE reports SET status = $2 WHERE id = $1 RETURNING id', [reportId, action === 'hide' ? 'reviewed' : 'dismissed']);
+      await client.query('COMMIT');
       return Boolean(result.rowCount);
     } catch (error) {
-      await pool.query('ROLLBACK');
+      await client.query('ROLLBACK');
       throw error;
+    } finally {
+      client.release();
     }
   }
   const report = [...localReports.values()].find((item) => item.id === reportId);

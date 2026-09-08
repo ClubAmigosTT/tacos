@@ -47,6 +47,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 4. Exponer una preferencia de actividad para que cada usuario decida si sus visitas alimentan el feed social.
 5. Mantener el repositorio en memoria sólo como fallback de diseño local; producción siempre usa `DATABASE_URL`.
 6. Permitir editar el nombre público desde Ajustes y reflejar el cambio inmediatamente en la sesión autenticada.
+7. Ejecutar escrituras multi-entidad con clientes dedicados del pool para conservar atomicidad en producción.
 
 **Aceptación:** registro, login, `/v1/me`, 401/403, listas privadas, preferencia de actividad y aislamiento entre usuarios están cubiertos por `scripts/smoke-api.mjs`.
 
