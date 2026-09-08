@@ -43,6 +43,18 @@ const recommendations = await request('/v1/recommendations', { token: bob.token 
 if (typeof recommendations.places?.[0]?.tasteMatch !== 'number') throw new Error('Taste-aware recommendation score missing');
 const taste = await request('/v1/me/taste', { token: bob.token });
 if (!taste.taste?.title) throw new Error('Taste profile missing');
+const list = await request('/v1/lists', {
+  method: 'POST',
+  body: JSON.stringify({ title: 'Smoke route', description: 'Lista de prueba' }),
+  token: bob.token
+}, 201);
+await request(`/v1/lists/${list.id}/items`, {
+  method: 'POST',
+  body: JSON.stringify({ branchId: 'vilsito', note: 'Pedir pastor' }),
+  token: bob.token
+});
+const listDetail = await request(`/v1/lists/${list.id}`, { token: alice.token });
+if (listDetail.items?.[0]?.branchId !== 'vilsito') throw new Error('Public list detail did not include its place');
 await request(`/v1/users/${bob.user.id}/follow`, { method: 'DELETE', token: alice.token });
 
 console.log(`API smoke passed: ${baseUrl}`);

@@ -3,6 +3,7 @@ import { places, type Place } from '@/data/fixtures';
 
 export type AuthUser = { id: string; email: string; displayName: string };
 export type ApiList = { id: string; title: string; description: string; owner: { id: string; displayName: string }; itemCount: number; visitedCount: number; coverImage: string };
+export type ApiListDetail = ApiList & { items: Array<{ branchId: string; note: string; position: number; place: Place }> };
 export type FeedItem = { id: string; visited_at: string; rating: number; user_id: string; display_name: string; place_id: string; place_name: string; neighborhood: string; image_url: string; tacos: string };
 export type TasteProfile = { title: string; description: string; tags: string[]; profile: { intensity: number; spicy: number; traditional: number; texture: number; value: number } };
 
@@ -109,6 +110,10 @@ export async function lists(token?: string) {
   } catch {
     return { lists: [] as ApiList[] };
   }
+}
+
+export async function listDetails(listId: string, token?: string) {
+  return request<ApiListDetail>(`/v1/lists/${listId}`, undefined, token);
 }
 
 export async function createList(input: { title: string; description?: string; visibility?: 'public' | 'private' }, token: string) {

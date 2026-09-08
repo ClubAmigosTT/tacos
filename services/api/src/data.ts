@@ -30,6 +30,7 @@ export type ApiList = {
   visitedCount: number;
   coverImage: string;
 };
+export type ApiListDetail = ApiList & { items: Array<{ branchId: string; note: string; position: number; place: ApiPlace }> };
 
 export const places: ApiPlace[] = [
   {

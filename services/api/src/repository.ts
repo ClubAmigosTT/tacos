@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import bcrypt from 'bcryptjs';
-import { lists as fixtureLists, places, type ApiList, type ApiPlace, type FlavorProfile, type TasteProfile } from './data.js';
+import { lists as fixtureLists, places, type ApiList, type ApiListDetail, type ApiPlace, type FlavorProfile, type TasteProfile } from './data.js';
 
 const pool = process.env.DATABASE_URL
   ? new Pool({ connectionString: process.env.DATABASE_URL, max: 10, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined })
@@ -358,6 +358,45 @@ export async function getLists(userId?: string): Promise<ApiList[]> {
     return { id: list.id, title: list.title, description: list.description, owner: { id: list.ownerId, displayName: owner?.displayName ?? 'Tacos' }, itemCount: list.placeIds.length, visitedCount, coverImage: list.coverImage } satisfies ApiList;
   });
   return [...fixtureLists, ...mapped];
+}
+
+export async function getListDetails(listId: string, userId?: string): Promise<ApiListDetail | undefined> {
+  if (pool) {
+    const listResult = await pool.query(`
+      SELECT l.id, l.title, l.description, l.owner_id, u.display_name AS owner_name,
+        COUNT(li.branch_id)::int AS item_count,
+        COALESCE(SUM(CASE WHEN EXISTS (
+          SELECT 1 FROM visits vv WHERE vv.user_id = $2 AND vv.branch_id = li.branch_id
+        ) THEN 1 ELSE 0 END), 0)::int AS visited_count,
+        COALESCE(l.cover_image_url, MIN(b.image_url)) AS cover_image_url
+      FROM lists l JOIN users u ON u.id = l.owner_id
+      LEFT JOIN list_items li ON li.list_id = l.id
+      LEFT JOIN branches b ON b.id = li.branch_id
+      WHERE l.id = $1 AND (l.visibility = 'public' OR l.owner_id = $2)
+      GROUP BY l.id, u.display_name
+    `, [listId, userId ?? null]);
+    if (!listResult.rows[0]) return undefined;
+    const itemResult = await pool.query('SELECT branch_id, note, position FROM list_items WHERE list_id = $1 ORDER BY position, created_at', [listId]);
+    const items = (await Promise.all(itemResult.rows.map(async (row) => ({ branchId: row.branch_id, note: row.note ?? '', position: Number(row.position), place: await findPlace(row.branch_id) })))).filter((item): item is { branchId: string; note: string; position: number; place: ApiPlace } => Boolean(item.place));
+    return { ...normalizeList(listResult.rows[0]), items };
+  }
+  const local = localLists.get(listId);
+  if (local && (local.visibility === 'public' || local.ownerId === userId)) {
+    const owner = localUsers.get(local.ownerId);
+    const visitedCount = local.placeIds.filter((placeId) => [...localVisits.values()].some((visit) => visit.userId === userId && visit.placeId === placeId)).length;
+    return {
+      id: local.id,
+      title: local.title,
+      description: local.description,
+      owner: { id: local.ownerId, displayName: owner?.displayName ?? 'Tacos' },
+      itemCount: local.placeIds.length,
+      visitedCount,
+      coverImage: local.coverImage,
+      items: local.placeIds.map((placeId, position) => { const place = places.find((item) => item.id === placeId); return place ? { branchId: placeId, note: '', position, place } : undefined; }).filter((item): item is { branchId: string; note: string; position: number; place: ApiPlace } => Boolean(item))
+    };
+  }
+  const fixture = fixtureLists.find((item) => item.id === listId);
+  return fixture ? { ...fixture, items: [] } : undefined;
 }
 
 export async function createListForUser(input: { title: string; description?: string; visibility?: 'public' | 'private' }, userId: string): Promise<ApiList> {
