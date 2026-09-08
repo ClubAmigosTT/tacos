@@ -69,6 +69,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 39. Listas editables: el propietario puede cambiar título, descripción y visibilidad desde una pantalla móvil dedicada; la API mantiene autorización y consistencia del progreso.
 40. Diario editable: una visita propia permite corregir rating, precio y nota desde una pantalla dedicada; los cambios invalidan diario, feed y recomendaciones.
 41. Listas como rutas: el detalle muestra un mapa compacto con sus lugares y cada pin abre la ficha correspondiente.
+42. Privacidad accionable: cada usuario puede ocultar o volver a compartir su actividad en el feed desde una pantalla dedicada, sin borrar su diario.
 
 ## Verificación
 

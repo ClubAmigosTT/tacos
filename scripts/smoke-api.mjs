@@ -55,6 +55,14 @@ const visit = await request('/v1/visits', {
 
 const feed = await request('/v1/feed', { token: alice.token });
 if (feed.items?.length !== 1 || feed.items?.[0]?.note !== 'Smoke test') throw new Error(`Expected one feed item with its note, got ${feed.items?.length ?? 0}`);
+const privacy = await request('/v1/me/privacy', { token: bob.token });
+if (privacy.privacy?.shareActivity !== true) throw new Error('Privacy defaults were not returned');
+await request('/v1/me/privacy', { method: 'PATCH', body: JSON.stringify({ shareActivity: false }), token: bob.token });
+const hiddenFeed = await request('/v1/feed', { token: alice.token });
+if (hiddenFeed.items?.length !== 0) throw new Error('Private activity still appeared in the feed');
+await request('/v1/me/privacy', { method: 'PATCH', body: JSON.stringify({ shareActivity: true }), token: bob.token });
+const restoredFeed = await request('/v1/feed', { token: alice.token });
+if (restoredFeed.items?.length !== 1) throw new Error('Activity did not return after privacy was restored');
 const diary = await request('/v1/diary', { token: bob.token });
 if (diary.entries?.[0]?.price !== 44 || diary.entries?.[0]?.note !== 'Smoke test') throw new Error('Diary context was not persisted');
 const editedVisit = await request(`/v1/visits/${visit.id}`, {

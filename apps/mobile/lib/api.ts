@@ -138,6 +138,14 @@ export async function me(token: string) {
   return request<{ user: AuthUser }>('/v1/me', undefined, token);
 }
 
+export async function privacy(token: string) {
+  return request<{ privacy: { shareActivity: boolean } }>('/v1/me/privacy', undefined, token);
+}
+
+export async function updatePrivacy(input: { shareActivity: boolean }, token: string) {
+  return request<{ privacy: { shareActivity: boolean } }>('/v1/me/privacy', { method: 'PATCH', body: JSON.stringify(input) }, token);
+}
+
 export async function diary(token: string) {
   return request<{ entries: Array<{ id: string; visited_at: string; rating: number; price?: number | null; note?: string; photo_url?: string | null; place_name: string; neighborhood: string; tacos: string; taco_ratings?: Record<string, number | null>; image_url: string }> }>('/v1/diary', undefined, token);
 }

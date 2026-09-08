@@ -12,7 +12,7 @@ type ReportInput = { visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_
 export type PublicUser = { id: string; email: string; displayName: string; role: 'user' | 'admin'; following?: boolean };
 export type AdminReport = { id: string; visitId: string; reason: ReportInput['reason']; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string; reporter: { id: string; displayName: string }; author: { id: string; displayName: string }; place: { id: string; name: string }; rating: number; visitedAt: string };
 
-type LocalUser = PublicUser & { passwordHash: string };
+type LocalUser = PublicUser & { passwordHash: string; shareActivity: boolean };
 const localUsers = new Map<string, LocalUser>();
 const localVisits = new Map<string, { userId: string; placeId: string; tacoIds: string[]; tacoRatings?: Record<string, number>; rating: number; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number; createdAt: string; visibility: 'visible' | 'hidden' }>();
 const localFollows = new Set<string>();
@@ -393,7 +393,7 @@ export async function registerUser(input: { email: string; password: string; dis
     return { id: result.rows[0].id, email: result.rows[0].email, displayName: result.rows[0].display_name, role: result.rows[0].role };
   }
   if ([...localUsers.values()].some((user) => user.email === email)) throw new Error('EMAIL_TAKEN');
-  const user: LocalUser = { id: crypto.randomUUID(), email, displayName, role: configuredAdminEmails.has(email) ? 'admin' : 'user', passwordHash: await bcrypt.hash(input.password, 10) };
+  const user: LocalUser = { id: crypto.randomUUID(), email, displayName, role: configuredAdminEmails.has(email) ? 'admin' : 'user', passwordHash: await bcrypt.hash(input.password, 10), shareActivity: true };
   localUsers.set(user.id, user);
   return publicUser(user);
 }
@@ -419,6 +419,26 @@ export async function findUserById(id: string): Promise<PublicUser | undefined> 
   }
   const user = localUsers.get(id);
   return user ? publicUser(user) : undefined;
+}
+
+export async function getPrivacyForUser(userId: string): Promise<{ shareActivity: boolean } | undefined> {
+  if (pool) {
+    const result = await pool.query('SELECT share_activity FROM users WHERE id = $1 AND is_active = true', [userId]);
+    return result.rows[0] ? { shareActivity: Boolean(result.rows[0].share_activity) } : undefined;
+  }
+  const user = localUsers.get(userId);
+  return user ? { shareActivity: user.shareActivity } : undefined;
+}
+
+export async function updatePrivacyForUser(userId: string, input: { shareActivity: boolean }): Promise<{ shareActivity: boolean } | undefined> {
+  if (pool) {
+    const result = await pool.query('UPDATE users SET share_activity = $2, updated_at = now() WHERE id = $1 AND is_active = true RETURNING share_activity', [userId, input.shareActivity]);
+    return result.rows[0] ? { shareActivity: Boolean(result.rows[0].share_activity) } : undefined;
+  }
+  const user = localUsers.get(userId);
+  if (!user) return undefined;
+  user.shareActivity = input.shareActivity;
+  return { shareActivity: user.shareActivity };
 }
 
 export async function getUserProfile(userId: string, viewerId?: string) {
@@ -661,12 +681,12 @@ export async function getFeed(userId: string) {
       FROM follows f JOIN visits v ON v.user_id = f.followed_id
       JOIN users u ON u.id = v.user_id JOIN branches b ON b.id = v.branch_id
       LEFT JOIN visit_items vi ON vi.visit_id = v.id LEFT JOIN menu_items m ON m.id = vi.menu_item_id
-      WHERE f.follower_id = $1 AND v.visibility = 'visible' GROUP BY v.id, v.photo_url, v.note, u.id, b.id ORDER BY v.visited_at DESC LIMIT 50
+      WHERE f.follower_id = $1 AND v.visibility = 'visible' AND u.share_activity = true GROUP BY v.id, v.photo_url, v.note, u.id, b.id ORDER BY v.visited_at DESC LIMIT 50
     `, [userId]);
     return result.rows;
   }
   const followed = [...localFollows].filter((key) => key.startsWith(`${userId}:`)).map((key) => key.slice(userId.length + 1));
-  return [...localVisits.entries()].filter(([, visit]) => followed.includes(visit.userId) && visit.visibility === 'visible').sort(([, a], [, b]) => b.createdAt.localeCompare(a.createdAt)).map(([id, visit]) => {
+  return [...localVisits.entries()].filter(([, visit]) => followed.includes(visit.userId) && visit.visibility === 'visible' && localUsers.get(visit.userId)?.shareActivity !== false).sort(([, a], [, b]) => b.createdAt.localeCompare(a.createdAt)).map(([id, visit]) => {
     const place = places.find((item) => item.id === visit.placeId);
     const user = localUsers.get(visit.userId);
     const tacos = visit.tacoIds.map((tacoId) => place?.tacos.find((taco) => taco.id === tacoId)?.name ?? tacoId).join(', ');

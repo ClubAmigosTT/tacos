@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getAdminReports, getDiary, getFeed, getHealth, getListDetails, getLists, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, registerUser, removeListItemForUser, reportVisitForUser, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updateVisitForUser, type PublicUser } from './repository.js';
+import { addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getAdminReports, getDiary, getFeed, getHealth, getListDetails, getLists, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, registerUser, removeListItemForUser, reportVisitForUser, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateVisitForUser, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
 import { uploadVisitImage } from './storage.js';
 
@@ -72,6 +72,21 @@ app.post('/v1/auth/login', async (request, reply) => {
 app.get('/v1/me', async (request, reply) => {
   const user = await requireUser(request, reply);
   return user ? { user } : undefined;
+});
+
+app.get('/v1/me/privacy', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  return { privacy: await getPrivacyForUser(user.id) };
+});
+
+app.patch('/v1/me/privacy', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const body = z.object({ shareActivity: z.boolean() }).parse(request.body);
+  const privacy = await updatePrivacyForUser(user.id, body);
+  if (!privacy) return reply.code(404).send({ error: 'USER_NOT_FOUND' });
+  return { privacy };
 });
 
 app.get('/v1/discover', async (request) => {
