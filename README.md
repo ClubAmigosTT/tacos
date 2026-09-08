@@ -56,6 +56,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 26. Perfiles públicos: el grafo social abre un perfil con Taste ID, estadísticas y listas públicas sin exponer el correo fuera de la búsqueda.
 27. Estado social persistente: la búsqueda indica quién ya te sigue para mantener los controles correctos después de recargar la pantalla.
 28. Feed contextual: las notas de una visita viajan con la actividad social para conservar la voz y el criterio de cada registro.
+29. Navegación social: el avatar y nombre del feed abren directamente el perfil público del autor.
 
 ## Verificación
 
