@@ -101,6 +101,7 @@ En el emulador Android usa `http://10.0.2.2:4000`; el emulador redirige esa dire
 68. Horarios confiables: el filtro “Abierto ahora” distingue negocios diurnos de cierres de madrugada y rechaza horas malformadas.
 69. Estados vacíos accionables: el mapa explica cuando una combinación no tiene resultados y permite limpiar la búsqueda y los filtros en un toque.
 70. Perfil vivo: las colonias exploradas se calculan desde el Diario del usuario y no desde un número fijo.
+71. Privacidad completa: ocultar actividad también retira esa señal de las recomendaciones sociales, tanto en PostgreSQL como en el fallback local.
 
 ## Verificación
 

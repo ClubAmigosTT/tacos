@@ -85,6 +85,8 @@ if (privacy.privacy?.shareActivity !== true) throw new Error('Privacy defaults w
 await request('/v1/me/privacy', { method: 'PATCH', body: JSON.stringify({ shareActivity: false }), token: bob.token });
 const hiddenFeed = await request('/v1/feed', { token: alice.token });
 if (hiddenFeed.items?.length !== 0) throw new Error('Private activity still appeared in the feed');
+const hiddenRecommendations = await request('/v1/recommendations', { token: alice.token });
+if (hiddenRecommendations.places?.some((place) => typeof place.socialMatch === 'number')) throw new Error('Private activity still influenced social recommendations');
 await request('/v1/me/privacy', { method: 'PATCH', body: JSON.stringify({ shareActivity: true }), token: bob.token });
 const restoredFeed = await request('/v1/feed', { token: alice.token });
 if (restoredFeed.items?.length !== 1) throw new Error('Activity did not return after privacy was restored');

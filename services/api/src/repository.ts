@@ -355,7 +355,8 @@ export async function getRecommendations(userId?: string): Promise<ApiPlace[]> {
     const social = await pool.query(`
       SELECT v.branch_id, AVG(v.rating)::numeric AS average_rating, COUNT(DISTINCT v.user_id)::int AS friend_count
       FROM follows f JOIN visits v ON v.user_id = f.followed_id
-      WHERE f.follower_id = $1 AND v.visibility = 'visible' GROUP BY v.branch_id
+      JOIN users followed ON followed.id = v.user_id
+      WHERE f.follower_id = $1 AND v.visibility = 'visible' AND followed.share_activity = true GROUP BY v.branch_id
     `, [userId]);
     for (const row of social.rows) socialSignals.set(row.branch_id, { average: Number(row.average_rating), friendCount: Number(row.friend_count) });
   } else {
@@ -370,7 +371,7 @@ export async function getRecommendations(userId?: string): Promise<ApiPlace[]> {
         }
         for (const value of [place?.name, place?.style, ...(place?.tags ?? []), ...visit.tacoIds.map((id) => place?.tacos.find((taco) => taco.id === id)?.name)]) for (const token of tokenise(String(value ?? ''))) preferenceTokens.add(token);
       }
-      if (followedIds.includes(visit.userId) && visit.visibility === 'visible') {
+      if (followedIds.includes(visit.userId) && visit.visibility === 'visible' && localUsers.get(visit.userId)?.shareActivity !== false) {
         const current = socialSums.get(visit.placeId) ?? { sum: 0, count: 0, users: new Set<string>() };
         current.sum += visit.rating;
         current.count += 1;
