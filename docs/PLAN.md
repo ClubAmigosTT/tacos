@@ -74,9 +74,9 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 8. Moderar comentarios desde una cola admin con ocultar/restaurar y preservación de evidencia.
 9. Compartir listas con colaboradores editor/lector y permitir que los editores gestionen lugares sin apropiarse de la curaduría.
 10. Rechazar sucursales inexistentes y excluir visitas ocultas del progreso mostrado en listas.
-10. Registrar eventos de producto anónimos y acotados para medir descubrimiento, conversión a visita y uso social sin almacenar búsquedas ni PII; usar un identificador aleatorio persistido localmente para medir recurrencia.
-11. Permitir eliminar una visita propia con confirmación y limpiar sus señales derivadas sin afectar entradas ajenas.
-12. Proponer la sucursal más cercana después de usar la cámara, manteniendo la selección explícita del usuario hasta confirmar.
+11. Registrar eventos de producto anónimos y acotados para medir descubrimiento, conversión a visita y uso social sin almacenar búsquedas ni PII; usar un identificador aleatorio persistido localmente para medir recurrencia.
+12. Permitir eliminar una visita propia con confirmación y limpiar sus señales derivadas sin afectar entradas ajenas.
+13. Proponer la sucursal más cercana después de usar la cámara, manteniendo la selección explícita del usuario hasta confirmar.
 
 **Aceptación:** una visita aparece en diario, feed y estadísticas; una foto inválida no se persiste; una falla de media permite guardar sin foto; una edición propia persiste y una edición ajena responde 404.
 
@@ -152,6 +152,5 @@ Lo único que no puede completarse desde este entorno es la conexión de cuentas
 ## 6. Evolución después del MVP
 
 - Medir latencia y volumen antes de separar recomendaciones, búsqueda o media en microservicios.
-- Añadir eventos de analítica anónimos, pruebas de carga y backups/restores de PostgreSQL.
-- Incorporar comentarios moderados, listas colaborativas y detección asistida por cámara sólo después de validar el hábito de registro; la edición de visitas ya está incluida en el MVP.
+- Añadir pruebas de carga y backups/restores de PostgreSQL; los eventos de producto, comentarios moderados, listas colaborativas y sugerencia asistida por cámara ya están incluidos en el MVP.
 - Mantener el score bayesiano como guardrail aunque se añadan embeddings o collaborative filtering.
