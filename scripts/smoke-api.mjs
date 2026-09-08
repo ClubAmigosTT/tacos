@@ -66,6 +66,8 @@ await request(`/v1/lists/${list.id}/items`, {
 });
 const listDetail = await request(`/v1/lists/${list.id}`, { token: alice.token });
 if (listDetail.items?.[0]?.branchId !== 'vilsito') throw new Error('Public list detail did not include its place');
+const bobProfile = await request(`/v1/users/${bob.user.id}/profile`, { token: alice.token });
+if (bobProfile.user?.displayName !== 'Beto Smoke' || bobProfile.lists?.some((item) => item.visibility === 'private')) throw new Error('Public user profile leaked private data or is incomplete');
 const publicLists = await request('/v1/lists');
 if (!publicLists.lists?.some((item) => item.id === list.id) || publicLists.lists?.some((item) => item.visibility === 'private')) throw new Error('Public list discovery leaked or omitted a list');
 await request(`/v1/lists/${list.id}/items/vilsito`, { method: 'DELETE', token: bob.token });
