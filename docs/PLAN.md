@@ -67,6 +67,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 6. Mostrar las listas como rutas: mapa compacto, progreso visitado y navegación a cada sucursal.
 7. Añadir conversaciones por visita con comentarios visibles, borrado por autor y límites de longitud.
 8. Moderar comentarios desde una cola admin con ocultar/restaurar y preservación de evidencia.
+9. Compartir listas con colaboradores editor/lector y permitir que los editores gestionen lugares sin apropiarse de la curaduría.
 
 **Aceptación:** una visita aparece en diario, feed y estadísticas; una foto inválida no se persiste; una falla de media permite guardar sin foto; una edición propia persiste y una edición ajena responde 404.
 

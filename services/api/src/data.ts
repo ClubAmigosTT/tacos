@@ -34,8 +34,11 @@ export type ApiList = {
   visitedCount: number;
   coverImage: string;
   visibility?: 'public' | 'private';
+  collaboratorCount?: number;
+  canEdit?: boolean;
 };
-export type ApiListDetail = ApiList & { items: Array<{ branchId: string; note: string; position: number; place: ApiPlace }> };
+export type ApiListCollaborator = { id: string; displayName: string; role: 'editor' | 'viewer' };
+export type ApiListDetail = ApiList & { collaborators?: ApiListCollaborator[]; items: Array<{ branchId: string; note: string; position: number; place: ApiPlace }> };
 
 export const places: ApiPlace[] = [
   {

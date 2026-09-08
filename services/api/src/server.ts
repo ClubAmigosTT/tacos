@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitComment, createVisitForUser, deleteVisitComment, discoverPlaces, findPlace, findUserById, followUser, getAdminComments, getAdminReports, getDiary, getFeed, getHealth, getListDetails, getLists, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, getVisitComments, registerUser, removeListItemForUser, reportVisitForUser, reviewAdminComment, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateVisitForUser, type PublicUser } from './repository.js';
+import { addListCollaborator, addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitComment, createVisitForUser, deleteVisitComment, discoverPlaces, findPlace, findUserById, followUser, getAdminComments, getAdminReports, getDiary, getFeed, getHealth, getListDetails, getLists, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, getVisitComments, registerUser, removeListCollaborator, removeListItemForUser, reportVisitForUser, reviewAdminComment, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateVisitForUser, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
 import { uploadVisitImage } from './storage.js';
 
@@ -217,6 +217,28 @@ app.patch('/v1/lists/:id', async (request, reply) => {
   const updated = await updateListForUser(params.id, body, user.id);
   if (!updated) return reply.code(404).send({ error: 'LIST_NOT_FOUND' });
   return updated;
+});
+
+app.post('/v1/lists/:id/collaborators', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const params = z.object({ id: z.string().uuid() }).parse(request.params);
+  const body = z.object({ userId: z.string(), role: z.enum(['editor', 'viewer']).default('editor') }).parse(request.body);
+  const result = await addListCollaborator(params.id, body.userId, body.role, user.id);
+  if (result === 'not_allowed') return reply.code(403).send({ error: 'LIST_OWNER_REQUIRED' });
+  if (result === 'not_found') return reply.code(404).send({ error: 'LIST_OR_USER_NOT_FOUND' });
+  if (result === 'self') return reply.code(400).send({ error: 'OWNER_CANNOT_COLLABORATE' });
+  return reply.code(result === 'added' ? 201 : 200).send({ status: result, listId: params.id, userId: body.userId, role: body.role });
+});
+
+app.delete('/v1/lists/:id/collaborators/:userId', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const params = z.object({ id: z.string().uuid(), userId: z.string() }).parse(request.params);
+  const result = await removeListCollaborator(params.id, params.userId, user.id);
+  if (result === 'not_allowed') return reply.code(403).send({ error: 'LIST_OWNER_REQUIRED' });
+  if (result === 'not_found') return reply.code(404).send({ error: 'LIST_OR_COLLABORATOR_NOT_FOUND' });
+  return { status: result, listId: params.id, userId: params.userId };
 });
 
 app.post('/v1/lists/:id/items', async (request, reply) => {

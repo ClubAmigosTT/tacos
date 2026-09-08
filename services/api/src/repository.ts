@@ -20,6 +20,7 @@ const localSavedPlaces = new Set<string>();
 const localLists = new Map<string, { id: string; ownerId: string; title: string; description: string; visibility: 'public' | 'private'; coverImage: string; placeIds: string[]; createdAt: string }>();
 const localReports = new Map<string, { id: string; reporterId: string; visitId: string; reason: ReportInput['reason']; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string }>();
 const localComments = new Map<string, { id: string; visitId: string; authorId: string; body: string; createdAt: string; visibility: 'visible' | 'hidden' }>();
+const localListCollaborators = new Map<string, { listId: string; userId: string; role: 'editor' | 'viewer'; createdAt: string }>();
 
 const configuredAdminEmails = new Set((process.env.ADMIN_EMAILS ?? '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean));
 
@@ -481,6 +482,42 @@ export async function getDiary(userId: string, includeHidden = true) {
   });
 }
 
+type ListRole = 'owner' | 'editor' | 'viewer';
+
+async function getListRole(listId: string, userId: string): Promise<ListRole | undefined> {
+  if (pool) {
+    const result = await pool.query(`
+      SELECT l.owner_id, lc.role
+      FROM lists l LEFT JOIN list_collaborators lc ON lc.list_id = l.id AND lc.user_id = $2
+      WHERE l.id = $1
+    `, [listId, userId]);
+    const row = result.rows[0];
+    if (!row) return undefined;
+    if (row.owner_id === userId) return 'owner';
+    return row.role === 'editor' || row.role === 'viewer' ? row.role : undefined;
+  }
+  const list = localLists.get(listId);
+  if (!list) return undefined;
+  if (list.ownerId === userId) return 'owner';
+  const collaborator = localListCollaborators.get(`${listId}:${userId}`);
+  return collaborator?.role;
+}
+
+async function getListCollaborators(listId: string): Promise<Array<{ id: string; displayName: string; role: 'editor' | 'viewer' }>> {
+  if (pool) {
+    const result = await pool.query(`
+      SELECT u.id, u.display_name, lc.role
+      FROM list_collaborators lc JOIN users u ON u.id = lc.user_id
+      WHERE lc.list_id = $1 ORDER BY lc.created_at ASC
+    `, [listId]);
+    return result.rows.map((row) => ({ id: row.id, displayName: row.display_name, role: row.role }));
+  }
+  return [...localListCollaborators.values()]
+    .filter((collaborator) => collaborator.listId === listId)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map((collaborator) => ({ id: collaborator.userId, displayName: localUsers.get(collaborator.userId)?.displayName ?? 'Cuenta eliminada', role: collaborator.role }));
+}
+
 function normalizeList(row: any): ApiList {
   return {
     id: row.id,
@@ -490,7 +527,9 @@ function normalizeList(row: any): ApiList {
     itemCount: Number(row.item_count ?? 0),
     visitedCount: Number(row.visited_count ?? 0),
     coverImage: row.cover_image_url ?? places[0].image,
-    visibility: row.visibility ?? 'public'
+    visibility: row.visibility ?? 'public',
+    collaboratorCount: Number(row.collaborator_count ?? 0),
+    canEdit: Boolean(row.can_edit)
   };
 }
 
@@ -499,14 +538,16 @@ export async function getLists(userId?: string): Promise<ApiList[]> {
     const result = await pool.query(`
       SELECT l.id, l.title, l.description, l.visibility, l.owner_id, u.display_name AS owner_name,
         COUNT(li.branch_id)::int AS item_count,
-        COALESCE(SUM(CASE WHEN EXISTS (
+        (SELECT COUNT(*)::int FROM list_collaborators all_collaborators WHERE all_collaborators.list_id = l.id) AS collaborator_count,
+        (l.owner_id = $1 OR EXISTS (SELECT 1 FROM list_collaborators me WHERE me.list_id = l.id AND me.user_id = $1 AND me.role = 'editor')) AS can_edit,
+        COUNT(DISTINCT li.branch_id) FILTER (WHERE EXISTS (
           SELECT 1 FROM visits vv WHERE vv.user_id = $1 AND vv.branch_id = li.branch_id
-        ) THEN 1 ELSE 0 END), 0)::int AS visited_count,
+        ))::int AS visited_count,
         COALESCE(l.cover_image_url, MIN(b.image_url)) AS cover_image_url
       FROM lists l JOIN users u ON u.id = l.owner_id
       LEFT JOIN list_items li ON li.list_id = l.id
       LEFT JOIN branches b ON b.id = li.branch_id
-      WHERE l.visibility = 'public' OR l.owner_id = $1
+      WHERE l.visibility = 'public' OR l.owner_id = $1 OR EXISTS (SELECT 1 FROM list_collaborators viewer WHERE viewer.list_id = l.id AND viewer.user_id = $1)
       GROUP BY l.id, u.display_name
       ORDER BY l.updated_at DESC LIMIT 100
     `, [userId ?? null]);
@@ -514,11 +555,13 @@ export async function getLists(userId?: string): Promise<ApiList[]> {
   }
   // Keep the in-memory fallback aligned with PostgreSQL: every public list is
   // discoverable, while private lists are only returned to their owner.
-  const visible = [...localLists.values()].filter((list) => list.visibility === 'public' || list.ownerId === userId);
+  const visible = [...localLists.values()].filter((list) => list.visibility === 'public' || list.ownerId === userId || (userId ? localListCollaborators.has(`${list.id}:${userId}`) : false));
   const mapped = visible.map((list) => {
     const owner = localUsers.get(list.ownerId);
     const visitedCount = list.placeIds.filter((placeId) => [...localVisits.values()].some((visit) => visit.userId === userId && visit.placeId === placeId)).length;
-    return { id: list.id, title: list.title, description: list.description, owner: { id: list.ownerId, displayName: owner?.displayName ?? 'Tacos' }, itemCount: list.placeIds.length, visitedCount, coverImage: list.coverImage, visibility: list.visibility } satisfies ApiList;
+    const collaboratorCount = [...localListCollaborators.values()].filter((collaborator) => collaborator.listId === list.id).length;
+    const canEdit = list.ownerId === userId || [...localListCollaborators.values()].some((collaborator) => collaborator.listId === list.id && collaborator.userId === userId && collaborator.role === 'editor');
+    return { id: list.id, title: list.title, description: list.description, owner: { id: list.ownerId, displayName: owner?.displayName ?? 'Tacos' }, itemCount: list.placeIds.length, visitedCount, coverImage: list.coverImage, visibility: list.visibility, collaboratorCount, canEdit } satisfies ApiList;
   });
   return [...fixtureLists, ...mapped];
 }
@@ -528,6 +571,8 @@ export async function getListDetails(listId: string, userId?: string): Promise<A
     const listResult = await pool.query(`
         SELECT l.id, l.title, l.description, l.visibility, l.owner_id, u.display_name AS owner_name,
         COUNT(li.branch_id)::int AS item_count,
+        (SELECT COUNT(*)::int FROM list_collaborators all_collaborators WHERE all_collaborators.list_id = l.id) AS collaborator_count,
+        (l.owner_id = $2 OR EXISTS (SELECT 1 FROM list_collaborators me WHERE me.list_id = l.id AND me.user_id = $2 AND me.role = 'editor')) AS can_edit,
         COALESCE(SUM(CASE WHEN EXISTS (
           SELECT 1 FROM visits vv WHERE vv.user_id = $2 AND vv.branch_id = li.branch_id
         ) THEN 1 ELSE 0 END), 0)::int AS visited_count,
@@ -535,18 +580,20 @@ export async function getListDetails(listId: string, userId?: string): Promise<A
       FROM lists l JOIN users u ON u.id = l.owner_id
       LEFT JOIN list_items li ON li.list_id = l.id
       LEFT JOIN branches b ON b.id = li.branch_id
-      WHERE l.id = $1 AND (l.visibility = 'public' OR l.owner_id = $2)
+      WHERE l.id = $1 AND (l.visibility = 'public' OR l.owner_id = $2 OR EXISTS (SELECT 1 FROM list_collaborators viewer WHERE viewer.list_id = l.id AND viewer.user_id = $2))
       GROUP BY l.id, u.display_name
     `, [listId, userId ?? null]);
     if (!listResult.rows[0]) return undefined;
     const itemResult = await pool.query('SELECT branch_id, note, position FROM list_items WHERE list_id = $1 ORDER BY position, created_at', [listId]);
     const items = (await Promise.all(itemResult.rows.map(async (row) => ({ branchId: row.branch_id, note: row.note ?? '', position: Number(row.position), place: await findPlace(row.branch_id) })))).filter((item): item is { branchId: string; note: string; position: number; place: ApiPlace } => Boolean(item.place));
-    return { ...normalizeList(listResult.rows[0]), items };
+    return { ...normalizeList(listResult.rows[0]), collaborators: await getListCollaborators(listId), items };
   }
   const local = localLists.get(listId);
-  if (local && (local.visibility === 'public' || local.ownerId === userId)) {
+  if (local && (local.visibility === 'public' || local.ownerId === userId || (userId ? localListCollaborators.has(`${local.id}:${userId}`) : false))) {
     const owner = localUsers.get(local.ownerId);
     const visitedCount = local.placeIds.filter((placeId) => [...localVisits.values()].some((visit) => visit.userId === userId && visit.placeId === placeId)).length;
+    const collaborators = await getListCollaborators(local.id);
+    const canEdit = local.ownerId === userId || collaborators.some((collaborator) => collaborator.id === userId && collaborator.role === 'editor');
     return {
       id: local.id,
       title: local.title,
@@ -556,6 +603,9 @@ export async function getListDetails(listId: string, userId?: string): Promise<A
       visitedCount,
       coverImage: local.coverImage,
       visibility: local.visibility,
+      collaboratorCount: collaborators.length,
+      canEdit,
+      collaborators,
       items: local.placeIds.map((placeId, position) => { const place = places.find((item) => item.id === placeId); return place ? { branchId: placeId, note: '', position, place } : undefined; }).filter((item): item is { branchId: string; note: string; position: number; place: ApiPlace } => Boolean(item))
     };
   }
@@ -572,7 +622,8 @@ export async function createListForUser(input: { title: string; description?: st
     await pool.query('INSERT INTO lists (id, owner_id, title, description, visibility) VALUES ($1, $2, $3, $4, $5)', [id, userId, title, description, visibility]);
     const created = await pool.query(`
       SELECT l.id, l.title, l.description, l.visibility, l.owner_id, u.display_name AS owner_name,
-        0::int AS item_count, 0::int AS visited_count, NULL::text AS cover_image_url
+        0::int AS item_count, 0::int AS visited_count, NULL::text AS cover_image_url,
+        0::int AS collaborator_count, true AS can_edit
       FROM lists l JOIN users u ON u.id = l.owner_id WHERE l.id = $1
     `, [id]);
     return normalizeList(created.rows[0]);
@@ -580,7 +631,7 @@ export async function createListForUser(input: { title: string; description?: st
   const createdAt = new Date().toISOString();
   localLists.set(id, { id, ownerId: userId, title, description, visibility, coverImage: places[0].image, placeIds: [], createdAt });
   const owner = localUsers.get(userId);
-  return { id, title, description, owner: { id: userId, displayName: owner?.displayName ?? 'Tacos' }, itemCount: 0, visitedCount: 0, coverImage: places[0].image, visibility };
+  return { id, title, description, owner: { id: userId, displayName: owner?.displayName ?? 'Tacos' }, itemCount: 0, visitedCount: 0, coverImage: places[0].image, visibility, collaboratorCount: 0, canEdit: true };
 }
 
 export async function updateListForUser(listId: string, input: { title?: string; description?: string; visibility?: 'public' | 'private' }, userId: string): Promise<ApiListDetail | undefined> {
@@ -605,10 +656,57 @@ export async function updateListForUser(listId: string, input: { title?: string;
   return detail;
 }
 
+type CollaboratorResult = 'added' | 'already' | 'not_found' | 'not_allowed' | 'self';
+
+export async function addListCollaborator(listId: string, collaboratorId: string, role: 'editor' | 'viewer', ownerId: string): Promise<CollaboratorResult> {
+  if (pool) {
+    const list = await pool.query('SELECT owner_id FROM lists WHERE id = $1', [listId]);
+    if (!list.rowCount) return 'not_found';
+    if (list.rows[0].owner_id !== ownerId) return 'not_allowed';
+    if (list.rows[0].owner_id === collaboratorId) return 'self';
+    const target = await pool.query('SELECT 1 FROM users WHERE id = $1 AND is_active = true', [collaboratorId]);
+    if (!target.rowCount) return 'not_found';
+    const existing = await pool.query('SELECT 1 FROM list_collaborators WHERE list_id = $1 AND user_id = $2', [listId, collaboratorId]);
+    if (existing.rowCount) {
+      await pool.query('UPDATE list_collaborators SET role = $3 WHERE list_id = $1 AND user_id = $2', [listId, collaboratorId, role]);
+      await pool.query('UPDATE lists SET updated_at = now() WHERE id = $1', [listId]);
+      return 'already';
+    }
+    await pool.query('INSERT INTO list_collaborators (list_id, user_id, role) VALUES ($1, $2, $3)', [listId, collaboratorId, role]);
+    await pool.query('UPDATE lists SET updated_at = now() WHERE id = $1', [listId]);
+    return 'added';
+  }
+  const list = localLists.get(listId);
+  if (!list) return 'not_found';
+  if (list.ownerId !== ownerId) return 'not_allowed';
+  if (list.ownerId === collaboratorId) return 'self';
+  if (!localUsers.has(collaboratorId)) return 'not_found';
+  const key = `${listId}:${collaboratorId}`;
+  const already = localListCollaborators.has(key);
+  localListCollaborators.set(key, { listId, userId: collaboratorId, role, createdAt: localListCollaborators.get(key)?.createdAt ?? new Date().toISOString() });
+  return already ? 'already' : 'added';
+}
+
+export async function removeListCollaborator(listId: string, collaboratorId: string, ownerId: string): Promise<'removed' | 'not_found' | 'not_allowed'> {
+  if (pool) {
+    const list = await pool.query('SELECT owner_id FROM lists WHERE id = $1', [listId]);
+    if (!list.rowCount) return 'not_found';
+    if (list.rows[0].owner_id !== ownerId) return 'not_allowed';
+    const result = await pool.query('DELETE FROM list_collaborators WHERE list_id = $1 AND user_id = $2', [listId, collaboratorId]);
+    if (!result.rowCount) return 'not_found';
+    await pool.query('UPDATE lists SET updated_at = now() WHERE id = $1', [listId]);
+    return 'removed';
+  }
+  const list = localLists.get(listId);
+  if (!list) return 'not_found';
+  if (list.ownerId !== ownerId) return 'not_allowed';
+  return localListCollaborators.delete(`${listId}:${collaboratorId}`) ? 'removed' : 'not_found';
+}
+
 export async function addListItemForUser(listId: string, placeId: string, userId: string, note = ''): Promise<boolean> {
   if (pool) {
-    const owned = await pool.query('SELECT 1 FROM lists WHERE id = $1 AND owner_id = $2', [listId, userId]);
-    if (!owned.rowCount) return false;
+    const role = await getListRole(listId, userId);
+    if (role !== 'owner' && role !== 'editor') return false;
     await pool.query(`
       INSERT INTO list_items (list_id, branch_id, position, note)
       VALUES ($1, $2, COALESCE((SELECT MAX(position) + 1 FROM list_items WHERE list_id = $1), 0), $3)
@@ -618,21 +716,23 @@ export async function addListItemForUser(listId: string, placeId: string, userId
     return true;
   }
   const list = localLists.get(listId);
-  if (!list || list.ownerId !== userId || !places.some((place) => place.id === placeId)) return false;
+  const role = list ? await getListRole(listId, userId) : undefined;
+  if (!list || (role !== 'owner' && role !== 'editor') || !places.some((place) => place.id === placeId)) return false;
   if (!list.placeIds.includes(placeId)) list.placeIds.push(placeId);
   return true;
 }
 
 export async function removeListItemForUser(listId: string, placeId: string, userId: string): Promise<boolean> {
   if (pool) {
-    const owned = await pool.query('SELECT 1 FROM lists WHERE id = $1 AND owner_id = $2', [listId, userId]);
-    if (!owned.rowCount) return false;
+    const role = await getListRole(listId, userId);
+    if (role !== 'owner' && role !== 'editor') return false;
     const removed = await pool.query('DELETE FROM list_items WHERE list_id = $1 AND branch_id = $2', [listId, placeId]);
     if (removed.rowCount) await pool.query('UPDATE lists SET updated_at = now() WHERE id = $1', [listId]);
     return Boolean(removed.rowCount);
   }
   const list = localLists.get(listId);
-  if (!list || list.ownerId !== userId) return false;
+  const role = list ? await getListRole(listId, userId) : undefined;
+  if (!list || (role !== 'owner' && role !== 'editor')) return false;
   const index = list.placeIds.indexOf(placeId);
   if (index === -1) return false;
   list.placeIds.splice(index, 1);

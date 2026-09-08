@@ -25,7 +25,7 @@ export default function ListsScreen() {
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['lists'] }); }
   });
   const apiLists = data?.lists ?? [];
-  const scopedLists = placeId && user ? apiLists.filter((list) => list.owner.id === user.id) : apiLists;
+  const scopedLists = placeId && user ? apiLists.filter((list) => list.owner.id === user.id || list.canEdit) : apiLists;
   const visibleLists: List[] = scopedLists.length ? scopedLists : (!user ? fixtureLists : []);
 
   return <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">

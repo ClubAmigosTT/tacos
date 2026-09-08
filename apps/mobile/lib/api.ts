@@ -2,8 +2,9 @@ import Constants from 'expo-constants';
 import { places, type Place } from '@/data/fixtures';
 
 export type AuthUser = { id: string; email: string; displayName: string; role?: 'user' | 'admin'; following?: boolean };
-export type ApiList = { id: string; title: string; description: string; owner: { id: string; displayName: string }; itemCount: number; visitedCount: number; coverImage: string; visibility?: 'public' | 'private' };
-export type ApiListDetail = ApiList & { items: Array<{ branchId: string; note: string; position: number; place: Place }> };
+export type ApiList = { id: string; title: string; description: string; owner: { id: string; displayName: string }; itemCount: number; visitedCount: number; coverImage: string; visibility?: 'public' | 'private'; collaboratorCount?: number; canEdit?: boolean };
+export type ApiListCollaborator = { id: string; displayName: string; role: 'editor' | 'viewer' };
+export type ApiListDetail = ApiList & { collaborators?: ApiListCollaborator[]; items: Array<{ branchId: string; note: string; position: number; place: Place }> };
 export type ApiTaqueria = { id: string; name: string; slug: string; description: string; branchCount: number; branches: Place[] };
 export type FeedItem = { id: string; visited_at: string; rating: number; note?: string; user_id: string; display_name: string; place_id: string; place_name: string; neighborhood: string; image_url: string; tacos: string; comment_count?: number };
 export type VisitComment = { id: string; body: string; createdAt: string; author: { id: string; displayName: string }; own: boolean };
@@ -170,6 +171,14 @@ export async function createList(input: { title: string; description?: string; v
 
 export async function updateList(listId: string, input: { title?: string; description?: string; visibility?: 'public' | 'private' }, token: string) {
   return request<ApiListDetail>(`/v1/lists/${encodeURIComponent(listId)}`, { method: 'PATCH', body: JSON.stringify(input) }, token);
+}
+
+export async function addListCollaborator(listId: string, input: { userId: string; role?: 'editor' | 'viewer' }, token: string) {
+  return request<{ status: string; listId: string; userId: string; role: string }>(`/v1/lists/${encodeURIComponent(listId)}/collaborators`, { method: 'POST', body: JSON.stringify(input) }, token);
+}
+
+export async function removeListCollaborator(listId: string, userId: string, token: string) {
+  return request<{ status: string; listId: string; userId: string }>(`/v1/lists/${encodeURIComponent(listId)}/collaborators/${encodeURIComponent(userId)}`, { method: 'DELETE' }, token);
 }
 
 export async function addListItem(listId: string, input: { branchId: string; note?: string }, token: string) {

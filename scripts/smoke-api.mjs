@@ -139,6 +139,31 @@ await request(`/v1/lists/${list.id}`, {
 }, 404);
 const editedOwnerDetail = await request(`/v1/lists/${list.id}`, { token: bob.token });
 if (editedOwnerDetail.description !== 'Nueva curaduría') throw new Error('Edited list description was not persisted');
+await request(`/v1/lists/${list.id}`, { token: alice.token }, 404);
+const collaborator = await request(`/v1/lists/${list.id}/collaborators`, {
+  method: 'POST',
+  body: JSON.stringify({ userId: alice.user.id, role: 'editor' }),
+  token: bob.token
+}, 201);
+if (collaborator.status !== 'added') throw new Error('List collaborator was not added');
+const collaboratorDetail = await request(`/v1/lists/${list.id}`, { token: alice.token });
+if (collaboratorDetail.collaborators?.[0]?.id !== alice.user.id || collaboratorDetail.canEdit !== true) throw new Error('Collaborator could not access the private list');
+await request(`/v1/lists/${list.id}/items`, {
+  method: 'POST',
+  body: JSON.stringify({ branchId: 'oriente', note: 'Sugerencia de Alice' }),
+  token: alice.token
+});
+await request(`/v1/lists/${list.id}`, {
+  method: 'PATCH',
+  body: JSON.stringify({ title: 'Editor cannot rename' }),
+  token: alice.token
+}, 404);
+await request(`/v1/lists/${list.id}/items/oriente`, { method: 'DELETE', token: alice.token });
+const collaboratorLists = await request('/v1/lists', { token: alice.token });
+if (!collaboratorLists.lists?.some((item) => item.id === list.id && item.canEdit === true)) throw new Error('Collaborative list was not discoverable by editor');
+const removedCollaborator = await request(`/v1/lists/${list.id}/collaborators/${alice.user.id}`, { method: 'DELETE', token: bob.token });
+if (removedCollaborator.status !== 'removed') throw new Error('List collaborator was not removed');
+await request(`/v1/lists/${list.id}`, { token: alice.token }, 404);
 const privateList = await request('/v1/lists', { method: 'POST', body: JSON.stringify({ title: 'Private route', visibility: 'private' }), token: bob.token }, 201);
 await request(`/v1/lists/${privateList.id}`, { token: alice.token }, 404);
 const privateDetail = await request(`/v1/lists/${privateList.id}`, { token: bob.token });
