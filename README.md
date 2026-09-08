@@ -91,6 +91,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 61. Releases móviles reproducibles: cada perfil EAS fija su entorno y las actualizaciones OTA apuntan explícitamente a `production`.
 62. Paridad de fallback: sin `DATABASE_URL`, las visitas visibles también recalculan reputación, recencia, dispersión y volumen de reseñas para mantener el mismo comportamiento del MVP.
 63. Deep links compartibles: fichas, listas y Wrapped generan URLs `tacos://...` para abrir directamente el contenido compartido en la app.
+64. Diario temporal: el periodo del Diario y el año de Wrapped se calculan desde datos reales o el año actual, sin fechas hardcodeadas.
 
 ## Verificación
 

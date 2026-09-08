@@ -16,6 +16,7 @@ export default function WrappedScreen() {
   const average = entries.length ? (entries.reduce((sum, entry) => sum + Number(entry.rating), 0) / entries.length).toFixed(2) : '—';
   const best = entries.reduce<typeof entries[number] | undefined>((winner, entry) => !winner || Number(entry.rating) > Number(winner.rating) ? entry : winner, undefined);
   const neighborhoods = new Set(entries.map((entry) => entry.neighborhood).filter(Boolean));
+  const wrappedYear = new Date().getFullYear();
 
   async function share() {
     try { await Share.share({ message: `Mi año en tacos: ${tacos.length} tacos, ${entries.length} visitas y promedio ${average}. Mi favorito: ${best?.place_name ?? 'todavía por descubrir'}.\n${Linking.createURL('/wrapped')}` }); } catch { /* Sharing is optional on platforms without a native share sheet. */ }
@@ -24,7 +25,7 @@ export default function WrappedScreen() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="arrow-back" size={20} color={colors.ink} /></Pressable><View><Text style={styles.eyebrow}>MEMORIA GASTRONÓMICA</Text><Text style={styles.title}>Tu año en tacos</Text></View></View>
-      <View style={styles.hero}><Text style={styles.heroKicker}>TACOS WRAPPED · 2026</Text><Text style={styles.heroTitle}>{isLoading ? 'Cargando…' : entries.length ? 'Una ciudad entera en tu memoria.' : 'Tu historia está por empezar.'}</Text><Text style={styles.heroCopy}>{entries.length ? 'Un resumen de los lugares, tacos y decisiones que definieron tu año.' : 'Registra tu primera visita y vuelve aquí para ver cómo evoluciona tu gusto.'}</Text><View style={styles.heroMark}><Ionicons name="flame" size={26} color={colors.background} /></View></View>
+      <View style={styles.hero}><Text style={styles.heroKicker}>TACOS WRAPPED · {wrappedYear}</Text><Text style={styles.heroTitle}>{isLoading ? 'Cargando…' : entries.length ? 'Una ciudad entera en tu memoria.' : 'Tu historia está por empezar.'}</Text><Text style={styles.heroCopy}>{entries.length ? 'Un resumen de los lugares, tacos y decisiones que definieron tu año.' : 'Registra tu primera visita y vuelve aquí para ver cómo evoluciona tu gusto.'}</Text><View style={styles.heroMark}><Ionicons name="flame" size={26} color={colors.background} /></View></View>
       <View style={styles.grid}><Metric label="TACOS" value={String(tacos.length)} icon="restaurant-outline" /><Metric label="VISITAS" value={String(entries.length)} icon="location-outline" /><Metric label="PROMEDIO" value={average} icon="star-outline" /><Metric label="ZONAS" value={String(neighborhoods.size)} icon="map-outline" /></View>
       <View style={styles.feature}><Text style={styles.featureEyebrow}>TU MOMENTO CUMBRE</Text><Text style={styles.featureTitle}>{best?.place_name ?? 'Todavía no hay un favorito'}</Text><Text style={styles.featureCopy}>{best ? `${best.tacos} · ${Number(best.rating).toFixed(2)} de rating` : 'Tu mejor taco aparecerá aquí después de registrarlo.'}</Text></View>
       <Pressable style={styles.share} onPress={() => void share()}><Ionicons name="share-outline" size={18} color={colors.background} /><Text style={styles.shareText}>Compartir mi resumen</Text></Pressable>
