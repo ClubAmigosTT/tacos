@@ -55,6 +55,17 @@ const visit = await request('/v1/visits', {
 
 const feed = await request('/v1/feed', { token: alice.token });
 if (feed.items?.length !== 1 || feed.items?.[0]?.note !== 'Smoke test') throw new Error(`Expected one feed item with its note, got ${feed.items?.length ?? 0}`);
+const comment = await request(`/v1/visits/${visit.id}/comments`, {
+  method: 'POST',
+  body: JSON.stringify({ body: 'Gran elección, Beto.' }),
+  token: alice.token
+}, 201);
+const comments = await request(`/v1/visits/${visit.id}/comments`, { token: alice.token });
+if (comments.comments?.length !== 1 || comments.comments?.[0]?.body !== 'Gran elección, Beto.' || comments.comments?.[0]?.own !== true) throw new Error('Visit comment was not persisted');
+const feedWithComment = await request('/v1/feed', { token: alice.token });
+if (feedWithComment.items?.[0]?.comment_count !== 1) throw new Error('Feed comment count was not updated');
+await request(`/v1/comments/${comment.id}`, { method: 'DELETE', token: bob.token }, 404);
+await request(`/v1/comments/${comment.id}`, { method: 'DELETE', token: alice.token });
 const privacy = await request('/v1/me/privacy', { token: bob.token });
 if (privacy.privacy?.shareActivity !== true) throw new Error('Privacy defaults were not returned');
 await request('/v1/me/privacy', { method: 'PATCH', body: JSON.stringify({ shareActivity: false }), token: bob.token });

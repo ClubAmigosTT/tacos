@@ -19,6 +19,7 @@ const localFollows = new Set<string>();
 const localSavedPlaces = new Set<string>();
 const localLists = new Map<string, { id: string; ownerId: string; title: string; description: string; visibility: 'public' | 'private'; coverImage: string; placeIds: string[]; createdAt: string }>();
 const localReports = new Map<string, { id: string; reporterId: string; visitId: string; reason: ReportInput['reason']; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string }>();
+const localComments = new Map<string, { id: string; visitId: string; authorId: string; body: string; createdAt: string; visibility: 'visible' | 'hidden' }>();
 
 const configuredAdminEmails = new Set((process.env.ADMIN_EMAILS ?? '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean));
 
@@ -677,7 +678,8 @@ export async function getFeed(userId: string) {
     const result = await pool.query(`
       SELECT v.id, v.visited_at, v.rating, v.note, u.id AS user_id, u.display_name,
         b.id AS place_id, b.name AS place_name, b.neighborhood, COALESCE(v.photo_url, b.image_url) AS image_url,
-        COALESCE(string_agg(m.name, ', ' ORDER BY m.name), '') AS tacos
+        COALESCE(string_agg(m.name, ', ' ORDER BY m.name), '') AS tacos,
+        (SELECT COUNT(*)::int FROM visit_comments c WHERE c.visit_id = v.id AND c.visibility = 'visible') AS comment_count
       FROM follows f JOIN visits v ON v.user_id = f.followed_id
       JOIN users u ON u.id = v.user_id JOIN branches b ON b.id = v.branch_id
       LEFT JOIN visit_items vi ON vi.visit_id = v.id LEFT JOIN menu_items m ON m.id = vi.menu_item_id
@@ -690,8 +692,66 @@ export async function getFeed(userId: string) {
     const place = places.find((item) => item.id === visit.placeId);
     const user = localUsers.get(visit.userId);
     const tacos = visit.tacoIds.map((tacoId) => place?.tacos.find((taco) => taco.id === tacoId)?.name ?? tacoId).join(', ');
-    return { id, visited_at: visit.createdAt, rating: visit.rating, note: visit.note ?? '', user_id: visit.userId, display_name: user?.displayName ?? 'Tacos', place_id: visit.placeId, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', image_url: visit.photoUrl ?? place?.image ?? '', tacos };
+    return { id, visited_at: visit.createdAt, rating: visit.rating, note: visit.note ?? '', user_id: visit.userId, display_name: user?.displayName ?? 'Tacos', place_id: visit.placeId, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', image_url: visit.photoUrl ?? place?.image ?? '', tacos, comment_count: [...localComments.values()].filter((comment) => comment.visitId === id && comment.visibility === 'visible').length };
   });
+}
+
+type VisitComment = { id: string; body: string; createdAt: string; author: { id: string; displayName: string }; own: boolean };
+
+async function canViewVisitComments(visitId: string, userId: string) {
+  if (pool) {
+    const result = await pool.query(`
+      SELECT v.id
+      FROM visits v JOIN users author ON author.id = v.user_id
+      WHERE v.id = $1 AND v.visibility = 'visible'
+        AND (v.user_id = $2 OR (author.share_activity = true AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $2 AND f.followed_id = v.user_id)))
+    `, [visitId, userId]);
+    return Boolean(result.rowCount);
+  }
+  const visit = localVisits.get(visitId);
+  if (!visit || visit.visibility !== 'visible') return false;
+  return visit.userId === userId || (localUsers.get(visit.userId)?.shareActivity !== false && localFollows.has(`${userId}:${visit.userId}`));
+}
+
+export async function getVisitComments(visitId: string, userId: string): Promise<VisitComment[] | undefined> {
+  if (!(await canViewVisitComments(visitId, userId))) return undefined;
+  if (pool) {
+    const result = await pool.query(`
+      SELECT c.id, c.body, c.created_at, u.id AS author_id, u.display_name
+      FROM visit_comments c JOIN users u ON u.id = c.author_id
+      WHERE c.visit_id = $1 AND c.visibility = 'visible'
+      ORDER BY c.created_at ASC LIMIT 100
+    `, [visitId]);
+    return result.rows.map((row) => ({ id: row.id, body: row.body, createdAt: row.created_at, author: { id: row.author_id, displayName: row.display_name }, own: row.author_id === userId }));
+  }
+  return [...localComments.values()].filter((comment) => comment.visitId === visitId && comment.visibility === 'visible').sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map((comment) => ({ id: comment.id, body: comment.body, createdAt: comment.createdAt, author: { id: comment.authorId, displayName: localUsers.get(comment.authorId)?.displayName ?? 'Tacos' }, own: comment.authorId === userId }));
+}
+
+export async function createVisitComment(visitId: string, body: string, userId: string): Promise<VisitComment | undefined> {
+  if (!(await canViewVisitComments(visitId, userId))) return undefined;
+  const id = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  if (pool) {
+    const result = await pool.query(`
+      INSERT INTO visit_comments (id, visit_id, author_id, body) VALUES ($1, $2, $3, $4)
+      RETURNING id, body, created_at
+    `, [id, visitId, userId, body.trim()]);
+    const row = result.rows[0];
+    return { id: row.id, body: row.body, createdAt: row.created_at, author: { id: userId, displayName: (await findUserById(userId))?.displayName ?? 'Tacos' }, own: true };
+  }
+  localComments.set(id, { id, visitId, authorId: userId, body: body.trim(), createdAt, visibility: 'visible' });
+  return { id, body: body.trim(), createdAt, author: { id: userId, displayName: localUsers.get(userId)?.displayName ?? 'Tacos' }, own: true };
+}
+
+export async function deleteVisitComment(commentId: string, userId: string): Promise<boolean> {
+  if (pool) {
+    const result = await pool.query('DELETE FROM visit_comments WHERE id = $1 AND author_id = $2', [commentId, userId]);
+    return Boolean(result.rowCount);
+  }
+  const comment = localComments.get(commentId);
+  if (!comment || comment.authorId !== userId) return false;
+  localComments.delete(commentId);
+  return true;
 }
 
 export async function reportVisitForUser(input: ReportInput, reporterId: string): Promise<'created' | 'duplicate' | 'not_found'> {

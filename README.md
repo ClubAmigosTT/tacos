@@ -70,6 +70,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 40. Diario editable: una visita propia permite corregir rating, precio y nota desde una pantalla dedicada; los cambios invalidan diario, feed y recomendaciones.
 41. Listas como rutas: el detalle muestra un mapa compacto con sus lugares y cada pin abre la ficha correspondiente.
 42. Privacidad accionable: cada usuario puede ocultar o volver a compartir su actividad en el feed desde una pantalla dedicada, sin borrar su diario.
+43. Conversaciones por visita: el feed muestra el contador de comentarios y cada registro abre una conversación donde se puede comentar y borrar el comentario propio.
 
 ## Verificación
 

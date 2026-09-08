@@ -5,7 +5,8 @@ export type AuthUser = { id: string; email: string; displayName: string; role?: 
 export type ApiList = { id: string; title: string; description: string; owner: { id: string; displayName: string }; itemCount: number; visitedCount: number; coverImage: string; visibility?: 'public' | 'private' };
 export type ApiListDetail = ApiList & { items: Array<{ branchId: string; note: string; position: number; place: Place }> };
 export type ApiTaqueria = { id: string; name: string; slug: string; description: string; branchCount: number; branches: Place[] };
-export type FeedItem = { id: string; visited_at: string; rating: number; note?: string; user_id: string; display_name: string; place_id: string; place_name: string; neighborhood: string; image_url: string; tacos: string };
+export type FeedItem = { id: string; visited_at: string; rating: number; note?: string; user_id: string; display_name: string; place_id: string; place_name: string; neighborhood: string; image_url: string; tacos: string; comment_count?: number };
+export type VisitComment = { id: string; body: string; createdAt: string; author: { id: string; displayName: string }; own: boolean };
 export type TasteProfile = { title: string; description: string; tags: string[]; profile: { intensity: number; spicy: number; traditional: number; texture: number; value: number } };
 export type AdminReport = { id: string; visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string; reporter: { id: string; displayName: string }; author: { id: string; displayName: string }; place: { id: string; name: string }; rating: number; visitedAt: string };
 export type UserProfile = { user: { id: string; displayName: string }; stats: { visits: number; averageRating: number | null; listCount: number }; taste: TasteProfile; lists: ApiList[] };
@@ -200,6 +201,18 @@ export async function unfollowUser(userId: string, token: string) {
 
 export async function feed(token: string) {
   return request<{ items: FeedItem[] }>('/v1/feed', undefined, token);
+}
+
+export async function visitComments(visitId: string, token: string) {
+  return request<{ comments: VisitComment[] }>(`/v1/visits/${encodeURIComponent(visitId)}/comments`, undefined, token);
+}
+
+export async function createComment(visitId: string, body: string, token: string) {
+  return request<VisitComment>(`/v1/visits/${encodeURIComponent(visitId)}/comments`, { method: 'POST', body: JSON.stringify({ body }) }, token);
+}
+
+export async function deleteComment(commentId: string, token: string) {
+  return request<{ status: string; commentId: string }>(`/v1/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE' }, token);
 }
 
 export async function reportVisit(input: { visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details?: string }, token: string) {

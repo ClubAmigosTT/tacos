@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getAdminReports, getDiary, getFeed, getHealth, getListDetails, getLists, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, registerUser, removeListItemForUser, reportVisitForUser, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateVisitForUser, type PublicUser } from './repository.js';
+import { addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitComment, createVisitForUser, deleteVisitComment, discoverPlaces, findPlace, findUserById, followUser, getAdminReports, getDiary, getFeed, getHealth, getListDetails, getLists, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, getVisitComments, registerUser, removeListItemForUser, reportVisitForUser, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateVisitForUser, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
 import { uploadVisitImage } from './storage.js';
 
@@ -274,6 +274,34 @@ app.get('/v1/feed', async (request, reply) => {
   const user = await requireUser(request, reply);
   if (!user) return;
   return { items: await getFeed(user.id) };
+});
+
+app.get('/v1/visits/:id/comments', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const params = z.object({ id: z.string().uuid() }).parse(request.params);
+  const comments = await getVisitComments(params.id, user.id);
+  if (!comments) return reply.code(404).send({ error: 'VISIT_NOT_FOUND' });
+  return { comments };
+});
+
+app.post('/v1/visits/:id/comments', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const params = z.object({ id: z.string().uuid() }).parse(request.params);
+  const body = z.object({ body: z.string().trim().min(1).max(500) }).parse(request.body);
+  const comment = await createVisitComment(params.id, body.body, user.id);
+  if (!comment) return reply.code(404).send({ error: 'VISIT_NOT_FOUND' });
+  return reply.code(201).send(comment);
+});
+
+app.delete('/v1/comments/:id', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const params = z.object({ id: z.string().uuid() }).parse(request.params);
+  const deleted = await deleteVisitComment(params.id, user.id);
+  if (!deleted) return reply.code(404).send({ error: 'COMMENT_NOT_FOUND' });
+  return { status: 'deleted', commentId: params.id };
 });
 
 app.post('/v1/reports', async (request, reply) => {
