@@ -7,6 +7,14 @@ import { issueToken, verifyToken } from './auth.js';
 const app = Fastify({ logger: true });
 await app.register(cors, { origin: true });
 
+app.setErrorHandler((error, request, reply) => {
+  if (error instanceof z.ZodError) {
+    return reply.code(400).send({ error: 'INVALID_REQUEST', issues: error.issues });
+  }
+  request.log.error(error);
+  return reply.code(500).send({ error: 'INTERNAL_ERROR' });
+});
+
 declare module 'fastify' {
   interface FastifyRequest { user?: PublicUser }
 }
