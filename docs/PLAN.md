@@ -58,6 +58,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 3. Ordenar pins por el criterio activo: taco, apertura, precio, afinidad o calidad.
 4. Mantener Mapbox/Google Maps como infraestructura visual; el ranking y los pins son propiedad de Tacos.
 5. Conectar la búsqueda universal del inicio con el mapa contextual, conservando la consulta al navegar.
+6. Servir un score de reputación conservador: prior bayesiano, recencia, penalización por dispersión y límite por revisor distinto; devolver también el volumen de reseñas visibles.
 
 **Aceptación:** “Pastor”, “Abierto ahora”, “Barato” y “Para mí” producen resultados ordenados; negar ubicación no rompe el catálogo.
 
@@ -84,7 +85,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 1. Buscar personas, seguir/dejar de seguir y persistir el estado del botón.
 2. Requerir autenticación para consultar el directorio social y no exponer correos a visitantes anónimos.
 3. Abrir perfiles públicos con Taste ID, estadísticas y listas públicas; no exponer correo en esa vista.
-4. Calcular reputación bayesiana y afinidad de sabor; combinarla con señales de personas seguidas.
+4. Calcular reputación robusta (prior bayesiano, recencia, dispersión y límite por revisor) y afinidad de sabor; combinarla con señales de personas seguidas.
 5. Mostrar notas de visitas en el feed y llevar al perfil desde avatar/nombre.
 
 **Aceptación:** el smoke test confirma follow, unfollow, feed con nota, perfil público, exclusión de listas privadas y edición autorizada de listas.

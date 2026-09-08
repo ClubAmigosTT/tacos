@@ -15,6 +15,7 @@ export type Place = {
   distance: string;
   openUntil: string;
   rating: number;
+  reviewCount?: number;
   match: number;
   style: string;
   coordinates: { latitude: number; longitude: number };

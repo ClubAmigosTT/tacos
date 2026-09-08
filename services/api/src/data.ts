@@ -10,6 +10,8 @@ export type ApiPlace = {
   distance: string;
   openUntil: string;
   rating: number;
+  /** Number of visible reviews contributing to the reputation score. */
+  reviewCount?: number;
   match: number;
   style: string;
   coordinates: { latitude: number; longitude: number };

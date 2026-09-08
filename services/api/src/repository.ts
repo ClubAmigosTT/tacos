@@ -156,6 +156,7 @@ function normalizePlace(row: any): ApiPlace {
     distance: row.distance_km == null ? 'cerca de ti' : `${Number(row.distance_km).toFixed(1)} km`,
     openUntil: row.open_until ?? '23:00',
     rating: Number(row.rating),
+    reviewCount: row.review_count == null ? undefined : Number(row.review_count),
     match: Number(row.match_score ?? 80),
     style: row.style,
     coordinates: { latitude: Number(row.latitude), longitude: Number(row.longitude) },
@@ -176,6 +177,72 @@ function haversineKm(from: { latitude: number; longitude: number }, to: { latitu
   const a = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(latitudeA) * Math.cos(latitudeB) * Math.sin(longitudeDelta / 2) ** 2;
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
+
+// Reputation is deliberately conservative: recent reviews matter, noisy
+// ratings are discounted, and one prolific reviewer cannot dominate a branch.
+// The Bayesian prior keeps low-volume places from jumping to the top of the
+// map while the recency component lets a sustained change in quality surface.
+const reputationJoin = `
+      LEFT JOIN LATERAL (
+        SELECT stats.review_count,
+          CASE WHEN stats.review_count = 0 THEN b.rating
+            ELSE LEAST(5::numeric, GREATEST(1::numeric,
+              (((stats.effective_count * ((stats.average_rating * 0.65) + (stats.recent_rating * 0.35))) + (10 * 4.2)) / (stats.effective_count + 10))
+              - LEAST(0.25::numeric, stats.dispersion * 0.08)
+              + LEAST(0.08::numeric, GREATEST(0::numeric, stats.recent_rating - stats.average_rating) * 0.12)
+            ))
+          END AS score
+        FROM (
+          SELECT COUNT(*)::numeric AS review_count,
+            AVG(v.rating)::numeric AS average_rating,
+            COALESCE(STDDEV_POP(v.rating), 0)::numeric AS dispersion,
+            COALESCE(
+              (
+                SUM(v.rating * POWER(0.5::double precision,
+                  GREATEST(0::double precision, EXTRACT(EPOCH FROM (now() - v.visited_at))::double precision / 15552000.0)))
+                / NULLIF(SUM(POWER(0.5::double precision,
+                  GREATEST(0::double precision, EXTRACT(EPOCH FROM (now() - v.visited_at))::double precision / 15552000.0))), 0)
+              )::numeric,
+              AVG(v.rating)::numeric,
+              b.rating
+            ) AS recent_rating,
+            GREATEST(1::numeric, LEAST(COUNT(*)::numeric, GREATEST(1::numeric, COUNT(DISTINCT v.user_id)::numeric * 3))) AS effective_count
+          FROM visits v
+          WHERE v.branch_id = b.id AND v.visibility = 'visible'
+        ) stats
+      ) reviews ON true`;
+
+const reputationSelect = `
+      CASE WHEN COALESCE(reviews.review_count, 0) = 0 THEN b.rating ELSE reviews.score END AS rating,
+      COALESCE(reviews.review_count, 0)::int AS review_count,`;
+
+const tacoReputationSelect = `(
+        SELECT CASE WHEN stats.review_count = 0 THEN m.rating
+          ELSE LEAST(5::numeric, GREATEST(1::numeric,
+            (((stats.effective_count * ((stats.average_rating * 0.65) + (stats.recent_rating * 0.35))) + (5 * 4.2)) / (stats.effective_count + 5))
+            - LEAST(0.25::numeric, stats.dispersion * 0.08)
+            + LEAST(0.08::numeric, GREATEST(0::numeric, stats.recent_rating - stats.average_rating) * 0.12)
+          ))
+        END
+        FROM (
+          SELECT COUNT(*)::numeric AS review_count,
+            AVG(vi.rating)::numeric AS average_rating,
+            COALESCE(STDDEV_POP(vi.rating), 0)::numeric AS dispersion,
+            COALESCE(
+              (
+                SUM(vi.rating * POWER(0.5::double precision,
+                  GREATEST(0::double precision, EXTRACT(EPOCH FROM (now() - vv.visited_at))::double precision / 15552000.0)))
+                / NULLIF(SUM(POWER(0.5::double precision,
+                  GREATEST(0::double precision, EXTRACT(EPOCH FROM (now() - vv.visited_at))::double precision / 15552000.0))), 0)
+              )::numeric,
+              AVG(vi.rating)::numeric,
+              m.rating
+            ) AS recent_rating,
+            GREATEST(1::numeric, LEAST(COUNT(*)::numeric, GREATEST(1::numeric, COUNT(DISTINCT vv.user_id)::numeric * 3))) AS effective_count
+          FROM visit_items vi JOIN visits vv ON vv.id = vi.visit_id
+          WHERE vi.menu_item_id = m.id AND vi.rating IS NOT NULL AND vv.visibility = 'visible'
+        ) stats
+      )`;
 
 export async function discoverPlaces(query: DiscoverQuery): Promise<ApiPlace[]> {
   if (!pool) {
@@ -202,23 +269,19 @@ export async function discoverPlaces(query: DiscoverQuery): Promise<ApiPlace[]> 
   const orderBy = query.lat != null && query.lng != null ? 'distance_km ASC NULLS LAST, rating DESC' : 'rating DESC';
   const result = await pool.query(`
       SELECT b.id, b.taqueria_id, t.name AS taqueria_name, b.name, b.neighborhood, b.open_until,
-      CASE WHEN COALESCE(reviews.review_count, 0) = 0 THEN b.rating
-        ELSE ((reviews.review_count * reviews.average_rating) + (10 * 4.2)) / (reviews.review_count + 10) END AS rating,
+      ${reputationSelect}
       b.match_score, b.style,
       b.image_url, b.description, b.tags, b.flavor_profile, ST_Y(b.location::geometry) AS latitude,
       ST_X(b.location::geometry) AS longitude, ${distanceSelect},
       COALESCE(json_agg(json_build_object('id', m.id, 'name', m.name, 'rating', COALESCE((
-        SELECT ((COUNT(*) * AVG(vi.rating)) + (5 * 4.2)) / (COUNT(*) + 5)
-        FROM visit_items vi JOIN visits vv ON vv.id = vi.visit_id
-        WHERE vi.menu_item_id = m.id AND vi.rating IS NOT NULL AND vv.visibility = 'visible'
+        ${tacoReputationSelect}
       ), m.rating),
         'price', m.price, 'note', m.note)) FILTER (WHERE m.id IS NOT NULL), '[]') AS tacos
     FROM branches b JOIN taquerias t ON t.id = b.taqueria_id
-      LEFT JOIN LATERAL (SELECT COUNT(*)::numeric AS review_count, AVG(v.rating)::numeric AS average_rating
-        FROM visits v WHERE v.branch_id = b.id AND v.visibility = 'visible') reviews ON true
+      ${reputationJoin}
       LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
     WHERE ${predicates.join(' AND ')}
-    GROUP BY b.id, t.name, reviews.review_count, reviews.average_rating ORDER BY ${orderBy} LIMIT $${values.length}
+    GROUP BY b.id, t.name, reviews.review_count, reviews.score ORDER BY ${orderBy} LIMIT $${values.length}
   `, values);
   return result.rows.map(normalizePlace);
 }
@@ -334,22 +397,18 @@ export async function findPlace(id: string): Promise<ApiPlace | undefined> {
   if (!pool) return fallback;
   const result = await pool.query(`
     SELECT b.id, b.taqueria_id, t.name AS taqueria_name, b.name, b.neighborhood, b.open_until,
-      CASE WHEN COALESCE(reviews.review_count, 0) = 0 THEN b.rating
-        ELSE ((reviews.review_count * reviews.average_rating) + (10 * 4.2)) / (reviews.review_count + 10) END AS rating,
+      ${reputationSelect}
       b.match_score, b.style,
       b.image_url, b.description, b.tags, b.flavor_profile, ST_Y(b.location::geometry) AS latitude,
       ST_X(b.location::geometry) AS longitude, NULL::numeric AS distance_km,
       COALESCE(json_agg(json_build_object('id', m.id, 'name', m.name, 'rating', COALESCE((
-        SELECT ((COUNT(*) * AVG(vi.rating)) + (5 * 4.2)) / (COUNT(*) + 5)
-        FROM visit_items vi JOIN visits vv ON vv.id = vi.visit_id
-        WHERE vi.menu_item_id = m.id AND vi.rating IS NOT NULL AND vv.visibility = 'visible'
+        ${tacoReputationSelect}
       ), m.rating),
         'price', m.price, 'note', m.note)) FILTER (WHERE m.id IS NOT NULL), '[]') AS tacos
     FROM branches b JOIN taquerias t ON t.id = b.taqueria_id
-      LEFT JOIN LATERAL (SELECT COUNT(*)::numeric AS review_count, AVG(v.rating)::numeric AS average_rating
-        FROM visits v WHERE v.branch_id = b.id AND v.visibility = 'visible') reviews ON true
+      ${reputationJoin}
       LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
-    WHERE b.id = $1 AND b.is_active = true GROUP BY b.id, t.name, reviews.review_count, reviews.average_rating
+    WHERE b.id = $1 AND b.is_active = true GROUP BY b.id, t.name, reviews.review_count, reviews.score
   `, [id]);
   return result.rows[0] ? normalizePlace(result.rows[0]) : undefined;
 }
