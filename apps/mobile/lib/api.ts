@@ -11,9 +11,14 @@ const API_URL = configuredUrl?.replace(/\/$/, '');
 
 async function request<T>(path: string, options?: RequestInit, token?: string): Promise<T> {
   if (!API_URL) throw new Error('API URL no configurada');
+  const headers: HeadersInit = {
+    ...(options?.body ? { 'Content-Type': 'application/json' } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options?.headers ?? {})
+  };
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options?.headers ?? {}) }
+    headers
   });
   if (!response.ok) throw new Error(`API ${response.status}`);
   return response.json() as Promise<T>;
