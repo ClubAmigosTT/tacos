@@ -79,6 +79,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 49. Registro asistido por cámara: después de tomar una foto, la app propone la taquería más cercana por ubicación y exige confirmación manual antes de cambiar el registro.
 50. Búsqueda universal: la barra de inicio acepta el antojo y abre el mapa con la consulta ya aplicada, mientras que el módulo social del inicio lee actividad real del feed autenticado.
 51. Migración segura de catálogo: los padres de taquería se crean antes de la llave foránea, incluso para sucursales importadas fuera del catálogo de ejemplo.
+52. Audiencia anónima: la app conserva un identificador aleatorio local para medir recurrencia sin enviar correo, ubicación ni texto de búsqueda.
 
 ## Verificación
 

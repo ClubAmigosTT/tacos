@@ -1,4 +1,6 @@
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { places, type Place } from '@/data/fixtures';
 
 export type AuthUser = { id: string; email: string; displayName: string; role?: 'user' | 'admin'; following?: boolean };
@@ -17,8 +19,30 @@ export type UserProfile = { user: { id: string; displayName: string }; stats: { 
 const configuredUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
 const API_URL = configuredUrl?.replace(/\/$/, '');
 const REQUEST_TIMEOUT_MS = 15_000;
+const ANONYMOUS_ID_KEY = 'tacos.analytics.anonymous_id';
+let anonymousIdPromise: Promise<string> | undefined;
 export type ProductEventProperty = string | number | boolean | null;
 export type ProductEventName = 'app_open' | 'map_search' | 'map_filter' | 'radar_filter' | 'place_open' | 'visit_saved' | 'visit_deleted' | 'list_open' | 'list_created' | 'list_collaborator_changed' | 'profile_open' | 'feed_open';
+
+function createAnonymousId() {
+  const randomUuid = globalThis.crypto?.randomUUID?.();
+  return `anon-${randomUuid ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`}`;
+}
+
+async function getAnonymousId() {
+  if (anonymousIdPromise) return anonymousIdPromise;
+  anonymousIdPromise = (async () => {
+    const stored = Platform.OS === 'web'
+      ? globalThis.localStorage?.getItem(ANONYMOUS_ID_KEY)
+      : await SecureStore.getItemAsync(ANONYMOUS_ID_KEY);
+    if (stored && /^[a-zA-Z0-9._:-]{8,128}$/.test(stored)) return stored;
+    const next = createAnonymousId();
+    if (Platform.OS === 'web') globalThis.localStorage?.setItem(ANONYMOUS_ID_KEY, next);
+    else await SecureStore.setItemAsync(ANONYMOUS_ID_KEY, next);
+    return next;
+  })().catch(() => createAnonymousId());
+  return anonymousIdPromise;
+}
 
 function haversineKm(from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }) {
   const earthRadiusKm = 6371;
@@ -55,7 +79,8 @@ async function request<T>(path: string, options?: RequestInit, token?: string): 
 export async function trackEvent(eventName: ProductEventName, properties: Record<string, ProductEventProperty> = {}, token?: string) {
   if (!API_URL) return;
   try {
-    await request<{ status: 'accepted' }>('/v1/events', { method: 'POST', body: JSON.stringify({ eventName, properties }) }, token);
+    const anonymousId = token ? undefined : await getAnonymousId();
+    await request<{ status: 'accepted' }>('/v1/events', { method: 'POST', body: JSON.stringify({ eventName, anonymousId, properties }) }, token);
   } catch {
     // Analytics must never block a product action or break the offline fallback.
   }
