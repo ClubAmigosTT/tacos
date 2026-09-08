@@ -507,6 +507,19 @@ export async function updatePrivacyForUser(userId: string, input: { shareActivit
   return { shareActivity: user.shareActivity };
 }
 
+export async function updateUserProfileForUser(userId: string, input: { displayName: string }): Promise<PublicUser | undefined> {
+  const displayName = input.displayName.trim();
+  if (pool) {
+    const result = await pool.query('UPDATE users SET display_name = $2, updated_at = now() WHERE id = $1 AND is_active = true RETURNING id, email, display_name, role', [userId, displayName]);
+    const row = result.rows[0];
+    return row ? { id: row.id, email: row.email, displayName: row.display_name, role: row.role } : undefined;
+  }
+  const user = localUsers.get(userId);
+  if (!user) return undefined;
+  user.displayName = displayName;
+  return publicUser(user);
+}
+
 export async function getUserProfile(userId: string, viewerId?: string) {
   const user = await findUserById(userId);
   if (!user) return undefined;

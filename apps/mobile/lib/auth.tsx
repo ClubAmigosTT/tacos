@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { login as loginRequest, me, register as registerRequest, type AuthUser } from '@/lib/api';
+import { login as loginRequest, me, register as registerRequest, updateProfile as updateProfileRequest, type AuthUser } from '@/lib/api';
 
 const TOKEN_KEY = 'tacos.session.token';
 type AuthContextValue = {
@@ -10,6 +10,7 @@ type AuthContextValue = {
   loading: boolean;
   signIn: (input: { email: string; password: string }) => Promise<void>;
   signUp: (input: { email: string; password: string; displayName: string }) => Promise<void>;
+  updateProfile: (input: { displayName: string }) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -53,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user, token, loading,
     async signIn(input) { const result = await loginRequest(input); await writeToken(result.token); setToken(result.token); setUser(result.user); },
     async signUp(input) { const result = await registerRequest(input); await writeToken(result.token); setToken(result.token); setUser(result.user); },
+    async updateProfile(input) { if (!token) throw new Error('UNAUTHORIZED'); const result = await updateProfileRequest(input, token); setUser(result.user); },
     async signOut() { await writeToken(null); setToken(undefined); setUser(undefined); }
   }), [loading, token, user]);
 

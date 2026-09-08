@@ -161,6 +161,10 @@ export async function me(token: string) {
   return request<{ user: AuthUser }>('/v1/me', undefined, token);
 }
 
+export async function updateProfile(input: { displayName: string }, token: string) {
+  return request<{ user: AuthUser }>('/v1/me/profile', { method: 'PATCH', body: JSON.stringify(input) }, token);
+}
+
 export async function privacy(token: string) {
   return request<{ privacy: { shareActivity: boolean } }>('/v1/me/privacy', undefined, token);
 }

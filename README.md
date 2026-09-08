@@ -75,6 +75,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 45. Listas colaborativas: el propietario puede invitar editores o lectores; los editores gestionan lugares, mientras que el propietario conserva la edición editorial y el control de acceso.
 46. Analítica de producto sin PII: eventos acotados para aperturas, búsquedas, filtros, aperturas de fichas, registros y colaboración; fallar analítica nunca bloquea una acción.
 47. Control del diario: el autor puede eliminar una visita propia con confirmación; la API la retira también de recomendaciones, estadísticas y conversaciones asociadas.
+48. Identidad editable: el usuario puede cambiar su nombre público desde Ajustes y la sesión se actualiza sin volver a iniciar sesión.
 
 ## Verificación
 

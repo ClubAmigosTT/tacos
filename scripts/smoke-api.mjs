@@ -33,6 +33,11 @@ await request('/v1/events', {
 
 const alice = await createUser('Ana Smoke', 'ana');
 const bob = await createUser('Beto Smoke', 'beto');
+const updatedProfile = await request('/v1/me/profile', { method: 'PATCH', body: JSON.stringify({ displayName: 'Ana Editada' }), token: alice.token });
+if (updatedProfile.user?.displayName !== 'Ana Editada') throw new Error('Profile name was not updated');
+const meAfterProfileUpdate = await request('/v1/me', { token: alice.token });
+if (meAfterProfileUpdate.user?.displayName !== 'Ana Editada') throw new Error('Updated profile was not reflected in the session');
+await request('/v1/me/profile', { method: 'PATCH', body: JSON.stringify({ displayName: 'A' }), token: alice.token }, 400);
 const nearby = await request('/v1/discover?lat=19.3869&lng=-99.1571&limit=3');
 if (nearby.places?.[0]?.id !== 'vilsito') throw new Error('Nearby discovery did not prioritize El Vilsito');
 const saved = await request('/v1/branches/vilsito/saved', { method: 'POST', token: bob.token });
