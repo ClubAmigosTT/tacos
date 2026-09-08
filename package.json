@@ -7,6 +7,7 @@
     "dev:api": "pnpm --filter @tacos/api dev",
     "typecheck": "pnpm -r typecheck",
     "build:api": "pnpm --filter @tacos/api build",
-    "smoke:api": "node scripts/smoke-api.mjs"
+    "smoke:api": "node scripts/smoke-api.mjs",
+    "smoke:admin": "node scripts/smoke-admin.mjs"
   }
 }

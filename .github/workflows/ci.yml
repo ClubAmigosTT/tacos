@@ -43,7 +43,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pnpm --filter @tacos/api start > /tmp/tacos-api.log 2>&1 &
+          ADMIN_EMAILS=admin-smoke@example.com pnpm --filter @tacos/api start > /tmp/tacos-api.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid"' EXIT
           for attempt in {1..20}; do
@@ -52,6 +52,7 @@ jobs:
           done
           curl --fail --silent http://127.0.0.1:4000/health > /dev/null
           pnpm smoke:api
+          pnpm smoke:admin
 
       - name: Export Expo web bundle
         run: pnpm --filter @tacos/mobile exec expo export --platform web
