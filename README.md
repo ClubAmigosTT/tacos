@@ -20,6 +20,7 @@ pnpm install
 copy .env.example .env
 pnpm dev:api
 pnpm dev:mobile
+pnpm dev:local # levanta API y preview web juntos
 ```
 
 La app móvil funciona con fixtures si no existe `DATABASE_URL`. La API local queda en `http://localhost:4000`. Para probar cuentas localmente no hace falta una base de datos: se usa un repositorio en memoria. En un entorno compartido configura al menos `JWT_SECRET` y `DATABASE_URL`. `ADMIN_EMAILS` acepta una lista separada por comas para bootstrap controlado del primer administrador; para promover usuarios existentes usa una migración/SQL de administración.
@@ -94,6 +95,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 64. Diario temporal: el periodo del Diario y el año de Wrapped se calculan desde datos reales o el año actual, sin fechas hardcodeadas.
 65. Búsqueda eficiente: el mapa espera 250 ms después de la última tecla antes de consultar el API y permite confirmar la búsqueda con Enter.
 66. Buscar en esta zona: al mover el mapa nativo aparece una acción explícita que consulta el nuevo centro sin perder la ubicación del usuario.
+67. Desarrollo local: `pnpm dev:local` levanta el API y el preview web en paralelo para probar el producto con un solo comando.
 
 ## Verificación
 

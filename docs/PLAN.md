@@ -127,6 +127,7 @@ pnpm install
 copy .env.example .env
 pnpm dev:api
 pnpm dev:mobile
+pnpm dev:local
 pnpm typecheck
 pnpm build:api
 pnpm smoke:api
@@ -147,6 +148,8 @@ pnpm --filter @tacos/mobile exec expo export --platform web
 ## 5. Estado actual y siguiente paso externo
 
 El repositorio ya contiene el MVP funcional de las fases 1–7: mapa contextual, detalle normalizado, registro, fotos, diario, Taste ID, Radar, listas públicas/privadas, guardados, grafo social, perfiles, recomendaciones, feed, moderación y CI.
+
+Para desarrollo local, `pnpm dev:local` levanta API y preview web en paralelo; la app queda disponible en `http://localhost:8081/` y el health check en `http://localhost:4000/health`.
 
 Lo único que no puede completarse desde este entorno es la conexión de cuentas externas: crear el repositorio remoto, autorizar Render/EAS, pegar las claves S3/Maps y ejecutar el primer deploy. Una vez configuradas esas credenciales, la secuencia de la Fase 8 deja la app operando sin depender de esta computadora.
 
