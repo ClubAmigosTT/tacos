@@ -1,17 +1,35 @@
 import { useMemo, useState } from 'react';
 import { router } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { places } from '@/data/fixtures';
+import { discover } from '@/lib/api';
 import { colors, radii, spacing } from '@/theme';
 import { RatingBadge } from '@/components/RatingBadge';
 import { MapCanvas } from '@/components/MapCanvas';
 
 const filters = ['Pastor', 'Abierto ahora', 'Barato', '92% para mí'];
 
+function isOpenNow(openUntil: string) {
+  const [hours, minutes] = openUntil.split(':').map(Number);
+  const closing = hours * 60 + minutes;
+  const now = new Date();
+  const current = now.getHours() * 60 + now.getMinutes();
+  return closing < 6 * 60 ? current >= 18 * 60 || current <= closing : current <= closing;
+}
+
 export default function MapScreen() {
   const [active, setActive] = useState('Pastor');
-  const sorted = useMemo(() => active === 'Barato' ? [...places].sort((a, b) => (a.tacos[0]?.price ?? 0) - (b.tacos[0]?.price ?? 0)) : places, [active]);
+  const { data = places } = useQuery({ queryKey: ['discover', 'map'], queryFn: discover });
+  const sorted = useMemo(() => {
+    const source = [...data];
+    if (active === 'Barato') return source.sort((a, b) => (Math.min(...a.tacos.map((taco) => taco.price), Infinity) - Math.min(...b.tacos.map((taco) => taco.price), Infinity)));
+    if (active === '92% para mí') return source.sort((a, b) => b.match - a.match);
+    if (active === 'Pastor') return source.sort((a, b) => (b.tacos.find((taco) => taco.name === 'Pastor')?.rating ?? b.rating) - (a.tacos.find((taco) => taco.name === 'Pastor')?.rating ?? a.rating));
+    if (active === 'Abierto ahora') return source.filter((place) => isOpenNow(place.openUntil));
+    return source;
+  }, [active, data]);
 
   return (
     <View style={styles.screen}>

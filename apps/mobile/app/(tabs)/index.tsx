@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { discover } from '@/lib/api';
@@ -19,10 +19,10 @@ export default function HomeScreen() {
           <Text style={styles.kicker}>CDMX · MARTES 23:48</Text>
           <Text style={styles.logo}>tacos<Text style={styles.logoDot}>.</Text></Text>
         </View>
-        <Pressable style={styles.avatar}><Text style={styles.avatarText}>M</Text></Pressable>
+        <Pressable style={styles.avatar} onPress={() => router.push('/(tabs)/profile')}><Text style={styles.avatarText}>M</Text></Pressable>
       </View>
 
-      <Pressable style={styles.search}>
+      <Pressable style={styles.search} onPress={() => router.push('/(tabs)/map')}>
         <Ionicons name="search" size={20} color={colors.muted} />
         <Text style={styles.searchText}>¿Qué se te antoja?</Text>
         <View style={styles.searchShortcut}><Text style={styles.shortcutText}>⌘ K</Text></View>
