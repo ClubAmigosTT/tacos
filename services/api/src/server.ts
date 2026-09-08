@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getAdminReports, getDiary, getFeed, getHealth, getListDetails, getLists, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, registerUser, removeListItemForUser, reportVisitForUser, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, type PublicUser } from './repository.js';
+import { addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getAdminReports, getDiary, getFeed, getHealth, getListDetails, getLists, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, registerUser, removeListItemForUser, reportVisitForUser, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
 import { uploadVisitImage } from './storage.js';
 
@@ -181,6 +181,16 @@ app.post('/v1/lists', async (request, reply) => {
   if (!user) return;
   const body = z.object({ title: z.string().trim().min(2).max(80), description: z.string().trim().max(240).optional(), visibility: z.enum(['public', 'private']).default('public') }).parse(request.body);
   return reply.code(201).send(await createListForUser(body, user.id));
+});
+
+app.patch('/v1/lists/:id', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const params = z.object({ id: z.string() }).parse(request.params);
+  const body = z.object({ title: z.string().trim().min(2).max(80).optional(), description: z.string().trim().max(240).optional(), visibility: z.enum(['public', 'private']).optional() }).refine((value) => Object.keys(value).length > 0, { message: 'At least one field is required' }).parse(request.body);
+  const updated = await updateListForUser(params.id, body, user.id);
+  if (!updated) return reply.code(404).send({ error: 'LIST_NOT_FOUND' });
+  return updated;
 });
 
 app.post('/v1/lists/:id/items', async (request, reply) => {

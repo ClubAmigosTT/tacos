@@ -154,6 +154,10 @@ export async function createList(input: { title: string; description?: string; v
   return request<ApiList>('/v1/lists', { method: 'POST', body: JSON.stringify(input) }, token);
 }
 
+export async function updateList(listId: string, input: { title?: string; description?: string; visibility?: 'public' | 'private' }, token: string) {
+  return request<ApiListDetail>(`/v1/lists/${encodeURIComponent(listId)}`, { method: 'PATCH', body: JSON.stringify(input) }, token);
+}
+
 export async function addListItem(listId: string, input: { branchId: string; note?: string }, token: string) {
   return request<{ status: string; listId: string; branchId: string }>(`/v1/lists/${listId}/items`, { method: 'POST', body: JSON.stringify(input) }, token);
 }

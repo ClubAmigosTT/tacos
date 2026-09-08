@@ -518,6 +518,28 @@ export async function createListForUser(input: { title: string; description?: st
   return { id, title, description, owner: { id: userId, displayName: owner?.displayName ?? 'Tacos' }, itemCount: 0, visitedCount: 0, coverImage: places[0].image, visibility };
 }
 
+export async function updateListForUser(listId: string, input: { title?: string; description?: string; visibility?: 'public' | 'private' }, userId: string): Promise<ApiListDetail | undefined> {
+  if (pool) {
+    const values: unknown[] = [listId, userId];
+    const assignments: string[] = [];
+    if (input.title !== undefined) { values.push(input.title.trim()); assignments.push(`title = $${values.length}`); }
+    if (input.description !== undefined) { values.push(input.description.trim()); assignments.push(`description = $${values.length}`); }
+    if (input.visibility !== undefined) { values.push(input.visibility); assignments.push(`visibility = $${values.length}`); }
+    if (assignments.length) {
+      const updated = await pool.query(`UPDATE lists SET ${assignments.join(', ')}, updated_at = now() WHERE id = $1 AND owner_id = $2 RETURNING id`, values);
+      if (!updated.rowCount) return undefined;
+    }
+    return getListDetails(listId, userId);
+  }
+  const list = localLists.get(listId);
+  if (!list || list.ownerId !== userId) return undefined;
+  if (input.title !== undefined) list.title = input.title.trim();
+  if (input.description !== undefined) list.description = input.description.trim();
+  if (input.visibility !== undefined) list.visibility = input.visibility;
+  const detail = await getListDetails(listId, userId);
+  return detail;
+}
+
 export async function addListItemForUser(listId: string, placeId: string, userId: string, note = ''): Promise<boolean> {
   if (pool) {
     const owned = await pool.query('SELECT 1 FROM lists WHERE id = $1 AND owner_id = $2', [listId, userId]);

@@ -72,7 +72,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 3. Calcular reputación bayesiana y afinidad de sabor; combinarla con señales de personas seguidas.
 4. Mostrar notas de visitas en el feed y llevar al perfil desde avatar/nombre.
 
-**Aceptación:** el smoke test confirma follow, unfollow, feed con nota, perfil público y exclusión de listas privadas.
+**Aceptación:** el smoke test confirma follow, unfollow, feed con nota, perfil público, exclusión de listas privadas y edición autorizada de listas.
 
 ### Fase 7 — Moderación y operación (2–4 días)
 

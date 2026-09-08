@@ -89,6 +89,19 @@ if (!publicLists.lists?.some((item) => item.id === list.id) || publicLists.lists
 await request(`/v1/lists/${list.id}/items/vilsito`, { method: 'DELETE', token: bob.token });
 const emptyListDetail = await request(`/v1/lists/${list.id}`, { token: bob.token });
 if (emptyListDetail.items?.length !== 0) throw new Error('List item was not removed');
+const editedList = await request(`/v1/lists/${list.id}`, {
+  method: 'PATCH',
+  body: JSON.stringify({ title: 'Edited route', description: 'Nueva curaduría', visibility: 'private' }),
+  token: bob.token
+});
+if (editedList.title !== 'Edited route' || editedList.visibility !== 'private') throw new Error('List owner could not edit metadata');
+await request(`/v1/lists/${list.id}`, {
+  method: 'PATCH',
+  body: JSON.stringify({ title: 'Nope' }),
+  token: alice.token
+}, 404);
+const editedOwnerDetail = await request(`/v1/lists/${list.id}`, { token: bob.token });
+if (editedOwnerDetail.description !== 'Nueva curaduría') throw new Error('Edited list description was not persisted');
 const privateList = await request('/v1/lists', { method: 'POST', body: JSON.stringify({ title: 'Private route', visibility: 'private' }), token: bob.token }, 201);
 await request(`/v1/lists/${privateList.id}`, { token: alice.token }, 404);
 const privateDetail = await request(`/v1/lists/${privateList.id}`, { token: bob.token });
