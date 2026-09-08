@@ -24,13 +24,15 @@ export default function ListsScreen() {
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['lists'] }); }
   });
   const apiLists = data?.lists ?? [];
-  const visibleLists: List[] = apiLists.length ? apiLists : (!user ? fixtureLists : []);
+  const scopedLists = placeId && user ? apiLists.filter((list) => list.owner.id === user.id) : apiLists;
+  const visibleLists: List[] = scopedLists.length ? scopedLists : (!user ? fixtureLists : []);
 
   return <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
     <View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable><View style={styles.headerCopy}><Text style={styles.eyebrow}>CURADURÍA PERSONAL</Text><Text style={styles.title}>Tus listas</Text></View><Ionicons name="albums-outline" size={22} color={colors.accent} /></View>
     <Text style={styles.intro}>{placeId ? 'Elige una lista para guardar esta taquería. Después podrás volver a ella desde tu perfil.' : 'Guarda lugares por antojo, colonia o estado de ánimo. Las listas convierten tus visitas en una forma de recomendar.'}</Text>
     {user ? <View style={styles.createCard}><Text style={styles.createEyebrow}>NUEVA LISTA</Text><TextInput value={title} onChangeText={setTitle} placeholder="Ej. Pastor que sí defendería" placeholderTextColor={colors.dim} style={styles.input} maxLength={80} /><TextInput value={description} onChangeText={setDescription} placeholder="Una descripción breve (opcional)" placeholderTextColor={colors.dim} style={[styles.input, styles.descriptionInput]} maxLength={240} multiline /><Pressable style={[styles.createButton, (!title.trim() || mutation.isPending) && styles.disabled]} disabled={!title.trim() || mutation.isPending} onPress={() => mutation.mutate()}><Ionicons name="add" size={18} color={colors.background} /><Text style={styles.createButtonText}>{mutation.isPending ? 'Guardando…' : 'Crear lista'}</Text></Pressable></View> : <Pressable style={styles.loginCard} onPress={() => router.push('/auth')}><View style={styles.loginIcon}><Ionicons name="person-add-outline" size={18} color={colors.background} /></View><View style={{ flex: 1 }}><Text style={styles.loginTitle}>Crea listas públicas</Text><Text style={styles.loginDetail}>Entra para guardar lugares y compartir tu criterio.</Text></View><Ionicons name="chevron-forward" size={17} color={colors.muted} /></Pressable>}
-    <View style={styles.listHeader}><Text style={styles.sectionTitle}>Selecciones</Text><Text style={styles.count}>{visibleLists.length} LISTAS</Text></View>
+    <View style={styles.listHeader}><Text style={styles.sectionTitle}>{placeId ? 'Elige una lista' : 'Selecciones'}</Text><Text style={styles.count}>{visibleLists.length} LISTAS</Text></View>
+    {saveMutation.isError ? <Text style={styles.error}>No pudimos guardar el lugar en esa lista.</Text> : null}
     {visibleLists.length ? visibleLists.map((list) => <ListCard key={list.id} list={list} saveMode={Boolean(placeId)} saved={saveMutation.isSuccess && saveMutation.variables === list.id} onPress={placeId ? () => { if (user) saveMutation.mutate(list.id); else router.push({ pathname: '/auth', params: { returnTo: '/lists', placeId } }); } : undefined} />) : <View style={styles.empty}><Ionicons name="bookmark-outline" size={25} color={colors.dim} /><Text style={styles.emptyTitle}>Todavía no tienes listas</Text><Text style={styles.emptyText}>Crea la primera y empieza a construir tu mapa de antojos.</Text></View>}
   </ScrollView>;
 }
@@ -75,5 +77,6 @@ const styles = StyleSheet.create({
   progress: { color: colors.ink, opacity: 0.76, fontSize: 9, fontWeight: '900', letterSpacing: 0.6 },
   empty: { alignItems: 'center', paddingVertical: spacing.xxl, paddingHorizontal: spacing.lg },
   emptyTitle: { color: colors.ink, fontSize: 17, fontWeight: '900', marginTop: spacing.md },
-  emptyText: { color: colors.muted, fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 5 }
+  emptyText: { color: colors.muted, fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 5 },
+  error: { color: colors.danger, fontSize: 12, marginBottom: spacing.md }
 });
