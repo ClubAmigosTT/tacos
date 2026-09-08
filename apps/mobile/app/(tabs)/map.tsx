@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -33,14 +33,16 @@ function lowestPrice(place: (typeof places)[number]) {
 }
 
 export default function MapScreen() {
+  const { q: initialQuery } = useLocalSearchParams<{ q?: string }>();
   const [active, setActive] = useState('Pastor');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialQuery ?? '');
   const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number }>();
   const [locationDenied, setLocationDenied] = useState(false);
   const [radarOpen, setRadarOpen] = useState(false);
   const [radarDistance, setRadarDistance] = useState<(typeof radarDistances)[number]>('En la zona');
   const [radarPrice, setRadarPrice] = useState<(typeof radarPrices)[number]>('Cualquier precio');
   const [radarMood, setRadarMood] = useState<(typeof radarMoods)[number]>('Alta calidad');
+  useEffect(() => { if (initialQuery != null) setSearch(initialQuery); }, [initialQuery]);
   async function loadLocation() {
     try {
       const permission = await Location.requestForegroundPermissionsAsync();

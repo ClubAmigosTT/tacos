@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link, router } from 'expo-router';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { recommendations } from '@/lib/api';
+import { feed as feedRequest, recommendations } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 import { PlaceCard } from '@/components/PlaceCard';
@@ -11,11 +12,21 @@ import { RatingBadge } from '@/components/RatingBadge';
 
 export default function HomeScreen() {
   const { token, user } = useAuth();
+  const [search, setSearch] = useState('');
   const { data = [] } = useQuery({ queryKey: ['recommendations', token], queryFn: () => recommendations(token) });
+  const { data: feedData } = useQuery({ queryKey: ['feed', 'home', token], queryFn: () => feedRequest(token!), enabled: Boolean(token), staleTime: 60_000 });
   const featured = data[0];
   const featuredTaco = featured?.tacos.reduce((best, taco) => taco.rating > (best?.rating ?? 0) ? taco : best, featured.tacos[0]);
   const hour = new Date().getHours();
   const moment = hour >= 22 || hour < 4 ? 'DE MADRUGADA' : hour < 12 ? 'PARA DESAYUNAR' : 'AHORA';
+  const activityItems = feedData?.items ?? [];
+  const activityNeighborhoods = [...new Set(activityItems.map((item) => item.neighborhood).filter(Boolean))].slice(0, 2).join(' / ');
+
+  function submitSearch() {
+    const query = search.trim();
+    if (query) router.push({ pathname: '/(tabs)/map', params: { q: query } });
+    else router.push('/(tabs)/map');
+  }
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -27,11 +38,11 @@ export default function HomeScreen() {
         <Pressable style={styles.avatar} onPress={() => router.push('/(tabs)/profile')}><Text style={styles.avatarText}>M</Text></Pressable>
       </View>
 
-      <Pressable style={styles.search} onPress={() => router.push('/(tabs)/map')}>
+      <View style={styles.search}>
         <Ionicons name="search" size={20} color={colors.muted} />
-        <Text style={styles.searchText}>¿Qué se te antoja?</Text>
-        <View style={styles.searchShortcut}><Text style={styles.shortcutText}>⌘ K</Text></View>
-      </Pressable>
+        <TextInput value={search} onChangeText={setSearch} onSubmitEditing={submitSearch} placeholder="¿Qué se te antoja?" placeholderTextColor={colors.muted} style={styles.searchInput} returnKeyType="search" />
+        <Pressable style={styles.searchShortcut} onPress={submitSearch}><Text style={styles.shortcutText}>↵</Text></Pressable>
+      </View>
 
       {featured ? (
         <Link href={`/place/${featured.id}`} asChild>
@@ -50,7 +61,7 @@ export default function HomeScreen() {
 
       <View style={styles.section}><SectionTitle eyebrow="tu mapa" title="Descubre cerca" action="Ver mapa →" /><ScrollView horizontal showsHorizontalScrollIndicator={false}>{data.map((place) => <PlaceCard key={place.id} place={place} />)}</ScrollView></View>
 
-      <View style={styles.section}><SectionTitle eyebrow="actividad" title="Lo que está pasando" /><Pressable style={styles.activity} onPress={() => router.push('/feed')}><View style={styles.activityAvatars}><View style={[styles.miniAvatar, { backgroundColor: '#DF7E54' }]}><Text>J</Text></View><View style={[styles.miniAvatar, { backgroundColor: '#728BC1' }]}><Text>A</Text></View><View style={[styles.miniAvatar, { backgroundColor: '#C08A54' }]}><Text>R</Text></View></View><View style={styles.activityCopy}><Text style={styles.activityTitle}>Tus amigos están comiendo</Text><Text style={styles.activityMeta}>3 registros nuevos · Roma / Narvarte</Text></View><Ionicons name="arrow-forward" size={17} color={colors.muted} /></Pressable></View>
+      <View style={styles.section}><SectionTitle eyebrow="actividad" title="Lo que está pasando" /><Pressable style={styles.activity} onPress={() => router.push('/feed')}><View style={styles.activityAvatars}>{token && activityItems.length ? activityItems.slice(0, 3).map((item, index) => <View key={`${item.user_id}-${index}`} style={[styles.miniAvatar, { backgroundColor: ['#DF7E54', '#728BC1', '#C08A54'][index] }]}><Text>{item.display_name.slice(0, 1).toUpperCase()}</Text></View>) : <><View style={[styles.miniAvatar, { backgroundColor: '#DF7E54' }]}><Text>J</Text></View><View style={[styles.miniAvatar, { backgroundColor: '#728BC1' }]}><Text>A</Text></View><View style={[styles.miniAvatar, { backgroundColor: '#C08A54' }]}><Text>R</Text></View></>}</View><View style={styles.activityCopy}><Text style={styles.activityTitle}>{token ? (activityItems.length ? 'Tu círculo está comiendo' : 'Encuentra gente con criterio') : 'Tus amigos están comiendo'}</Text><Text style={styles.activityMeta}>{token ? (activityItems.length ? `${activityItems.length} registros nuevos${activityNeighborhoods ? ` · ${activityNeighborhoods}` : ''}` : 'Sigue personas para llenar tu mapa social') : '3 registros nuevos · Roma / Narvarte'}</Text></View><Ionicons name="arrow-forward" size={17} color={colors.muted} /></Pressable></View>
 
       <View style={styles.section}><SectionTitle eyebrow="selección editorial" title="Listas para esta noche" /><Pressable style={styles.listCard} onPress={() => router.push('/lists')}><View style={styles.listNumber}><Text style={styles.listNumberText}>07</Text><Text style={styles.listNumberLabel}>LUGARES</Text></View><View style={styles.listCopy}><Text style={styles.listTitle}>Pastor después de medianoche</Text><Text style={styles.listMeta}>Por @comelocal · 4.72 promedio</Text></View><Ionicons name="chevron-forward" size={19} color={colors.muted} /></Pressable></View>
     </ScrollView>
@@ -67,7 +78,7 @@ const styles = StyleSheet.create({
   avatar: { width: 38, height: 38, borderRadius: 20, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.background, fontWeight: '900' },
   search: { height: 54, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, gap: 11, marginBottom: spacing.lg },
-  searchText: { color: colors.muted, fontSize: 15, flex: 1 },
+  searchInput: { color: colors.ink, fontSize: 15, flex: 1, paddingVertical: 0 },
   searchShortcut: { borderWidth: 1, borderColor: colors.border, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 4 },
   shortcutText: { color: colors.dim, fontSize: 11, fontWeight: '700' },
   hero: { height: 330, borderRadius: radii.lg, overflow: 'hidden', marginBottom: spacing.xl, backgroundColor: colors.surfaceRaised },

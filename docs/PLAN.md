@@ -55,6 +55,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 2. Calcular distancia con PostGIS en producción y Haversine en fallback.
 3. Ordenar pins por el criterio activo: taco, apertura, precio, afinidad o calidad.
 4. Mantener Mapbox/Google Maps como infraestructura visual; el ranking y los pins son propiedad de Tacos.
+5. Conectar la búsqueda universal del inicio con el mapa contextual, conservando la consulta al navegar.
 
 **Aceptación:** “Pastor”, “Abierto ahora”, “Barato” y “Para mí” producen resultados ordenados; negar ubicación no rompe el catálogo.
 

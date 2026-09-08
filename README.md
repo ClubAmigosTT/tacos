@@ -77,6 +77,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 47. Control del diario: el autor puede eliminar una visita propia con confirmación; la API la retira también de recomendaciones, estadísticas y conversaciones asociadas.
 48. Identidad editable: el usuario puede cambiar su nombre público desde Ajustes y la sesión se actualiza sin volver a iniciar sesión.
 49. Registro asistido por cámara: después de tomar una foto, la app propone la taquería más cercana por ubicación y exige confirmación manual antes de cambiar el registro.
+50. Búsqueda universal: la barra de inicio acepta el antojo y abre el mapa con la consulta ya aplicada, mientras que el módulo social del inicio lee actividad real del feed autenticado.
 
 ## Verificación
 
