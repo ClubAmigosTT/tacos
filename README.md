@@ -108,6 +108,8 @@ En el emulador Android usa `http://10.0.2.2:4000`; el emulador redirige esa dire
 75. Paridad de búsqueda: PostgreSQL también encuentra sucursales por nombre de taco mediante `EXISTS` e índice trigram, igual que el fallback local.
 76. Decisión en la ficha: el detalle calcula precio promedio del menú y estado de apertura con la misma regla nocturna del mapa.
 77. Sesión sin parpadeos: Diario, Perfil y Registro esperan la restauración de SecureStore/localStorage antes de mostrar fixtures o estados de autenticación.
+78. Cierre del registro: guardar una visita invalida diario, feed, recomendaciones, mapa y ficha, y el CTA vuelve al mapa sin duplicar la pantalla de formulario.
+78. Cierre del registro: guardar una visita invalida diario, feed, recomendaciones, mapa y ficha, y el CTA vuelve al mapa sin duplicar la pantalla de formulario.
 
 ## Verificación
 
