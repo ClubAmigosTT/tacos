@@ -62,7 +62,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 32. Migración tolerante: `011_backfill_taquerias.sql` conserva sucursales existentes aunque no pertenezcan al seed inicial.
 33. Reputación moderable: visitas ocultas ya no afectan score global, Taste ID, recomendaciones ni estadísticas públicas; el autor conserva su diario.
 34. Validación normalizada: títulos, nombres, notas y correos se recortan y validan antes de escribir en la base.
-35. Operación Render: `/health` comprueba PostgreSQL, el API cierra conexiones limpiamente durante reinicios y producción falla rápido si falta `JWT_SECRET`.
+35. Operación Render: `/health` comprueba PostgreSQL, el esquema migrado y PostGIS; el API cierra conexiones limpiamente durante reinicios y producción falla rápido si falta `JWT_SECRET`.
 36. Mapa responsive: la ubicación concedida después del montaje recentra el mapa nativo con una transición corta.
 37. Health con timeout: las comprobaciones de PostgreSQL fallan rápido para que Render pueda reemplazar una instancia degradada.
 38. Cliente resiliente: las peticiones móviles cancelan solicitudes colgadas después de 15 segundos y activan los fallbacks existentes.

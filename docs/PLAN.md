@@ -98,7 +98,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 2. Ocultar contenido desde el panel admin sin borrar la evidencia.
 3. Arrancar el primer admin con `ADMIN_EMAILS` o SQL controlado en Render.
 4. Añadir límites de tamaño, logs estructurados, manejo de errores sin filtrar secretos y fallo explícito si producción no tiene `JWT_SECRET`.
-5. Configurar health checks y cierre graceful para que Render pueda reemplazar instancias sin conexiones huérfanas.
+5. Configurar health checks que validen PostgreSQL, el esquema migrado y PostGIS, además de cierre graceful para que Render pueda reemplazar instancias sin conexiones huérfanas.
 6. Ejecutar mantenimiento periódico desde worker/cron: analizar tablas operativas y aplicar retención explícita sólo a eventos de producto.
 7. Mantener índices parciales para las agregaciones de reputación sobre visitas visibles y ratings de tacos.
 8. Ejecutar el migrador con un cliente dedicado y un lock advisory para que los reemplazos de Render no apliquen el mismo archivo en paralelo.

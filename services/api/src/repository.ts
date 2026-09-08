@@ -36,10 +36,11 @@ export async function getHealth() {
   if (!pool) return { status: 'ok' as const, database: 'memory' as const };
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    await Promise.race([
-      pool.query('SELECT 1'),
+    const result = await Promise.race([
+      pool.query("SELECT 1, to_regclass('public.schema_migrations') AS schema, postgis_version() AS postgis"),
       new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('HEALTH_TIMEOUT')), 3_000); })
     ]);
+    if (!result.rows[0]?.schema || !result.rows[0]?.postgis) return { status: 'degraded' as const, database: 'postgres' as const, reason: 'schema_not_ready' as const };
     return { status: 'ok' as const, database: 'postgres' as const };
   } catch {
     return { status: 'degraded' as const, database: 'unavailable' as const };
