@@ -534,13 +534,13 @@ export async function unfollowUser(followerId: string, followedId: string) {
 export async function getFeed(userId: string) {
   if (pool) {
     const result = await pool.query(`
-      SELECT v.id, v.visited_at, v.rating, u.id AS user_id, u.display_name,
+      SELECT v.id, v.visited_at, v.rating, v.note, u.id AS user_id, u.display_name,
         b.id AS place_id, b.name AS place_name, b.neighborhood, COALESCE(v.photo_url, b.image_url) AS image_url,
         COALESCE(string_agg(m.name, ', ' ORDER BY m.name), '') AS tacos
       FROM follows f JOIN visits v ON v.user_id = f.followed_id
       JOIN users u ON u.id = v.user_id JOIN branches b ON b.id = v.branch_id
       LEFT JOIN visit_items vi ON vi.visit_id = v.id LEFT JOIN menu_items m ON m.id = vi.menu_item_id
-      WHERE f.follower_id = $1 AND v.visibility = 'visible' GROUP BY v.id, v.photo_url, u.id, b.id ORDER BY v.visited_at DESC LIMIT 50
+      WHERE f.follower_id = $1 AND v.visibility = 'visible' GROUP BY v.id, v.photo_url, v.note, u.id, b.id ORDER BY v.visited_at DESC LIMIT 50
     `, [userId]);
     return result.rows;
   }
@@ -549,7 +549,7 @@ export async function getFeed(userId: string) {
     const place = places.find((item) => item.id === visit.placeId);
     const user = localUsers.get(visit.userId);
     const tacos = visit.tacoIds.map((tacoId) => place?.tacos.find((taco) => taco.id === tacoId)?.name ?? tacoId).join(', ');
-    return { id, visited_at: visit.createdAt, rating: visit.rating, user_id: visit.userId, display_name: user?.displayName ?? 'Tacos', place_id: visit.placeId, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', image_url: visit.photoUrl ?? place?.image ?? '', tacos };
+    return { id, visited_at: visit.createdAt, rating: visit.rating, note: visit.note ?? '', user_id: visit.userId, display_name: user?.displayName ?? 'Tacos', place_id: visit.placeId, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', image_url: visit.photoUrl ?? place?.image ?? '', tacos };
   });
 }
 

@@ -45,7 +45,7 @@ const visit = await request('/v1/visits', {
 }, 201);
 
 const feed = await request('/v1/feed', { token: alice.token });
-if (feed.items?.length !== 1) throw new Error(`Expected one feed item, got ${feed.items?.length ?? 0}`);
+if (feed.items?.length !== 1 || feed.items?.[0]?.note !== 'Smoke test') throw new Error(`Expected one feed item with its note, got ${feed.items?.length ?? 0}`);
 const diary = await request('/v1/diary', { token: bob.token });
 if (diary.entries?.[0]?.price !== 44 || diary.entries?.[0]?.note !== 'Smoke test') throw new Error('Diary context was not persisted');
 const recommendations = await request('/v1/recommendations', { token: bob.token });
