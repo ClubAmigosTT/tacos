@@ -63,6 +63,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 33. Reputación moderable: visitas ocultas ya no afectan score global, Taste ID, recomendaciones ni estadísticas públicas; el autor conserva su diario.
 34. Validación normalizada: títulos, nombres, notas y correos se recortan y validan antes de escribir en la base.
 35. Operación Render: `/health` comprueba PostgreSQL y el API cierra conexiones limpiamente durante reinicios.
+36. Mapa responsive: la ubicación concedida después del montaje recentra el mapa nativo con una transición corta.
 
 ## Verificación
 
