@@ -68,6 +68,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 12. Aplicar `share_activity` también al cálculo de señales sociales de recomendaciones y cubrirlo en el smoke test.
 13. Invalidar las cachés de feed y recomendaciones cuando cambia la preferencia de actividad y reflejar que afecta visitas existentes.
 14. Permitir seguir/dejar de seguir desde un perfil público y devolver el estado para que la UI sobreviva a una recarga.
+15. Hacer que la búsqueda de un taco cambie el rating visible de pins y tarjetas al score de ese taco, manteniendo el promedio global para consultas generales.
 
 **Aceptación:** “Pastor”, “Abierto ahora”, “Barato” y “Para mí” producen resultados ordenados; negar ubicación no rompe el catálogo.
 

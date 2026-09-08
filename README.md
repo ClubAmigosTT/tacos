@@ -104,6 +104,7 @@ En el emulador Android usa `http://10.0.2.2:4000`; el emulador redirige esa dire
 71. Privacidad completa: ocultar actividad también retira esa señal de las recomendaciones sociales, tanto en PostgreSQL como en el fallback local.
 72. Privacidad inmediata: el cliente invalida feed y recomendaciones al cambiar el ajuste, y la pantalla describe el alcance real del cambio.
 73. Seguimiento desde perfil: los perfiles públicos muestran y actualizan el estado Seguir/Siguiendo, con cachés sociales invalidadas después de cada cambio.
+74. Mapa por taco: una búsqueda como “suadero” detecta el taco del menú, ordena por su reputación y muestra ese rating en pins y tarjetas, en lugar del promedio global.
 
 ## Verificación
 
