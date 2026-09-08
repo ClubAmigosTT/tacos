@@ -6,6 +6,7 @@ import { listDetails, removeListItem } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 import { PlaceCard } from '@/components/PlaceCard';
+import { MapCanvas } from '@/components/MapCanvas';
 
 export default function ListDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -31,6 +32,7 @@ export default function ListDetailScreen() {
       <Text style={styles.description}>{list.description}</Text>
       <View style={styles.metaRow}><Text style={styles.owner}>por @{list.owner.displayName.toLowerCase().replace(/\s+/g, '')}</Text><Text style={styles.progress}>{list.visitedCount}/{list.itemCount} VISITADOS · {progress}%</Text></View>
       <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${progress}%` }]} /></View>
+      {list.items.length ? <View style={styles.mapPreview}><MapCanvas places={list.items.map((item) => item.place)} active="" onSelect={(placeId) => router.push(`/place/${placeId}`)} /></View> : null}
       <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Lugares</Text><Text style={styles.count}>{list.items.length}</Text></View>
       {removeMutation.isError ? <Text style={styles.error}>No pudimos quitar ese lugar. Inténtalo de nuevo.</Text> : null}
       {list.items.length ? list.items.map((item) => <View key={item.branchId} style={styles.item}><PlaceCard place={item.place} compact />{item.note ? <Text style={styles.note}>{item.note}</Text> : null}{isOwner ? <Pressable style={styles.remove} disabled={removeMutation.isPending} onPress={() => removeMutation.mutate(item.branchId)}><Ionicons name="remove-circle-outline" size={15} color={colors.warm} /><Text style={styles.removeText}>{removeMutation.isPending ? 'Quitando…' : 'Quitar de la lista'}</Text></Pressable> : null}</View>) : <View style={styles.empty}><Ionicons name="map-outline" size={28} color={colors.dim} /><Text style={styles.emptyTitle}>Todavía no hay lugares</Text><Text style={styles.muted}>Guarda taquerías desde sus fichas para empezar esta ruta.</Text></View>}
@@ -53,6 +55,7 @@ const styles = StyleSheet.create({
   progress: { color: colors.muted, fontSize: 9, fontWeight: '900', letterSpacing: 0.6 },
   progressTrack: { height: 6, backgroundColor: colors.surfaceRaised, borderRadius: 4, overflow: 'hidden', marginTop: 9 },
   progressFill: { height: '100%', backgroundColor: colors.accent, borderRadius: 4 },
+  mapPreview: { height: 190, borderRadius: radii.md, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, marginTop: spacing.xl },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: spacing.xxl, marginBottom: spacing.md },
   sectionTitle: { color: colors.ink, fontSize: 23, fontWeight: '900' },
   count: { color: colors.muted, fontSize: 12, fontWeight: '900' },

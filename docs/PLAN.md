@@ -63,6 +63,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 3. Subir fotos validadas por firma y tamaño a S3-compatible; guardar sólo la URL en PostgreSQL.
 4. Mostrar diario, Taste ID, Passport y Wrapped; compartir el resumen mediante la hoja nativa.
 5. Permitir que el propietario corrija rating, precio y nota sin alterar la sucursal ni los tacos registrados.
+6. Mostrar las listas como rutas: mapa compacto, progreso visitado y navegación a cada sucursal.
 
 **Aceptación:** una visita aparece en diario, feed y estadísticas; una foto inválida no se persiste; una falla de media permite guardar sin foto; una edición propia persiste y una edición ajena responde 404.
 
