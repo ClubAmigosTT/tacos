@@ -36,6 +36,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Hours filter smoke test
+        run: pnpm smoke:hours
+
       - name: Build API
         run: pnpm build:api
 

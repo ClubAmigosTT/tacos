@@ -61,6 +61,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 6. Servir un score de reputación conservador: prior bayesiano, recencia, penalización por dispersión y límite por revisor distinto; devolver también el volumen de reseñas visibles.
 7. Aplicar debounce de 250 ms a la búsqueda del mapa para evitar consultas por cada tecla y conservar confirmación explícita con Enter.
 8. Mostrar “Buscar en esta zona” al desplazar el mapa nativo y actualizar el centro sólo cuando el usuario confirma.
+9. Interpretar cierres de madrugada y cierres diurnos con una regla compartida, para que “Abierto ahora” no marque abiertos los lugares después de medianoche.
 
 **Aceptación:** “Pastor”, “Abierto ahora”, “Barato” y “Para mí” producen resultados ordenados; negar ubicación no rompe el catálogo.
 

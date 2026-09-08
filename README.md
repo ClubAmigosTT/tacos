@@ -96,12 +96,14 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 65. Búsqueda eficiente: el mapa espera 250 ms después de la última tecla antes de consultar el API y permite confirmar la búsqueda con Enter.
 66. Buscar en esta zona: al mover el mapa nativo aparece una acción explícita que consulta el nuevo centro sin perder la ubicación del usuario.
 67. Desarrollo local: `pnpm dev:local` levanta el API y el preview web en paralelo para probar el producto con un solo comando.
+68. Horarios confiables: el filtro “Abierto ahora” distingue negocios diurnos de cierres de madrugada y rechaza horas malformadas.
 
 ## Verificación
 
 ```bash
 pnpm typecheck
 pnpm build:api
+pnpm smoke:hours
 pnpm --filter @tacos/mobile exec expo export --platform web
 pnpm smoke:api # requiere la API activa en http://127.0.0.1:4000
 pnpm smoke:admin # requiere la API activa con ADMIN_EMAILS=admin-smoke@example.com

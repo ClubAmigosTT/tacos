@@ -10,20 +10,12 @@ import { colors, radii, spacing } from '@/theme';
 import { RatingBadge } from '@/components/RatingBadge';
 import { MapCanvas } from '@/components/MapCanvas';
 import { useAuth } from '@/lib/auth';
-
+import { isOpenNow } from '@/lib/hours';
 const filters = ['Pastor', 'Abierto ahora', 'Barato', '92% para mí'];
 const radarDistances = ['Cerca', 'En la zona', 'Toda la ciudad'] as const;
 const radarPrices = ['Barato', 'Medio', 'Cualquier precio'] as const;
 const radarMoods = ['Clásico', 'Aventura', 'Alta calidad'] as const;
 const defaultMapCenter = { latitude: 19.402, longitude: -99.163 };
-
-function isOpenNow(openUntil: string) {
-  const [hours, minutes] = openUntil.split(':').map(Number);
-  const closing = hours * 60 + minutes;
-  const now = new Date();
-  const current = now.getHours() * 60 + now.getMinutes();
-  return closing < 6 * 60 ? current >= 18 * 60 || current <= closing : current <= closing;
-}
 
 function distanceKm(distance: string) {
   const value = Number.parseFloat(distance.replace(',', '.'));
