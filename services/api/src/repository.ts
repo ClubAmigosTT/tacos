@@ -214,7 +214,7 @@ export async function getDiary(userId: string) {
       FROM visits v JOIN branches b ON b.id = v.branch_id
       LEFT JOIN visit_items vi ON vi.visit_id = v.id
       LEFT JOIN menu_items m ON m.id = vi.menu_item_id
-      WHERE v.user_id = $1 GROUP BY v.id, b.name, b.neighborhood, b.image_url
+      WHERE v.user_id = $1 GROUP BY v.id, v.price, v.note, v.photo_url, b.name, b.neighborhood, b.image_url
       ORDER BY v.visited_at DESC LIMIT 100
     `, [userId]);
     return result.rows;
