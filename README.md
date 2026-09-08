@@ -55,6 +55,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 pnpm typecheck
 pnpm build:api
 pnpm --filter @tacos/mobile exec expo export --platform web
+pnpm smoke:api # requiere la API activa en http://127.0.0.1:4000
 ```
 
 Cada push y pull request a `main` o `master` ejecuta los mismos tres checks en GitHub Actions (`.github/workflows/ci.yml`). Render sólo debería desplegar commits que pasen esta verificación.
