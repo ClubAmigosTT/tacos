@@ -37,6 +37,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 7. Recomendaciones personalizadas desde el historial (`/v1/recommendations`).
 8. Listas públicas/privadas, guardado de lugares y progreso visitado.
 9. Grafo social mínimo: búsqueda de personas, seguir/dejar de seguir y feed de actividad.
+10. Permiso de ubicación en iOS/Android y distancias PostGIS cuando el dispositivo comparte coordenadas.
 
 ## Verificación
 
