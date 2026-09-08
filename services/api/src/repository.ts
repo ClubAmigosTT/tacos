@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import bcrypt from 'bcryptjs';
-import { lists as fixtureLists, places, type ApiList, type ApiPlace } from './data.js';
+import { lists as fixtureLists, places, type ApiList, type ApiPlace, type FlavorProfile } from './data.js';
 
 const pool = process.env.DATABASE_URL
   ? new Pool({ connectionString: process.env.DATABASE_URL, max: 10, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined })
@@ -21,6 +21,7 @@ function publicUser(user: LocalUser): PublicUser {
 }
 
 function normalizePlace(row: any): ApiPlace {
+  const fallbackProfile: FlavorProfile = places.find((place) => place.id === row.id)?.flavorProfile ?? { intensity: 50, spicy: 50, traditional: 50, texture: 50, value: 50 };
   return {
     id: row.id,
     name: row.name,
@@ -34,6 +35,7 @@ function normalizePlace(row: any): ApiPlace {
     image: row.image_url,
     description: row.description,
     tags: row.tags ?? [],
+    flavorProfile: { ...fallbackProfile, ...(row.flavor_profile ?? {}) },
     tacos: (row.tacos ?? []).map((taco: any) => ({ id: taco.id, name: taco.name, rating: Number(taco.rating), price: Number(taco.price), note: taco.note }))
   };
 }
@@ -61,7 +63,7 @@ export async function discoverPlaces(query: DiscoverQuery): Promise<ApiPlace[]> 
       CASE WHEN COALESCE(reviews.review_count, 0) = 0 THEN b.rating
         ELSE ((reviews.review_count * reviews.average_rating) + (10 * 4.2)) / (reviews.review_count + 10) END AS rating,
       b.match_score, b.style,
-      b.image_url, b.description, b.tags, ST_Y(b.location::geometry) AS latitude,
+      b.image_url, b.description, b.tags, b.flavor_profile, ST_Y(b.location::geometry) AS latitude,
       ST_X(b.location::geometry) AS longitude, ${distanceSelect},
       COALESCE(json_agg(json_build_object('id', m.id, 'name', m.name, 'rating', COALESCE((
         SELECT ((COUNT(*) * AVG(vi.rating)) + (5 * 4.2)) / (COUNT(*) + 5)
@@ -122,7 +124,7 @@ export async function findPlace(id: string): Promise<ApiPlace | undefined> {
       CASE WHEN COALESCE(reviews.review_count, 0) = 0 THEN b.rating
         ELSE ((reviews.review_count * reviews.average_rating) + (10 * 4.2)) / (reviews.review_count + 10) END AS rating,
       b.match_score, b.style,
-      b.image_url, b.description, b.tags, ST_Y(b.location::geometry) AS latitude,
+      b.image_url, b.description, b.tags, b.flavor_profile, ST_Y(b.location::geometry) AS latitude,
       ST_X(b.location::geometry) AS longitude, NULL::numeric AS distance_km,
       COALESCE(json_agg(json_build_object('id', m.id, 'name', m.name, 'rating', COALESCE((
         SELECT ((COUNT(*) * AVG(vi.rating)) + (5 * 4.2)) / (COUNT(*) + 5)

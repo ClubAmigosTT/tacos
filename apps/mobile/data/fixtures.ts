@@ -20,6 +20,7 @@ export type Place = {
   description: string;
   tacos: Taco[];
   tags: string[];
+  flavorProfile: { intensity: number; spicy: number; traditional: number; texture: number; value: number };
 };
 
 export type List = {
@@ -46,6 +47,7 @@ export const places: Place[] = [
     image: 'https://images.unsplash.com/photo-1552332386-f8dd00dc2f85?auto=format&fit=crop&w=1200&q=80',
     description: 'Pastor intenso, tortilla recién hecha y una noche que casi nunca termina.',
     tags: ['clásico', 'madrugada', 'salsa fuerte'],
+    flavorProfile: { intensity: 86, spicy: 72, traditional: 94, texture: 88, value: 78 },
     tacos: [
       { id: 'vilsito-pastor', name: 'Pastor', rating: 4.92, price: 22, note: 'Piña, borde crujiente y adobo profundo.' },
       { id: 'vilsito-suadero', name: 'Suadero', rating: 4.58, price: 24, note: 'Graso en el buen sentido; pide doble tortilla.' },
@@ -65,6 +67,7 @@ export const places: Place[] = [
     image: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=1200&q=80',
     description: 'Una taquería compacta y precisa, con gran control de grasa, textura y salsa.',
     tags: ['suave', 'salsa verde', 'precio medio'],
+    flavorProfile: { intensity: 68, spicy: 54, traditional: 61, texture: 92, value: 64 },
     tacos: [
       { id: 'oriente-suadero', name: 'Suadero', rating: 4.88, price: 28, note: 'Textura mantequillosa y final limpio.' },
       { id: 'oriente-campechano', name: 'Campechano', rating: 4.72, price: 32, note: 'Más intenso, con buen contraste de texturas.' }
@@ -83,6 +86,7 @@ export const places: Place[] = [
     image: 'https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?auto=format&fit=crop&w=1200&q=80',
     description: 'Tacos directos, rápidos y sin pretensiones para una noche de antojo.',
     tags: ['barato', 'rápido', 'clásico'],
+    flavorProfile: { intensity: 74, spicy: 48, traditional: 89, texture: 70, value: 96 },
     tacos: [
       { id: 'parados-carnitas', name: 'Carnitas', rating: 4.69, price: 20, note: 'Pide surtida para probar las partes.' },
       { id: 'parados-pastor', name: 'Pastor', rating: 4.55, price: 18, note: 'Más dulce y ligero que el promedio.' }
