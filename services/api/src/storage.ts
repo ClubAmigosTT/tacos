@@ -23,6 +23,10 @@ export async function uploadVisitImage(input: { userId: string; base64: string; 
   if (!client || !bucket || !publicBase) throw new Error('STORAGE_NOT_CONFIGURED');
   const bytes = Buffer.from(input.base64, 'base64');
   if (!bytes.length || bytes.length > 8 * 1024 * 1024) throw new Error('IMAGE_TOO_LARGE');
+  const isJpeg = input.contentType === 'image/jpeg' && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  const isPng = input.contentType === 'image/png' && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  const isWebp = input.contentType === 'image/webp' && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
+  if (!isJpeg && !isPng && !isWebp) throw new Error('INVALID_IMAGE');
   const key = `visits/${input.userId}/${crypto.randomUUID()}.${contentTypes[input.contentType]}`;
   await client.send(new PutObjectCommand({
     Bucket: bucket,

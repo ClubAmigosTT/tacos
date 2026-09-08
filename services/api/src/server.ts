@@ -103,6 +103,7 @@ app.post('/v1/media/images', async (request, reply) => {
   } catch (error) {
     if (error instanceof Error && error.message === 'STORAGE_NOT_CONFIGURED') return reply.code(503).send({ error: 'STORAGE_NOT_CONFIGURED' });
     if (error instanceof Error && error.message === 'IMAGE_TOO_LARGE') return reply.code(413).send({ error: 'IMAGE_TOO_LARGE' });
+    if (error instanceof Error && error.message === 'INVALID_IMAGE') return reply.code(400).send({ error: 'INVALID_IMAGE' });
     throw error;
   }
 });
