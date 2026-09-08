@@ -27,6 +27,15 @@ const alice = await createUser('Ana Smoke', 'ana');
 const bob = await createUser('Beto Smoke', 'beto');
 const nearby = await request('/v1/discover?lat=19.3869&lng=-99.1571&limit=3');
 if (nearby.places?.[0]?.id !== 'vilsito') throw new Error('Nearby discovery did not prioritize El Vilsito');
+const saved = await request('/v1/branches/vilsito/saved', { method: 'POST', token: bob.token });
+if (saved.status !== 'saved') throw new Error('Place was not saved');
+const savedPlaces = await request('/v1/me/saved', { token: bob.token });
+if (!savedPlaces.placeIds?.includes('vilsito')) throw new Error('Saved places were not returned');
+const savedAgain = await request('/v1/branches/vilsito/saved', { method: 'POST', token: bob.token });
+if (savedAgain.status !== 'already_saved') throw new Error('Duplicate saved place was not idempotent');
+await request('/v1/branches/vilsito/saved', { method: 'DELETE', token: bob.token });
+const unsavedPlaces = await request('/v1/me/saved', { token: bob.token });
+if (unsavedPlaces.placeIds?.includes('vilsito')) throw new Error('Place was not removed from saved places');
 const taqueria = await request('/v1/taquerias/vilsito');
 if (taqueria.branches?.[0]?.taqueriaId !== 'vilsito') throw new Error('Taqueria parent relation missing');
 

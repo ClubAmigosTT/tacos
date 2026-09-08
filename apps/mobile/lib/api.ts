@@ -83,6 +83,18 @@ export async function getPlace(id: string): Promise<Place> {
   }
 }
 
+export async function savedPlaces(token: string) {
+  return request<{ placeIds: string[] }>('/v1/me/saved', undefined, token);
+}
+
+export async function savePlace(placeId: string, token: string) {
+  return request<{ status: string; placeId: string }>(`/v1/branches/${encodeURIComponent(placeId)}/saved`, { method: 'POST' }, token);
+}
+
+export async function unsavePlace(placeId: string, token: string) {
+  return request<{ status: string; placeId: string }>(`/v1/branches/${encodeURIComponent(placeId)}/saved`, { method: 'DELETE' }, token);
+}
+
 export async function getTaqueria(id: string) {
   try {
     return await request<ApiTaqueria>(`/v1/taquerias/${id}`);

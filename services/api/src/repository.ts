@@ -16,6 +16,7 @@ type LocalUser = PublicUser & { passwordHash: string };
 const localUsers = new Map<string, LocalUser>();
 const localVisits = new Map<string, { userId: string; placeId: string; tacoIds: string[]; tacoRatings?: Record<string, number>; rating: number; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number; createdAt: string; visibility: 'visible' | 'hidden' }>();
 const localFollows = new Set<string>();
+const localSavedPlaces = new Set<string>();
 const localLists = new Map<string, { id: string; ownerId: string; title: string; description: string; visibility: 'public' | 'private'; coverImage: string; placeIds: string[]; createdAt: string }>();
 const localReports = new Map<string, { id: string; reporterId: string; visitId: string; reason: ReportInput['reason']; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string }>();
 
@@ -255,6 +256,36 @@ export async function getTaqueria(id: string): Promise<ApiTaqueria | undefined> 
   if (!branches.length) return undefined;
   const first = branches[0];
   return { id, name: first.taqueriaName ?? first.name, slug: id, description: `${first.name} y sus sucursales.`, branchCount: branches.length, branches };
+}
+
+export async function getSavedPlaceIds(userId: string): Promise<string[]> {
+  if (pool) {
+    const result = await pool.query('SELECT branch_id FROM saved_places WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+    return result.rows.map((row) => row.branch_id);
+  }
+  return [...localSavedPlaces].filter((key) => key.startsWith(`${userId}:`)).map((key) => key.slice(userId.length + 1));
+}
+
+export async function savePlaceForUser(placeId: string, userId: string): Promise<'saved' | 'already_saved' | 'not_found'> {
+  if (pool) {
+    const branch = await pool.query('SELECT 1 FROM branches WHERE id = $1 AND is_active = true', [placeId]);
+    if (!branch.rowCount) return 'not_found';
+    const result = await pool.query('INSERT INTO saved_places (user_id, branch_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING branch_id', [userId, placeId]);
+    return result.rowCount ? 'saved' : 'already_saved';
+  }
+  if (!places.some((place) => place.id === placeId)) return 'not_found';
+  const key = `${userId}:${placeId}`;
+  if (localSavedPlaces.has(key)) return 'already_saved';
+  localSavedPlaces.add(key);
+  return 'saved';
+}
+
+export async function unsavePlaceForUser(placeId: string, userId: string): Promise<boolean> {
+  if (pool) {
+    const result = await pool.query('DELETE FROM saved_places WHERE user_id = $1 AND branch_id = $2', [userId, placeId]);
+    return Boolean(result.rowCount);
+  }
+  return localSavedPlaces.delete(`${userId}:${placeId}`);
 }
 
 export async function createVisit(input: VisitInput) {

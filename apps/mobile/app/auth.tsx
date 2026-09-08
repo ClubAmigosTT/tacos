@@ -24,6 +24,7 @@ export default function AuthScreen() {
       else await signIn({ email, password });
       if (returnTo === '/register') router.replace({ pathname: '/register', params: placeId ? { placeId } : undefined });
       else if (returnTo === '/lists') router.replace({ pathname: '/lists', params: placeId ? { placeId } : undefined });
+      else if (returnTo?.startsWith('/place/')) router.replace(returnTo as never);
       else router.replace('/(tabs)/profile');
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : '';
