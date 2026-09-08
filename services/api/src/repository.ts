@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import bcrypt from 'bcryptjs';
-import { lists as fixtureLists, places, type ApiList, type ApiPlace, type FlavorProfile } from './data.js';
+import { lists as fixtureLists, places, type ApiList, type ApiPlace, type FlavorProfile, type TasteProfile } from './data.js';
 
 const pool = process.env.DATABASE_URL
   ? new Pool({ connectionString: process.env.DATABASE_URL, max: 10, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined })
@@ -15,6 +15,13 @@ const localUsers = new Map<string, LocalUser>();
 const localVisits = new Map<string, { userId: string; placeId: string; tacoIds: string[]; tacoRatings?: Record<string, number>; rating: number; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number; createdAt: string }>();
 const localFollows = new Set<string>();
 const localLists = new Map<string, { id: string; ownerId: string; title: string; description: string; visibility: 'public' | 'private'; coverImage: string; placeIds: string[]; createdAt: string }>();
+
+const defaultTaste: TasteProfile = {
+  title: 'Pastor nocturno',
+  description: 'Picante alto · precio sensible · explorador de lugares callejeros',
+  tags: ['PASTOR 92%', 'PICANTE 84%', 'NOCHE 78%'],
+  profile: { intensity: 86, spicy: 72, traditional: 94, texture: 88, value: 78 }
+};
 
 function publicUser(user: LocalUser): PublicUser {
   return { id: user.id, email: user.email, displayName: user.displayName };
@@ -114,6 +121,39 @@ export async function getRecommendations(userId?: string): Promise<ApiPlace[]> {
     const personalMatch = Math.min(99, Math.round(place.match + Math.min(15, overlap * 4)));
     return { ...place, match: personalMatch };
   }).sort((a, b) => b.match - a.match || b.rating - a.rating);
+}
+
+export async function getTasteProfile(userId: string): Promise<TasteProfile> {
+  let visits = 0;
+  const sums: FlavorProfile = { intensity: 0, spicy: 0, traditional: 0, texture: 0, value: 0 };
+  if (pool) {
+    const result = await pool.query(`
+      SELECT COUNT(*)::int AS visits,
+        AVG((b.flavor_profile->>'intensity')::numeric) AS intensity,
+        AVG((b.flavor_profile->>'spicy')::numeric) AS spicy,
+        AVG((b.flavor_profile->>'traditional')::numeric) AS traditional,
+        AVG((b.flavor_profile->>'texture')::numeric) AS texture,
+        AVG((b.flavor_profile->>'value')::numeric) AS value
+      FROM visits v JOIN branches b ON b.id = v.branch_id WHERE v.user_id = $1
+    `, [userId]);
+    const row = result.rows[0];
+    visits = Number(row?.visits ?? 0);
+    if (visits) for (const key of Object.keys(sums) as Array<keyof FlavorProfile>) sums[key] = Number(row[key] ?? defaultTaste.profile[key]);
+  } else {
+    for (const visit of localVisits.values()) {
+      if (visit.userId !== userId) continue;
+      const place = places.find((item) => item.id === visit.placeId);
+      if (!place) continue;
+      visits += 1;
+      for (const key of Object.keys(sums) as Array<keyof FlavorProfile>) sums[key] += place.flavorProfile[key];
+    }
+  }
+  if (!visits) return { ...defaultTaste, profile: { ...defaultTaste.profile }, tags: [...defaultTaste.tags] };
+  const profile = Object.fromEntries((Object.keys(sums) as Array<keyof FlavorProfile>).map((key) => [key, Math.round(sums[key] / visits)])) as FlavorProfile;
+  const title = profile.spicy >= 70 ? 'Pastor nocturno' : profile.value >= 80 ? 'Explorador de barrio' : profile.traditional >= 75 ? 'Clásico con criterio' : 'Curioso de la ciudad';
+  const description = (profile.spicy >= 70 ? 'Picante alto' : 'Picante moderado') + ' · ' + (profile.value >= 75 ? 'precio sensible' : 'buscas equilibrio') + ' · ' + (profile.traditional >= 75 ? 'clásicos' : 'nuevos estilos');
+  const tags = [Math.round(profile.traditional) + '% CLÁSICO', Math.round(profile.spicy) + '% PICANTE', Math.round(profile.value) + '% VALOR'];
+  return { title, description, tags, profile };
 }
 
 export async function findPlace(id: string): Promise<ApiPlace | undefined> {

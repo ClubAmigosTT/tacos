@@ -2,7 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radii, spacing } from '@/theme';
 import { useAuth } from '@/lib/auth';
-import { diary as diaryRequest, lists as listsRequest } from '@/lib/api';
+import { diary as diaryRequest, lists as listsRequest, taste as tasteRequest } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 
@@ -10,15 +10,17 @@ export default function ProfileScreen() {
   const { user, token, signOut } = useAuth();
   const { data } = useQuery({ queryKey: ['diary', 'profile', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
   const { data: listData } = useQuery({ queryKey: ['lists', 'profile', token], queryFn: () => listsRequest(token), enabled: true });
+  const { data: tasteData } = useQuery({ queryKey: ['taste', token], queryFn: () => tasteRequest(token!), enabled: Boolean(token) });
   const entries = data?.entries ?? [];
   const visits = user ? entries.length : 17;
   const average = user ? (entries.length ? (entries.reduce((sum, entry) => sum + Number(entry.rating), 0) / entries.length).toFixed(2) : '—') : '4.21';
   const listCount = user ? (listData?.lists.filter((list) => list.owner.id === user.id).length ?? 0) : 12;
+  const tasteId = tasteData?.taste;
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.top}><View style={styles.avatar}><Text style={styles.avatarText}>{(user?.displayName ?? 'M').slice(0, 1).toUpperCase()}</Text></View><View style={styles.topCopy}><Text style={styles.name}>{user?.displayName ?? 'Marcelo'}</Text><Text style={styles.location}>{user?.email ?? 'Ciudad de México · 2026'}</Text></View><Ionicons name="settings-outline" size={21} color={colors.muted} /></View>
       {!user ? <Pressable style={styles.loginCard} onPress={() => router.push('/auth')}><View style={styles.loginIcon}><Ionicons name="person-add-outline" size={18} color={colors.background} /></View><View style={{ flex: 1 }}><Text style={styles.loginTitle}>Guarda tu historia</Text><Text style={styles.loginDetail}>Entra para registrar visitas y crear listas.</Text></View><Ionicons name="chevron-forward" size={17} color={colors.muted} /></Pressable> : <Pressable style={styles.logout} onPress={() => void signOut()}><Text style={styles.logoutText}>Cerrar sesión</Text></Pressable>}
-      <View style={styles.taste}><Text style={styles.tasteEyebrow}>TU TASTE ID</Text><Text style={styles.tasteTitle}>Pastor nocturno</Text><Text style={styles.tasteDescription}>Picante alto · precio sensible · explorador de lugares callejeros</Text><View style={styles.tags}><Text style={styles.tag}>PASTOR 92%</Text><Text style={styles.tag}>PICANTE 84%</Text><Text style={styles.tag}>NOCHE 78%</Text></View></View>
+      <View style={styles.taste}><Text style={styles.tasteEyebrow}>TU TASTE ID</Text><Text style={styles.tasteTitle}>{tasteId?.title ?? 'Pastor nocturno'}</Text><Text style={styles.tasteDescription}>{tasteId?.description ?? 'Picante alto · precio sensible · explorador de lugares callejeros'}</Text><View style={styles.tags}>{(tasteId?.tags ?? ['PASTOR 92%', 'PICANTE 84%', 'NOCHE 78%']).map((tag) => <Text style={styles.tag} key={tag}>{tag}</Text>)}</View></View>
       <View style={styles.stats}><View><Text style={styles.statNumber}>{visits}</Text><Text style={styles.statLabel}>VISITAS</Text></View><View><Text style={styles.statNumber}>{listCount}</Text><Text style={styles.statLabel}>LISTAS</Text></View><View><Text style={styles.statNumber}>{average}</Text><Text style={styles.statLabel}>PROMEDIO</Text></View></View>
       <Text style={styles.sectionTitle}>Tu identidad gastronómica</Text>
       <View style={styles.menu}><MenuRow icon="book-outline" title="Diario" detail={`${visits} visitas registradas`} onPress={() => router.push('/(tabs)/diary')} /><MenuRow icon="list-outline" title="Listas" detail={`${listCount} listas públicas`} onPress={() => router.push('/lists')} /><MenuRow icon="people-outline" title="Actividad" detail="Sigue a gente con criterio" onPress={() => router.push('/feed')} /><MenuRow icon="map-outline" title="Mapa personal" detail="3 colonias exploradas" onPress={() => router.push('/(tabs)/map')} /><MenuRow icon="compass-outline" title="Taco Passport" detail="Desbloquea zonas de la ciudad" onPress={() => router.push('/passport')} /><MenuRow icon="sparkles-outline" title="Resumen anual" detail="Tus tacos en una sola historia" onPress={() => router.push('/wrapped')} /><MenuRow icon="shield-checkmark-outline" title="Privacidad" detail="Controla tus datos" last /></View>

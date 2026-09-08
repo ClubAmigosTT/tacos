@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListItemForUser, authenticateUser, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getDiary, getFeed, getLists, getRecommendations, registerUser, searchUsers, unfollowUser, type PublicUser } from './repository.js';
+import { addListItemForUser, authenticateUser, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getDiary, getFeed, getLists, getRecommendations, getTasteProfile, registerUser, searchUsers, unfollowUser, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
 import { uploadVisitImage } from './storage.js';
 
@@ -70,6 +70,12 @@ app.get('/v1/discover', async (request) => {
 app.get('/v1/recommendations', async (request) => {
   const user = await resolveUser(request);
   return { places: await getRecommendations(user?.id), context: { personalized: Boolean(user), generatedAt: new Date().toISOString() } };
+});
+
+app.get('/v1/me/taste', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  return { taste: await getTasteProfile(user.id) };
 });
 
 app.get('/v1/branches/:id', async (request, reply) => {

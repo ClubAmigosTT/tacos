@@ -4,6 +4,7 @@ import { places, type Place } from '@/data/fixtures';
 export type AuthUser = { id: string; email: string; displayName: string };
 export type ApiList = { id: string; title: string; description: string; owner: { id: string; displayName: string }; itemCount: number; visitedCount: number; coverImage: string };
 export type FeedItem = { id: string; visited_at: string; rating: number; user_id: string; display_name: string; place_id: string; place_name: string; neighborhood: string; image_url: string; tacos: string };
+export type TasteProfile = { title: string; description: string; tags: string[]; profile: { intensity: number; spicy: number; traditional: number; texture: number; value: number } };
 
 const configuredUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
 const API_URL = configuredUrl?.replace(/\/$/, '');
@@ -44,6 +45,10 @@ export async function recommendations(token?: string): Promise<Place[]> {
   } catch {
     return places;
   }
+}
+
+export async function taste(token: string) {
+  return request<{ taste: TasteProfile }>('/v1/me/taste', undefined, token);
 }
 
 export async function getPlace(id: string): Promise<Place> {

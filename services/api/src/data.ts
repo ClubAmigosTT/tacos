@@ -1,5 +1,6 @@
 export type ApiTaco = { id: string; name: string; rating: number; price: number; note: string };
 export type FlavorProfile = { intensity: number; spicy: number; traditional: number; texture: number; value: number };
+export type TasteProfile = { title: string; description: string; tags: string[]; profile: FlavorProfile };
 export type ApiPlace = {
   id: string;
   name: string;
