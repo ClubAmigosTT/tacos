@@ -119,6 +119,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 4. Verificar `/health`, aplicar migraciones con `preDeployCommand` y revisar logs del primer deploy.
 5. En EAS: `eas init`, definir `EXPO_PUBLIC_API_URL` HTTPS y `GOOGLE_MAPS_API_KEY`, compilar el perfil production y enviar a TestFlight/Google Play.
 6. Fijar el entorno EAS en cada perfil y, para cambios JavaScript posteriores, usar `eas update --channel production --environment production`; para cambios nativos generar un nuevo build.
+7. Hacer que el perfil EAS `production` falle si la URL de API no es HTTPS o si Android no tiene `GOOGLE_MAPS_API_KEY`.
 
 **Aceptación:** la API responde desde `https://…onrender.com`, la app se conecta sin esta computadora encendida y el smoke test corre en CI.
 

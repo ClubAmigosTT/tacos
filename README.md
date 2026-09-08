@@ -140,4 +140,4 @@ npx eas-cli@latest submit --platform ios --profile production
 npx eas-cli@latest submit --platform android --profile production
 ```
 
-Los builds ocurren en EAS, no en esta computadora. Para actualizaciones JavaScript posteriores usa `eas update --channel production --environment production`.
+Los builds ocurren en EAS, no en esta computadora. El perfil `production` falla de forma explícita si `EXPO_PUBLIC_API_URL` no es HTTPS o si falta `GOOGLE_MAPS_API_KEY`, evitando publicar una app que dependa de `localhost`. Para actualizaciones JavaScript posteriores usa `eas update --channel production --environment production`.
