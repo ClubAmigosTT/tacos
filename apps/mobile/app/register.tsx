@@ -5,7 +5,7 @@ import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, Vi
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { createVisit, discover, uploadImage } from '@/lib/api';
+import { createVisit, discover, trackEvent, uploadImage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { places } from '@/data/fixtures';
 import { colors, radii, spacing } from '@/theme';
@@ -87,6 +87,7 @@ export default function RegisterScreen() {
     try {
       const uploaded = photo ? await uploadImage({ base64: photo.base64, contentType: photo.contentType }, token) : undefined;
       await createVisit({ placeId, tacoIds, rating, tacoRatings, price: price ? Number(price) : undefined, note: note.trim() || undefined, photoUrl: uploaded?.url, latitude: coordinates?.latitude, longitude: coordinates?.longitude }, token);
+      void trackEvent('visit_saved', { place_id: placeId }, token);
       setSaved(true);
     } catch {
       setError(photo ? 'No pudimos subir la foto. Revisa la conexión o quítala para guardar la visita sin imagen.' : 'No pudimos guardar la visita. Revisa tu conexión e inténtalo de nuevo.');

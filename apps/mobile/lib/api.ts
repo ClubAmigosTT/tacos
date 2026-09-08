@@ -11,11 +11,14 @@ export type VisitComment = { id: string; body: string; createdAt: string; author
 export type TasteProfile = { title: string; description: string; tags: string[]; profile: { intensity: number; spicy: number; traditional: number; texture: number; value: number } };
 export type AdminReport = { id: string; visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string; reporter: { id: string; displayName: string }; author: { id: string; displayName: string }; place: { id: string; name: string }; rating: number; visitedAt: string };
 export type AdminComment = { id: string; visitId: string; body: string; visibility: 'visible' | 'hidden'; createdAt: string; author: { id: string; displayName: string }; place: { id: string; name: string } };
+export type AdminAnalytics = { days: number; totalEvents: number; uniqueAudiences: number; byEvent: Array<{ eventName: string; count: number }> };
 export type UserProfile = { user: { id: string; displayName: string }; stats: { visits: number; averageRating: number | null; listCount: number }; taste: TasteProfile; lists: ApiList[] };
 
 const configuredUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
 const API_URL = configuredUrl?.replace(/\/$/, '');
 const REQUEST_TIMEOUT_MS = 15_000;
+export type ProductEventProperty = string | number | boolean | null;
+export type ProductEventName = 'app_open' | 'map_search' | 'map_filter' | 'radar_filter' | 'place_open' | 'visit_saved' | 'list_open' | 'list_created' | 'list_collaborator_changed' | 'profile_open' | 'feed_open';
 
 function haversineKm(from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }) {
   const earthRadiusKm = 6371;
@@ -47,6 +50,19 @@ async function request<T>(path: string, options?: RequestInit, token?: string): 
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function trackEvent(eventName: ProductEventName, properties: Record<string, ProductEventProperty> = {}, token?: string) {
+  if (!API_URL) return;
+  try {
+    await request<{ status: 'accepted' }>('/v1/events', { method: 'POST', body: JSON.stringify({ eventName, properties }) }, token);
+  } catch {
+    // Analytics must never block a product action or break the offline fallback.
+  }
+}
+
+export async function adminAnalytics(token: string, days = 14) {
+  return request<{ analytics: AdminAnalytics }>(`/v1/admin/analytics?days=${days}`, undefined, token);
 }
 
 export async function discover(options: { q?: string; lat?: number; lng?: number; limit?: number } = {}): Promise<Place[]> {

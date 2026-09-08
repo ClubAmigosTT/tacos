@@ -21,6 +21,7 @@ const localLists = new Map<string, { id: string; ownerId: string; title: string;
 const localReports = new Map<string, { id: string; reporterId: string; visitId: string; reason: ReportInput['reason']; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string }>();
 const localComments = new Map<string, { id: string; visitId: string; authorId: string; body: string; createdAt: string; visibility: 'visible' | 'hidden' }>();
 const localListCollaborators = new Map<string, { listId: string; userId: string; role: 'editor' | 'viewer'; createdAt: string }>();
+const localProductEvents: Array<{ eventName: string; userId?: string; anonymousId?: string; properties: Record<string, string | number | boolean | null>; createdAt: string }> = [];
 
 const configuredAdminEmails = new Set((process.env.ADMIN_EMAILS ?? '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean));
 
@@ -49,6 +50,56 @@ export async function getHealth() {
 
 export async function closeRepository() {
   if (pool) await pool.end();
+}
+
+const allowedEventPropertyKeys = new Set(['source', 'filter', 'query_length', 'place_id', 'list_id', 'duration_ms', 'role', 'visibility', 'result_count']);
+
+function sanitizeEventProperties(properties: Record<string, unknown> | undefined) {
+  return Object.fromEntries(Object.entries(properties ?? {})
+    .filter(([key, value]) => allowedEventPropertyKeys.has(key) && (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null))
+    .map(([key, value]) => [key, typeof value === 'string' ? value.slice(0, 64) : value])
+    .slice(0, 12)) as Record<string, string | number | boolean | null>;
+}
+
+export async function recordProductEvent(input: { eventName: string; userId?: string; anonymousId?: string; properties?: Record<string, unknown> }) {
+  const properties = sanitizeEventProperties(input.properties);
+  if (pool) {
+    await pool.query(`
+      INSERT INTO product_events (event_name, user_id, anonymous_id, properties)
+      VALUES ($1, $2, $3, $4::jsonb)
+    `, [input.eventName, input.userId ?? null, input.anonymousId ?? null, JSON.stringify(properties)]);
+    return;
+  }
+  localProductEvents.push({ eventName: input.eventName, userId: input.userId, anonymousId: input.anonymousId, properties, createdAt: new Date().toISOString() });
+  if (localProductEvents.length > 500) localProductEvents.shift();
+}
+
+export type AdminAnalytics = {
+  days: number;
+  totalEvents: number;
+  uniqueAudiences: number;
+  byEvent: Array<{ eventName: string; count: number }>;
+};
+
+export async function getAdminAnalytics(days = 14): Promise<AdminAnalytics> {
+  const windowDays = Math.min(Math.max(Math.trunc(days), 1), 90);
+  if (pool) {
+    const [totals, grouped] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int AS total_events, COUNT(DISTINCT COALESCE(user_id, anonymous_id))::int AS unique_audiences FROM product_events WHERE created_at >= now() - ($1::int * interval '1 day')`, [windowDays]),
+      pool.query(`SELECT event_name, COUNT(*)::int AS count FROM product_events WHERE created_at >= now() - ($1::int * interval '1 day') GROUP BY event_name ORDER BY count DESC, event_name LIMIT 20`, [windowDays])
+    ]);
+    return { days: windowDays, totalEvents: Number(totals.rows[0]?.total_events ?? 0), uniqueAudiences: Number(totals.rows[0]?.unique_audiences ?? 0), byEvent: grouped.rows.map((row) => ({ eventName: row.event_name, count: Number(row.count) })) };
+  }
+  const since = Date.now() - windowDays * 24 * 60 * 60 * 1000;
+  const events = localProductEvents.filter((event) => Date.parse(event.createdAt) >= since);
+  const counts = new Map<string, number>();
+  const audiences = new Set<string>();
+  for (const event of events) {
+    counts.set(event.eventName, (counts.get(event.eventName) ?? 0) + 1);
+    const audience = event.userId ?? event.anonymousId;
+    if (audience) audiences.add(audience);
+  }
+  return { days: windowDays, totalEvents: events.length, uniqueAudiences: audiences.size, byEvent: [...counts.entries()].map(([eventName, count]) => ({ eventName, count })).sort((a, b) => b.count - a.count).slice(0, 20) };
 }
 
 function publicUser(user: LocalUser): PublicUser {

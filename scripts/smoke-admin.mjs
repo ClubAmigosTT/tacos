@@ -24,6 +24,11 @@ const admin = await register('admin-smoke@example.com', 'Admin Smoke');
 const author = await register(`author-${suffix}@example.com`, 'Author Smoke');
 const viewer = await register(`viewer-${suffix}@example.com`, 'Viewer Smoke');
 
+await request('/v1/events', { method: 'POST', body: JSON.stringify({ eventName: 'app_open', properties: { source: 'admin-smoke' } }), token: viewer.token }, 202);
+await request('/v1/admin/analytics', { token: viewer.token }, 403);
+const analytics = await request('/v1/admin/analytics', { token: admin.token });
+if (analytics.analytics?.totalEvents < 1 || !analytics.analytics?.byEvent?.some((event) => event.eventName === 'app_open')) throw new Error('Admin analytics did not aggregate product events');
+
 await request(`/v1/users/${author.user.id}/follow`, { method: 'POST', body: JSON.stringify({}), token: viewer.token });
 const visit = await request('/v1/visits', {
   method: 'POST',

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { lists as fixtureLists, type List } from '@/data/fixtures';
-import { addListItem, createList, lists as listsRequest } from '@/lib/api';
+import { addListItem, createList, lists as listsRequest, trackEvent } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 
@@ -18,7 +18,7 @@ export default function ListsScreen() {
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
   const mutation = useMutation({
     mutationFn: () => createList({ title, description, visibility }, token!),
-    onSuccess: () => { setTitle(''); setDescription(''); setVisibility('public'); void queryClient.invalidateQueries({ queryKey: ['lists'] }); }
+    onSuccess: () => { void trackEvent('list_created', { visibility }, token); setTitle(''); setDescription(''); setVisibility('public'); void queryClient.invalidateQueries({ queryKey: ['lists'] }); }
   });
   const saveMutation = useMutation({
     mutationFn: (listId: string) => addListItem(listId, { branchId: placeId! }, token!),

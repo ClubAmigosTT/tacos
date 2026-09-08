@@ -1,8 +1,9 @@
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { listDetails, removeListItem } from '@/lib/api';
+import { listDetails, removeListItem, trackEvent } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 import { PlaceCard } from '@/components/PlaceCard';
@@ -12,6 +13,7 @@ export default function ListDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { token, user } = useAuth();
   const queryClient = useQueryClient();
+  useEffect(() => { if (id) void trackEvent('list_open', { list_id: id }, token); }, [id, token]);
   const { data: list, isLoading, isError } = useQuery({ queryKey: ['list', id, token], queryFn: () => listDetails(id, token), enabled: Boolean(id) });
   const removeMutation = useMutation({
     mutationFn: (branchId: string) => removeListItem(id, branchId, token!),

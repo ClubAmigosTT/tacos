@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { addListCollaborator, listDetails, removeListCollaborator, searchUsers } from '@/lib/api';
+import { addListCollaborator, listDetails, removeListCollaborator, searchUsers, trackEvent } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 
@@ -15,9 +15,9 @@ export default function ListCollaboratorsScreen() {
   const [role, setRole] = useState<'editor' | 'viewer'>('editor');
   const { data: list, isLoading, isError } = useQuery({ queryKey: ['list', id, token], queryFn: () => listDetails(id, token), enabled: Boolean(id) });
   const { data: searchData } = useQuery({ queryKey: ['list-collaborator-search', query, token], queryFn: () => searchUsers(query, token), enabled: Boolean(token && query.trim().length >= 2) });
-  const addMutation = useMutation({ mutationFn: (userId: string) => addListCollaborator(id, { userId, role }, token!), onSuccess: () => { setQuery(''); void queryClient.invalidateQueries({ queryKey: ['list', id] }); } });
-  const roleMutation = useMutation({ mutationFn: (input: { userId: string; role: 'editor' | 'viewer' }) => addListCollaborator(id, input, token!), onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['list', id] }) });
-  const removeMutation = useMutation({ mutationFn: (userId: string) => removeListCollaborator(id, userId, token!), onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['list', id] }) });
+  const addMutation = useMutation({ mutationFn: (userId: string) => addListCollaborator(id, { userId, role }, token!), onSuccess: () => { void trackEvent('list_collaborator_changed', { list_id: id, role }, token); setQuery(''); void queryClient.invalidateQueries({ queryKey: ['list', id] }); } });
+  const roleMutation = useMutation({ mutationFn: (input: { userId: string; role: 'editor' | 'viewer' }) => addListCollaborator(id, input, token!), onSuccess: (_result, input) => { void trackEvent('list_collaborator_changed', { list_id: id, role: input.role }, token); void queryClient.invalidateQueries({ queryKey: ['list', id] }); } });
+  const removeMutation = useMutation({ mutationFn: (userId: string) => removeListCollaborator(id, userId, token!), onSuccess: () => { void trackEvent('list_collaborator_changed', { list_id: id, role: 'removed' }, token); void queryClient.invalidateQueries({ queryKey: ['list', id] }); } });
   const existingIds = useMemo(() => new Set((list?.collaborators ?? []).map((collaborator) => collaborator.id)), [list?.collaborators]);
   const results = (searchData?.users ?? []).filter((candidate) => !existingIds.has(candidate.id) && candidate.id !== list?.owner.id);
 

@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListCollaborator, addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitComment, createVisitForUser, deleteVisitComment, discoverPlaces, findPlace, findUserById, followUser, getAdminComments, getAdminReports, getDiary, getFeed, getHealth, getListDetails, getLists, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, getVisitComments, registerUser, removeListCollaborator, removeListItemForUser, reportVisitForUser, reviewAdminComment, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateVisitForUser, type PublicUser } from './repository.js';
+import { addListCollaborator, addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitComment, createVisitForUser, deleteVisitComment, discoverPlaces, findPlace, findUserById, followUser, getAdminAnalytics, getAdminComments, getAdminReports, getDiary, getFeed, getHealth, getListDetails, getLists, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, getVisitComments, recordProductEvent, registerUser, removeListCollaborator, removeListItemForUser, reportVisitForUser, reviewAdminComment, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateVisitForUser, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
 import { uploadVisitImage } from './storage.js';
 
@@ -49,6 +49,19 @@ async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
 app.get('/health', async (_request, reply) => {
   const health = await getHealth();
   return reply.code(health.status === 'ok' ? 200 : 503).send({ ...health, service: 'tacos-api', timestamp: new Date().toISOString() });
+});
+
+const productEventNames = ['app_open', 'map_search', 'map_filter', 'radar_filter', 'place_open', 'visit_saved', 'list_open', 'list_created', 'list_collaborator_changed', 'profile_open', 'feed_open'] as const;
+
+app.post('/v1/events', async (request, reply) => {
+  const body = z.object({
+    eventName: z.enum(productEventNames),
+    anonymousId: z.string().regex(/^[a-zA-Z0-9._:-]{8,128}$/).optional(),
+    properties: z.record(z.string(), z.union([z.string().max(64), z.number(), z.boolean(), z.null()])).optional()
+  }).refine((value) => Object.keys(value.properties ?? {}).length <= 20, { message: 'Too many event properties' }).parse(request.body);
+  const user = await resolveUser(request);
+  await recordProductEvent({ eventName: body.eventName, userId: user?.id, anonymousId: body.anonymousId, properties: body.properties });
+  return reply.code(202).send({ status: 'accepted' });
 });
 
 app.post('/v1/auth/register', async (request, reply) => {
@@ -333,6 +346,13 @@ app.post('/v1/reports', async (request, reply) => {
   const result = await reportVisitForUser(body, user.id);
   if (result === 'not_found') return reply.code(404).send({ error: 'VISIT_NOT_FOUND' });
   return reply.code(result === 'created' ? 201 : 200).send({ status: result, visitId: body.visitId });
+});
+
+app.get('/v1/admin/analytics', async (request, reply) => {
+  const user = await requireAdmin(request, reply);
+  if (!user) return;
+  const query = z.object({ days: z.coerce.number().int().min(1).max(90).default(14) }).parse(request.query);
+  return { analytics: await getAdminAnalytics(query.days) };
 });
 
 app.get('/v1/admin/reports', async (request, reply) => {

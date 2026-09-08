@@ -1,8 +1,9 @@
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getPlace, savePlace, savedPlaces, unsavePlace } from '@/lib/api';
+import { getPlace, savePlace, savedPlaces, trackEvent, unsavePlace } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 import { RatingBadge } from '@/components/RatingBadge';
@@ -19,6 +20,7 @@ export default function PlaceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { token } = useAuth();
   const queryClient = useQueryClient();
+  useEffect(() => { if (id) void trackEvent('place_open', { place_id: id }, token); }, [id, token]);
   const { data: place } = useQuery({ queryKey: ['place', id], queryFn: () => getPlace(id), enabled: Boolean(id) });
   const { data: savedData } = useQuery({ queryKey: ['saved-places', token], queryFn: () => savedPlaces(token!), enabled: Boolean(token) });
   const savedMutation = useMutation({
