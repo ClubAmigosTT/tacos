@@ -34,6 +34,9 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 4. Registro/login con contraseña cifrada y token JWT.
 5. Diario que lee las visitas del usuario desde `/v1/diary`.
 6. Fallback de fixtures para poder diseñar y revisar la UI sin backend.
+7. Recomendaciones personalizadas desde el historial (`/v1/recommendations`).
+8. Listas públicas/privadas, guardado de lugares y progreso visitado.
+9. Grafo social mínimo: búsqueda de personas, seguir/dejar de seguir y feed de actividad.
 
 ## Verificación
 
