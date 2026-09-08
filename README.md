@@ -22,7 +22,7 @@ pnpm dev:api
 pnpm dev:mobile
 ```
 
-La app móvil funciona con fixtures si no existe `DATABASE_URL`. La API local queda en `http://localhost:4000`. Para probar cuentas localmente no hace falta una base de datos: se usa un repositorio en memoria. En un entorno compartido configura al menos `JWT_SECRET` y `DATABASE_URL`.
+La app móvil funciona con fixtures si no existe `DATABASE_URL`. La API local queda en `http://localhost:4000`. Para probar cuentas localmente no hace falta una base de datos: se usa un repositorio en memoria. En un entorno compartido configura al menos `JWT_SECRET` y `DATABASE_URL`. `ADMIN_EMAILS` acepta una lista separada por comas para bootstrap controlado del primer administrador; para promover usuarios existentes usa una migración/SQL de administración.
 
 Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por la IP LAN de la computadora que ejecuta la API (por ejemplo `http://192.168.1.70:4000`). En producción debe ser la URL HTTPS de Render.
 

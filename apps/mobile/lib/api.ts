@@ -1,12 +1,13 @@
 import Constants from 'expo-constants';
 import { places, type Place } from '@/data/fixtures';
 
-export type AuthUser = { id: string; email: string; displayName: string };
+export type AuthUser = { id: string; email: string; displayName: string; role?: 'user' | 'admin' };
 export type ApiList = { id: string; title: string; description: string; owner: { id: string; displayName: string }; itemCount: number; visitedCount: number; coverImage: string };
 export type ApiListDetail = ApiList & { items: Array<{ branchId: string; note: string; position: number; place: Place }> };
 export type ApiTaqueria = { id: string; name: string; slug: string; description: string; branchCount: number; branches: Place[] };
 export type FeedItem = { id: string; visited_at: string; rating: number; user_id: string; display_name: string; place_id: string; place_name: string; neighborhood: string; image_url: string; tacos: string };
 export type TasteProfile = { title: string; description: string; tags: string[]; profile: { intensity: number; spicy: number; traditional: number; texture: number; value: number } };
+export type AdminReport = { id: string; visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string; reporter: { id: string; displayName: string }; author: { id: string; displayName: string }; place: { id: string; name: string }; rating: number; visitedAt: string };
 
 const configuredUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
 const API_URL = configuredUrl?.replace(/\/$/, '');
@@ -158,4 +159,12 @@ export async function feed(token: string) {
 
 export async function reportVisit(input: { visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details?: string }, token: string) {
   return request<{ status: string; visitId: string }>('/v1/reports', { method: 'POST', body: JSON.stringify(input) }, token);
+}
+
+export async function adminReports(token: string, status: 'open' | 'reviewed' | 'dismissed' | 'all' = 'open') {
+  return request<{ reports: AdminReport[] }>(`/v1/admin/reports?status=${status}`, undefined, token);
+}
+
+export async function reviewReport(reportId: string, action: 'hide' | 'dismiss', token: string) {
+  return request<{ status: string; reportId: string }>(`/v1/admin/reports/${reportId}`, { method: 'PATCH', body: JSON.stringify({ action }) }, token);
 }

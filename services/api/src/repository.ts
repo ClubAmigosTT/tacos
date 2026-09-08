@@ -9,14 +9,17 @@ const pool = process.env.DATABASE_URL
 type DiscoverQuery = { q?: string; lat?: number; lng?: number; limit: number };
 type VisitInput = { placeId: string; tacoIds: string[]; rating: number; tacoRatings?: Record<string, number>; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number };
 type ReportInput = { visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details?: string };
-export type PublicUser = { id: string; email: string; displayName: string };
+export type PublicUser = { id: string; email: string; displayName: string; role: 'user' | 'admin' };
+export type AdminReport = { id: string; visitId: string; reason: ReportInput['reason']; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string; reporter: { id: string; displayName: string }; author: { id: string; displayName: string }; place: { id: string; name: string }; rating: number; visitedAt: string };
 
 type LocalUser = PublicUser & { passwordHash: string };
 const localUsers = new Map<string, LocalUser>();
-const localVisits = new Map<string, { userId: string; placeId: string; tacoIds: string[]; tacoRatings?: Record<string, number>; rating: number; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number; createdAt: string }>();
+const localVisits = new Map<string, { userId: string; placeId: string; tacoIds: string[]; tacoRatings?: Record<string, number>; rating: number; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number; createdAt: string; visibility: 'visible' | 'hidden' }>();
 const localFollows = new Set<string>();
 const localLists = new Map<string, { id: string; ownerId: string; title: string; description: string; visibility: 'public' | 'private'; coverImage: string; placeIds: string[]; createdAt: string }>();
-const localReports = new Set<string>();
+const localReports = new Map<string, { id: string; reporterId: string; visitId: string; reason: ReportInput['reason']; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string }>();
+
+const configuredAdminEmails = new Set((process.env.ADMIN_EMAILS ?? '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean));
 
 const defaultTaste: TasteProfile = {
   title: 'Pastor nocturno',
@@ -26,7 +29,7 @@ const defaultTaste: TasteProfile = {
 };
 
 function publicUser(user: LocalUser): PublicUser {
-  return { id: user.id, email: user.email, displayName: user.displayName };
+  return { id: user.id, email: user.email, displayName: user.displayName, role: user.role };
 }
 
 function normalizePlace(row: any): ApiPlace {
@@ -276,7 +279,7 @@ export async function createVisitForUser(input: VisitInput, userId: string) {
     }
   }
   const createdAt = new Date().toISOString();
-  localVisits.set(id, { userId, ...input, createdAt });
+  localVisits.set(id, { userId, ...input, createdAt, visibility: 'visible' });
   return { id, ...input, createdAt, status: 'recorded' };
 }
 
@@ -288,11 +291,12 @@ export async function registerUser(input: { email: string; password: string; dis
     if (existing.rowCount) throw new Error('EMAIL_TAKEN');
     const id = crypto.randomUUID();
     const passwordHash = await bcrypt.hash(input.password, 12);
-    const result = await pool.query('INSERT INTO users (id, email, email_lower, password_hash, display_name) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, display_name', [id, input.email.trim(), email, passwordHash, displayName]);
-    return { id: result.rows[0].id, email: result.rows[0].email, displayName: result.rows[0].display_name };
+    const role = configuredAdminEmails.has(email) ? 'admin' : 'user';
+    const result = await pool.query('INSERT INTO users (id, email, email_lower, password_hash, display_name, role) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, display_name, role', [id, input.email.trim(), email, passwordHash, displayName, role]);
+    return { id: result.rows[0].id, email: result.rows[0].email, displayName: result.rows[0].display_name, role: result.rows[0].role };
   }
   if ([...localUsers.values()].some((user) => user.email === email)) throw new Error('EMAIL_TAKEN');
-  const user: LocalUser = { id: crypto.randomUUID(), email, displayName, passwordHash: await bcrypt.hash(input.password, 10) };
+  const user: LocalUser = { id: crypto.randomUUID(), email, displayName, role: configuredAdminEmails.has(email) ? 'admin' : 'user', passwordHash: await bcrypt.hash(input.password, 10) };
   localUsers.set(user.id, user);
   return publicUser(user);
 }
@@ -300,10 +304,10 @@ export async function registerUser(input: { email: string; password: string; dis
 export async function authenticateUser(input: { email: string; password: string }): Promise<PublicUser | undefined> {
   const email = input.email.trim().toLowerCase();
   if (pool) {
-    const result = await pool.query('SELECT id, email, display_name, password_hash FROM users WHERE email_lower = $1 AND is_active = true', [email]);
+    const result = await pool.query('SELECT id, email, display_name, password_hash, role FROM users WHERE email_lower = $1 AND is_active = true', [email]);
     const row = result.rows[0];
     if (!row || !(await bcrypt.compare(input.password, row.password_hash))) return undefined;
-    return { id: row.id, email: row.email, displayName: row.display_name };
+    return { id: row.id, email: row.email, displayName: row.display_name, role: row.role };
   }
   const user = [...localUsers.values()].find((item) => item.email === email);
   if (!user || !(await bcrypt.compare(input.password, user.passwordHash))) return undefined;
@@ -312,9 +316,9 @@ export async function authenticateUser(input: { email: string; password: string 
 
 export async function findUserById(id: string): Promise<PublicUser | undefined> {
   if (pool) {
-    const result = await pool.query('SELECT id, email, display_name FROM users WHERE id = $1 AND is_active = true', [id]);
+    const result = await pool.query('SELECT id, email, display_name, role FROM users WHERE id = $1 AND is_active = true', [id]);
     const row = result.rows[0];
-    return row ? { id: row.id, email: row.email, displayName: row.display_name } : undefined;
+    return row ? { id: row.id, email: row.email, displayName: row.display_name, role: row.role } : undefined;
   }
   const user = localUsers.get(id);
   return user ? publicUser(user) : undefined;
@@ -464,11 +468,11 @@ export async function searchUsers(query: string, currentUserId?: string): Promis
   if (!normalized) return [];
   if (pool) {
     const result = await pool.query(`
-      SELECT id, email, display_name FROM users
+      SELECT id, email, display_name, role FROM users
       WHERE is_active = true AND id <> $1 AND (display_name ILIKE $2 OR email ILIKE $2)
       ORDER BY display_name LIMIT 20
     `, [currentUserId ?? '', `%${normalized}%`]);
-    return result.rows.map((row) => ({ id: row.id, email: row.email, displayName: row.display_name }));
+    return result.rows.map((row) => ({ id: row.id, email: row.email, displayName: row.display_name, role: row.role }));
   }
   return [...localUsers.values()].filter((user) => user.id !== currentUserId && `${user.displayName} ${user.email}`.toLowerCase().includes(normalized)).slice(0, 20).map(publicUser);
 }
@@ -505,7 +509,7 @@ export async function getFeed(userId: string) {
     return result.rows;
   }
   const followed = [...localFollows].filter((key) => key.startsWith(`${userId}:`)).map((key) => key.slice(userId.length + 1));
-  return [...localVisits.entries()].filter(([, visit]) => followed.includes(visit.userId)).sort(([, a], [, b]) => b.createdAt.localeCompare(a.createdAt)).map(([id, visit]) => {
+  return [...localVisits.entries()].filter(([, visit]) => followed.includes(visit.userId) && visit.visibility === 'visible').sort(([, a], [, b]) => b.createdAt.localeCompare(a.createdAt)).map(([id, visit]) => {
     const place = places.find((item) => item.id === visit.placeId);
     const user = localUsers.get(visit.userId);
     const tacos = visit.tacoIds.map((tacoId) => place?.tacos.find((taco) => taco.id === tacoId)?.name ?? tacoId).join(', ');
@@ -529,6 +533,72 @@ export async function reportVisitForUser(input: ReportInput, reporterId: string)
   if (!visit || visit.userId === reporterId) return 'not_found';
   const key = `${reporterId}:${input.visitId}`;
   if (localReports.has(key)) return 'duplicate';
-  localReports.add(key);
+  localReports.set(key, { id: crypto.randomUUID(), reporterId, visitId: input.visitId, reason: input.reason, details: input.details?.trim() ?? '', status: 'open', createdAt: new Date().toISOString() });
   return 'created';
+}
+
+export async function getAdminReports(status: 'open' | 'reviewed' | 'dismissed' | 'all' = 'open'): Promise<AdminReport[]> {
+  if (pool) {
+    const result = await pool.query(`
+      SELECT r.id, r.visit_id, r.reason, r.details, r.status, r.created_at,
+        reporter.id AS reporter_id, reporter.display_name AS reporter_name,
+        author.id AS author_id, author.display_name AS author_name,
+        b.id AS place_id, b.name AS place_name, v.rating, v.visited_at
+      FROM reports r
+      JOIN users reporter ON reporter.id = r.reporter_id
+      JOIN visits v ON v.id = r.visit_id
+      LEFT JOIN users author ON author.id = v.user_id
+      JOIN branches b ON b.id = v.branch_id
+      ${status === 'all' ? '' : 'WHERE r.status = $1'}
+      ORDER BY r.created_at DESC LIMIT 100
+    `, status === 'all' ? [] : [status]);
+    return result.rows.map((row) => ({
+      id: row.id,
+      visitId: row.visit_id,
+      reason: row.reason,
+      details: row.details ?? '',
+      status: row.status,
+      createdAt: row.created_at,
+      reporter: { id: row.reporter_id, displayName: row.reporter_name },
+      author: { id: row.author_id ?? '', displayName: row.author_name ?? 'Cuenta eliminada' },
+      place: { id: row.place_id, name: row.place_name },
+      rating: Number(row.rating),
+      visitedAt: row.visited_at
+    }));
+  }
+  return [...localReports.values()]
+    .filter((report) => status === 'all' || report.status === status)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((report) => {
+      const visit = localVisits.get(report.visitId);
+      const reporter = localUsers.get(report.reporterId);
+      const author = visit ? localUsers.get(visit.userId) : undefined;
+      const place = visit ? places.find((item) => item.id === visit.placeId) : undefined;
+      if (!visit || !place) return undefined;
+      return { id: report.id, visitId: report.visitId, reason: report.reason, details: report.details, status: report.status, createdAt: report.createdAt, reporter: { id: report.reporterId, displayName: reporter?.displayName ?? 'Cuenta eliminada' }, author: { id: visit.userId, displayName: author?.displayName ?? 'Cuenta eliminada' }, place: { id: place.id, name: place.name }, rating: visit.rating, visitedAt: visit.createdAt } satisfies AdminReport;
+    })
+    .filter((report): report is AdminReport => Boolean(report));
+}
+
+export async function reviewAdminReport(reportId: string, action: 'hide' | 'dismiss'): Promise<boolean> {
+  if (pool) {
+    await pool.query('BEGIN');
+    try {
+      if (action === 'hide') await pool.query("UPDATE visits SET visibility = 'hidden' WHERE id = (SELECT visit_id FROM reports WHERE id = $1)", [reportId]);
+      const result = await pool.query('UPDATE reports SET status = $2 WHERE id = $1 RETURNING id', [reportId, action === 'hide' ? 'reviewed' : 'dismissed']);
+      await pool.query('COMMIT');
+      return Boolean(result.rowCount);
+    } catch (error) {
+      await pool.query('ROLLBACK');
+      throw error;
+    }
+  }
+  const report = [...localReports.values()].find((item) => item.id === reportId);
+  if (!report) return false;
+  report.status = action === 'hide' ? 'reviewed' : 'dismissed';
+  if (action === 'hide') {
+    const visit = localVisits.get(report.visitId);
+    if (visit) visit.visibility = 'hidden';
+  }
+  return true;
 }

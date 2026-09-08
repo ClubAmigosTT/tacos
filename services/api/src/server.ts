@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListItemForUser, authenticateUser, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getDiary, getFeed, getListDetails, getLists, getRecommendations, getTaqueria, getTasteProfile, registerUser, reportVisitForUser, searchUsers, unfollowUser, type PublicUser } from './repository.js';
+import { addListItemForUser, authenticateUser, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getAdminReports, getDiary, getFeed, getListDetails, getLists, getRecommendations, getTaqueria, getTasteProfile, registerUser, reportVisitForUser, reviewAdminReport, searchUsers, unfollowUser, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
 import { uploadVisitImage } from './storage.js';
 
@@ -34,6 +34,15 @@ async function requireUser(request: FastifyRequest, reply: FastifyReply) {
     return undefined;
   }
   request.user = user;
+  return user;
+}
+
+async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
+  const user = await requireUser(request, reply);
+  if (!user || user.role !== 'admin') {
+    if (user) await reply.code(403).send({ error: 'ADMIN_REQUIRED' });
+    return undefined;
+  }
   return user;
 }
 
@@ -188,6 +197,23 @@ app.post('/v1/reports', async (request, reply) => {
   const result = await reportVisitForUser(body, user.id);
   if (result === 'not_found') return reply.code(404).send({ error: 'VISIT_NOT_FOUND' });
   return reply.code(result === 'created' ? 201 : 200).send({ status: result, visitId: body.visitId });
+});
+
+app.get('/v1/admin/reports', async (request, reply) => {
+  const user = await requireAdmin(request, reply);
+  if (!user) return;
+  const query = z.object({ status: z.enum(['open', 'reviewed', 'dismissed', 'all']).default('open') }).parse(request.query);
+  return { reports: await getAdminReports(query.status) };
+});
+
+app.patch('/v1/admin/reports/:id', async (request, reply) => {
+  const user = await requireAdmin(request, reply);
+  if (!user) return;
+  const params = z.object({ id: z.string().uuid() }).parse(request.params);
+  const body = z.object({ action: z.enum(['hide', 'dismiss']) }).parse(request.body);
+  const updated = await reviewAdminReport(params.id, body.action);
+  if (!updated) return reply.code(404).send({ error: 'REPORT_NOT_FOUND' });
+  return { status: body.action === 'hide' ? 'hidden' : 'dismissed', reportId: params.id };
 });
 
 const port = Number(process.env.PORT ?? 4000);
