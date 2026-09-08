@@ -59,6 +59,8 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 4. Mantener Mapbox/Google Maps como infraestructura visual; el ranking y los pins son propiedad de Tacos.
 5. Conectar la búsqueda universal del inicio con el mapa contextual, conservando la consulta al navegar.
 6. Servir un score de reputación conservador: prior bayesiano, recencia, penalización por dispersión y límite por revisor distinto; devolver también el volumen de reseñas visibles.
+7. Aplicar debounce de 250 ms a la búsqueda del mapa para evitar consultas por cada tecla y conservar confirmación explícita con Enter.
+8. Mostrar “Buscar en esta zona” al desplazar el mapa nativo y actualizar el centro sólo cuando el usuario confirma.
 
 **Aceptación:** “Pastor”, “Abierto ahora”, “Barato” y “Para mí” producen resultados ordenados; negar ubicación no rompe el catálogo.
 
@@ -104,8 +106,6 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 10. Mantener el fallback local alineado con PostgreSQL para poder validar el flujo de reputación sin depender de una base local.
 11. Compartir fichas, listas y Wrapped con deep links del esquema `tacos://`, manteniendo una ruta web equivalente en Expo Router.
 12. Derivar periodos y resúmenes del Diario desde las fechas reales para que el producto no dependa de un año fijo.
-13. Aplicar debounce de 250 ms a la búsqueda del mapa para evitar consultas por cada tecla y conservar confirmación explícita con Enter.
-14. Mostrar “Buscar en esta zona” al desplazar el mapa nativo y actualizar el centro sólo cuando el usuario confirma.
 
 **Aceptación:** un reporte aparece en `/v1/admin/reports`, un admin puede ocultarlo, el feed deja de mostrarlo, el perfil público no lo cuenta y `pnpm smoke:admin` confirma que no contamina recomendaciones.
 
