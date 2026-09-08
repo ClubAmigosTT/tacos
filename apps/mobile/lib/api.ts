@@ -115,7 +115,11 @@ export async function searchUsers(query: string, token?: string) {
 }
 
 export async function followUser(userId: string, token: string) {
-  return request<{ status: string; userId: string }>(`/v1/users/${userId}/follow`, { method: 'POST' }, token);
+  return request<{ status: string; userId: string }>(`/v1/users/${userId}/follow`, { method: 'POST', body: JSON.stringify({}) }, token);
+}
+
+export async function unfollowUser(userId: string, token: string) {
+  return request<{ status: string; userId: string }>(`/v1/users/${userId}/follow`, { method: 'DELETE' }, token);
 }
 
 export async function feed(token: string) {
