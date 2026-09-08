@@ -71,6 +71,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 15. Hacer que la búsqueda de un taco cambie el rating visible de pins y tarjetas al score de ese taco, manteniendo el promedio global para consultas generales.
 16. Buscar nombres de tacos activos dentro de PostgreSQL además de los campos de sucursal, con índice trigram y cobertura en el smoke test.
 17. Priorizar en la ficha el precio promedio calculado, distancia y estado de apertura, reutilizando la regla de horarios compartida.
+18. Evitar que la restauración de sesión muestre datos demo o un bloqueo de cuenta transitorio en Diario, Perfil y Registro.
 
 **Aceptación:** “Pastor”, “Abierto ahora”, “Barato” y “Para mí” producen resultados ordenados; negar ubicación no rompe el catálogo.
 

@@ -10,8 +10,9 @@ import { RatingBadge } from '@/components/RatingBadge';
 import { SectionTitle } from '@/components/SectionTitle';
 
 export default function DiaryScreen() {
-  const { token } = useAuth();
+  const { token, loading } = useAuth();
   const { data } = useQuery({ queryKey: ['diary', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
+  if (loading) return <View style={styles.loading}><Text style={styles.loadingText}>Cargando tu historia…</Text></View>;
   const entries = data ? data.entries.map((entry) => ({ id: entry.id, date: new Date(entry.visited_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }).toUpperCase(), place: entry.place_name, taco: entry.tacos, rating: Number(entry.rating), image: entry.image_url })) : token ? [] : diaryEntries;
   const diaryPeriod = data?.entries[0]?.visited_at
     ? new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' }).format(new Date(data.entries[0].visited_at))
@@ -29,6 +30,8 @@ export default function DiaryScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  loading: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
+  loadingText: { color: colors.muted },
   content: { paddingHorizontal: spacing.lg, paddingTop: 66, paddingBottom: 115 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xl },
   kicker: { color: colors.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 5 },

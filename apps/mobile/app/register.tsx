@@ -11,11 +11,13 @@ import { places } from '@/data/fixtures';
 import { colors, radii, spacing } from '@/theme';
 
 export default function RegisterScreen() {
-  const { token } = useAuth();
+  const { token, loading } = useAuth();
   const { placeId: initialPlaceId } = useLocalSearchParams<{ placeId?: string }>();
-  const [placeId, setPlaceId] = useState(initialPlaceId ?? places[0].id);
-  const [tacoIds, setTacoIds] = useState<string[]>([places[0].tacos[0].id]);
-  const [tacoRatings, setTacoRatings] = useState<Record<string, number>>({ [places[0].tacos[0].id]: 5 });
+  const initialPlace = places.find((item) => item.id === initialPlaceId) ?? places[0];
+  const initialTacoId = initialPlace.tacos[0]?.id;
+  const [placeId, setPlaceId] = useState(initialPlace.id);
+  const [tacoIds, setTacoIds] = useState<string[]>(initialTacoId ? [initialTacoId] : []);
+  const [tacoRatings, setTacoRatings] = useState<Record<string, number>>(initialTacoId ? { [initialTacoId]: 5 } : {});
   const [rating, setRating] = useState(5);
   const [price, setPrice] = useState('');
   const [note, setNote] = useState('');
@@ -50,6 +52,7 @@ export default function RegisterScreen() {
     setTacoRatings(first.tacos[0] ? { [first.tacos[0].id]: rating } : {});
   }, [availablePlaces, placeId, rating]);
 
+  if (loading) return <View style={styles.authRequired}><Text style={styles.successText}>Cargando tu sesión…</Text></View>;
   if (!token) return <View style={styles.authRequired}><View style={styles.successIcon}><Ionicons name="person" size={26} color={colors.background} /></View><Text style={styles.successTitle}>Tu diario necesita una cuenta</Text><Text style={styles.successText}>Crea tu identidad para guardar esta visita y verla después en tu historial.</Text><Pressable style={styles.primary} onPress={() => router.push({ pathname: '/auth', params: { returnTo: '/register', placeId } })}><Text style={styles.primaryText}>Entrar o crear cuenta</Text><Ionicons name="arrow-forward" size={18} color={colors.background} /></Pressable><Pressable onPress={() => router.back()}><Text style={styles.cancelText}>Ahora no</Text></Pressable></View>;
 
   function selectPlace(id: string) {

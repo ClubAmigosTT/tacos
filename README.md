@@ -107,6 +107,7 @@ En el emulador Android usa `http://10.0.2.2:4000`; el emulador redirige esa dire
 74. Mapa por taco: una búsqueda como “suadero” detecta el taco del menú, ordena por su reputación y muestra ese rating en pins y tarjetas, en lugar del promedio global.
 75. Paridad de búsqueda: PostgreSQL también encuentra sucursales por nombre de taco mediante `EXISTS` e índice trigram, igual que el fallback local.
 76. Decisión en la ficha: el detalle calcula precio promedio del menú y estado de apertura con la misma regla nocturna del mapa.
+77. Sesión sin parpadeos: Diario, Perfil y Registro esperan la restauración de SecureStore/localStorage antes de mostrar fixtures o estados de autenticación.
 
 ## Verificación
 

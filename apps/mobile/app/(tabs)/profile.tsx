@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 
 export default function ProfileScreen() {
-  const { user, token, signOut } = useAuth();
+  const { user, token, loading, signOut } = useAuth();
   useEffect(() => { void trackEvent('profile_open', {}, token); }, [token]);
   const { data } = useQuery({ queryKey: ['diary', 'profile', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
   const { data: listData } = useQuery({ queryKey: ['lists', 'profile', token], queryFn: () => listsRequest(token), enabled: true });
@@ -19,6 +19,7 @@ export default function ProfileScreen() {
   const listCount = user ? (listData?.lists.filter((list) => list.owner.id === user.id).length ?? 0) : 12;
   const exploredZones = user ? new Set(entries.map((entry) => entry.neighborhood).filter(Boolean)).size : 3;
   const tasteId = tasteData?.taste;
+  if (loading) return <View style={styles.loading}><Text style={styles.loadingText}>Cargando tu perfil…</Text></View>;
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.top}><View style={styles.avatar}><Text style={styles.avatarText}>{(user?.displayName ?? 'M').slice(0, 1).toUpperCase()}</Text></View><View style={styles.topCopy}><Text style={styles.name}>{user?.displayName ?? 'Marcelo'}</Text><Text style={styles.location}>{user?.email ?? 'Ciudad de México · 2026'}</Text></View>{user ? <Pressable accessibilityLabel="Abrir ajustes" onPress={() => router.push('/settings')}><Ionicons name="settings-outline" size={21} color={colors.muted} /></Pressable> : <Ionicons name="settings-outline" size={21} color={colors.muted} />}</View>
@@ -37,6 +38,8 @@ function MenuRow({ icon, title, detail, last = false, onPress }: { icon: keyof t
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  loading: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
+  loadingText: { color: colors.muted },
   content: { padding: spacing.lg, paddingTop: 66, paddingBottom: 115 },
   top: { flexDirection: 'row', alignItems: 'center', gap: 13, marginBottom: spacing.xl },
   avatar: { width: 62, height: 62, borderRadius: 31, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
