@@ -100,6 +100,7 @@ En el emulador Android usa `http://10.0.2.2:4000`; el emulador redirige esa dire
 67. Desarrollo local: `pnpm dev:local` levanta el API y el preview web en paralelo para probar el producto con un solo comando.
 68. Horarios confiables: el filtro “Abierto ahora” distingue negocios diurnos de cierres de madrugada y rechaza horas malformadas.
 69. Estados vacíos accionables: el mapa explica cuando una combinación no tiene resultados y permite limpiar la búsqueda y los filtros en un toque.
+70. Perfil vivo: las colonias exploradas se calculan desde el Diario del usuario y no desde un número fijo.
 
 ## Verificación
 

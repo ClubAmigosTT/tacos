@@ -64,6 +64,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 8. Mostrar “Buscar en esta zona” al desplazar el mapa nativo y actualizar el centro sólo cuando el usuario confirma.
 9. Interpretar cierres de madrugada y cierres diurnos con una regla compartida, para que “Abierto ahora” no marque abiertos los lugares después de medianoche.
 10. Mostrar un estado vacío útil cuando no hay resultados y permitir restablecer búsqueda, filtros y centro del mapa sin recargar la app.
+11. Derivar las estadísticas de identidad del Perfil desde las visitas reales, conservando fixtures sólo para el modo anónimo de demostración.
 
 **Aceptación:** “Pastor”, “Abierto ahora”, “Barato” y “Para mí” producen resultados ordenados; negar ubicación no rompe el catálogo.
 
