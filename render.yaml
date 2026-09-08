@@ -7,6 +7,7 @@ services:
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter @tacos/api build
     startCommand: pnpm --filter @tacos/api start
     preDeployCommand: pnpm --filter @tacos/api migrate
+    autoDeployTrigger: checksPass
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
@@ -45,6 +46,7 @@ services:
     plan: 0.5c-512mb
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter @tacos/api build
     startCommand: pnpm --filter @tacos/api worker
+    autoDeployTrigger: checksPass
     envVars:
       - key: NODE_VERSION
         value: "24"
@@ -70,6 +72,7 @@ services:
     schedule: "0 8 * * *"
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter @tacos/api build
     startCommand: pnpm --filter @tacos/api nightly
+    autoDeployTrigger: checksPass
     envVars:
       - key: NODE_VERSION
         value: "24"

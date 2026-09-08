@@ -100,6 +100,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 6. Ejecutar mantenimiento periódico desde worker/cron: analizar tablas operativas y aplicar retención explícita sólo a eventos de producto.
 7. Mantener índices parciales para las agregaciones de reputación sobre visitas visibles y ratings de tacos.
 8. Ejecutar el migrador con un cliente dedicado y un lock advisory para que los reemplazos de Render no apliquen el mismo archivo en paralelo.
+9. Hacer que web, worker y cron sólo auto-desplieguen después de que pase el workflow de CI.
 
 **Aceptación:** un reporte aparece en `/v1/admin/reports`, un admin puede ocultarlo, el feed deja de mostrarlo, el perfil público no lo cuenta y `pnpm smoke:admin` confirma que no contamina recomendaciones.
 
