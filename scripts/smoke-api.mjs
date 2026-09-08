@@ -42,6 +42,8 @@ if (meAfterProfileUpdate.user?.displayName !== 'Ana Editada') throw new Error('U
 await request('/v1/me/profile', { method: 'PATCH', body: JSON.stringify({ displayName: 'A' }), token: alice.token }, 400);
 const nearby = await request('/v1/discover?lat=19.3869&lng=-99.1571&limit=3');
 if (nearby.places?.[0]?.id !== 'vilsito') throw new Error('Nearby discovery did not prioritize El Vilsito');
+const tacoSearch = await request('/v1/discover?q=suadero&limit=10');
+if (!['vilsito', 'oriente'].every((placeId) => tacoSearch.places?.some((place) => place.id === placeId))) throw new Error('Menu-item discovery did not find every branch serving suadero');
 const saved = await request('/v1/branches/vilsito/saved', { method: 'POST', token: bob.token });
 if (saved.status !== 'saved') throw new Error('Place was not saved');
 const savedPlaces = await request('/v1/me/saved', { token: bob.token });

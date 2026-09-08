@@ -69,6 +69,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 13. Invalidar las cachés de feed y recomendaciones cuando cambia la preferencia de actividad y reflejar que afecta visitas existentes.
 14. Permitir seguir/dejar de seguir desde un perfil público y devolver el estado para que la UI sobreviva a una recarga.
 15. Hacer que la búsqueda de un taco cambie el rating visible de pins y tarjetas al score de ese taco, manteniendo el promedio global para consultas generales.
+16. Buscar nombres de tacos activos dentro de PostgreSQL además de los campos de sucursal, con índice trigram y cobertura en el smoke test.
 
 **Aceptación:** “Pastor”, “Abierto ahora”, “Barato” y “Para mí” producen resultados ordenados; negar ubicación no rompe el catálogo.
 

@@ -293,7 +293,7 @@ export async function discoverPlaces(query: DiscoverQuery): Promise<ApiPlace[]> 
   const predicates: string[] = ['b.is_active = true'];
   if (query.q) {
     values.push(`%${query.q.trim()}%`);
-    predicates.push(`(b.name ILIKE $${values.length} OR b.neighborhood ILIKE $${values.length} OR b.search_text ILIKE $${values.length})`);
+    predicates.push(`(b.name ILIKE $${values.length} OR b.neighborhood ILIKE $${values.length} OR b.search_text ILIKE $${values.length} OR EXISTS (SELECT 1 FROM menu_items search_menu WHERE search_menu.branch_id = b.id AND search_menu.is_active = true AND search_menu.name ILIKE $${values.length}))`);
   }
   const distanceSelect = query.lat != null && query.lng != null
     ? `ST_Distance(b.location, ST_SetSRID(ST_MakePoint($${values.length + 1}, $${values.length + 2}), 4326)::geography) / 1000 AS distance_km`
