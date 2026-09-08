@@ -40,6 +40,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 10. Permiso de ubicación en iOS/Android y distancias PostGIS cuando el dispositivo comparte coordenadas.
 11. Taco Passport: progreso por colonias desbloqueadas a partir de las visitas del diario.
 12. Reputación bayesiana en consultas PostgreSQL: prior conservador para sucursal y taco, evitando que pocas reseñas perfectas dominen el ranking.
+13. Contexto de visita: precio, nota, foto futura y coordenadas opcionales, más resumen anual compartible.
 
 ## Verificación
 

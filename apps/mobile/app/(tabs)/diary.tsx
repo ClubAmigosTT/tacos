@@ -1,5 +1,6 @@
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { diaryEntries } from '@/data/fixtures';
 import { diary as diaryRequest } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -16,7 +17,7 @@ export default function DiaryScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.header}><View><Text style={styles.kicker}>TU HISTORIA</Text><Text style={styles.title}>Taco Diary</Text></View><Ionicons name="ellipsis-horizontal" size={22} color={colors.muted} /></View>
       <View style={styles.stats}><View><Text style={styles.statNumber}>{token ? entries.length : 17}</Text><Text style={styles.statLabel}>VISITAS</Text></View><View><Text style={styles.statNumber}>{token ? entries.reduce((sum, entry) => sum + (entry.taco ? entry.taco.split(',').length : 0), 0) : 48}</Text><Text style={styles.statLabel}>TACOS</Text></View><View><Text style={styles.statNumber}>{token ? (entries.length ? (entries.reduce((sum, entry) => sum + entry.rating, 0) / entries.length).toFixed(2) : '—') : '4.21'}</Text><Text style={styles.statLabel}>PROMEDIO</Text></View></View>
-      <View style={styles.callout}><View style={styles.calloutIcon}><Ionicons name="sparkles" color={colors.background} size={17} /></View><View style={{ flex: 1 }}><Text style={styles.calloutTitle}>Tu agosto en tacos</Text><Text style={styles.calloutText}>Exploraste 3 colonias y tu hora favorita fue después de las 22:00.</Text></View><Ionicons name="chevron-forward" size={17} color={colors.muted} /></View>
+      <Pressable style={styles.callout} onPress={() => router.push('/wrapped')}><View style={styles.calloutIcon}><Ionicons name="sparkles" color={colors.background} size={17} /></View><View style={{ flex: 1 }}><Text style={styles.calloutTitle}>Tu resumen anual</Text><Text style={styles.calloutText}>Mira tus tacos, zonas exploradas y el lugar que más defendiste.</Text></View><Ionicons name="chevron-forward" size={17} color={colors.muted} /></Pressable>
       <SectionTitle eyebrow="agosto 2026" title="Tus registros" action="Ver todo" />
       <View style={styles.timeline}>{entries.map((entry, index) => <View key={entry.id} style={styles.entry}><View style={styles.date}><Text style={styles.dateText}>{entry.date.split(' ')[0]}</Text><Text style={styles.dateMonth}>{entry.date.split(' ')[1]}</Text></View><View style={styles.lineWrap}><View style={styles.dot} />{index < entries.length - 1 ? <View style={styles.line} /> : null}</View><View style={styles.entryCard}><Image source={{ uri: entry.image }} style={styles.entryImage} /><View style={styles.entryCopy}><Text style={styles.entryPlace}>{entry.place}</Text><Text style={styles.entryTaco}>{entry.taco}</Text><View style={styles.entryBottom}><RatingBadge rating={entry.rating} /><Text style={styles.entryHint}>registrado</Text></View></View></View></View>)}</View>
     </ScrollView>
