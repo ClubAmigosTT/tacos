@@ -97,7 +97,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 1. Permitir reportar una visita una sola vez por usuario.
 2. Ocultar contenido desde el panel admin sin borrar la evidencia.
 3. Arrancar el primer admin con `ADMIN_EMAILS` o SQL controlado en Render.
-4. Añadir límites de tamaño, logs estructurados y manejo de errores sin filtrar secretos.
+4. Añadir límites de tamaño, logs estructurados, manejo de errores sin filtrar secretos y fallo explícito si producción no tiene `JWT_SECRET`.
 5. Configurar health checks y cierre graceful para que Render pueda reemplazar instancias sin conexiones huérfanas.
 6. Ejecutar mantenimiento periódico desde worker/cron: analizar tablas operativas y aplicar retención explícita sólo a eventos de producto.
 7. Mantener índices parciales para las agregaciones de reputación sobre visitas visibles y ratings de tacos.

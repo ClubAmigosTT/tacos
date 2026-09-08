@@ -1,7 +1,11 @@
 import { SignJWT, jwtVerify } from 'jose';
 import type { PublicUser } from './repository.js';
 
-const secret = new TextEncoder().encode(process.env.JWT_SECRET ?? 'local-development-secret-change-me');
+const configuredSecret = process.env.JWT_SECRET?.trim();
+if (!configuredSecret && process.env.NODE_ENV === 'production') {
+  throw new Error('JWT_SECRET is required in production');
+}
+const secret = new TextEncoder().encode(configuredSecret ?? 'local-development-secret-change-me');
 
 export async function issueToken(user: PublicUser) {
   return new SignJWT({ email: user.email, displayName: user.displayName })
