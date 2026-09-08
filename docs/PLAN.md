@@ -31,7 +31,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 
 ### Fase 2 — Modelo de datos y migraciones (2–4 días)
 
-1. Aplicar las migraciones numeradas en orden: usuarios, sucursales, menús, visitas, ratings, sabor, listas, moderación, taquerías y lugares guardados.
+1. Aplicar las migraciones numeradas en orden: usuarios, sucursales, menús, visitas, ratings, sabor, listas, moderación, taquerías, lugares guardados y backfill de padres.
 2. Crear índices PostGIS para ubicación, trigramas para búsqueda y claves únicas para follows, reportes y guardados.
 3. Sembrar datos de ejemplo sólo como datos iniciales idempotentes.
 4. Probar las migraciones en una base PostgreSQL limpia antes del primer deploy.

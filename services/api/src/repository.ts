@@ -97,12 +97,13 @@ export async function discoverPlaces(query: DiscoverQuery): Promise<ApiPlace[]> 
       ST_X(b.location::geometry) AS longitude, ${distanceSelect},
       COALESCE(json_agg(json_build_object('id', m.id, 'name', m.name, 'rating', COALESCE((
         SELECT ((COUNT(*) * AVG(vi.rating)) + (5 * 4.2)) / (COUNT(*) + 5)
-        FROM visit_items vi WHERE vi.menu_item_id = m.id AND vi.rating IS NOT NULL
+        FROM visit_items vi JOIN visits vv ON vv.id = vi.visit_id
+        WHERE vi.menu_item_id = m.id AND vi.rating IS NOT NULL AND vv.visibility = 'visible'
       ), m.rating),
         'price', m.price, 'note', m.note)) FILTER (WHERE m.id IS NOT NULL), '[]') AS tacos
     FROM branches b JOIN taquerias t ON t.id = b.taqueria_id
       LEFT JOIN LATERAL (SELECT COUNT(*)::numeric AS review_count, AVG(v.rating)::numeric AS average_rating
-        FROM visits v WHERE v.branch_id = b.id) reviews ON true
+        FROM visits v WHERE v.branch_id = b.id AND v.visibility = 'visible') reviews ON true
       LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
     WHERE ${predicates.join(' AND ')}
     GROUP BY b.id, t.name, reviews.review_count, reviews.average_rating ORDER BY ${orderBy} LIMIT $${values.length}
@@ -128,7 +129,7 @@ export async function getRecommendations(userId?: string): Promise<ApiPlace[]> {
       FROM visits v JOIN branches b ON b.id = v.branch_id
       LEFT JOIN visit_items vi ON vi.visit_id = v.id
       LEFT JOIN menu_items m ON m.id = vi.menu_item_id
-      WHERE v.user_id = $1 AND v.rating >= 4
+      WHERE v.user_id = $1 AND v.rating >= 4 AND v.visibility = 'visible'
     `, [userId]);
     const seenVisits = new Set<string>();
     for (const row of history.rows) {
@@ -145,14 +146,14 @@ export async function getRecommendations(userId?: string): Promise<ApiPlace[]> {
     const social = await pool.query(`
       SELECT v.branch_id, AVG(v.rating)::numeric AS average_rating, COUNT(DISTINCT v.user_id)::int AS friend_count
       FROM follows f JOIN visits v ON v.user_id = f.followed_id
-      WHERE f.follower_id = $1 GROUP BY v.branch_id
+      WHERE f.follower_id = $1 AND v.visibility = 'visible' GROUP BY v.branch_id
     `, [userId]);
     for (const row of social.rows) socialSignals.set(row.branch_id, { average: Number(row.average_rating), friendCount: Number(row.friend_count) });
   } else {
     const followedIds = [...localFollows].filter((key) => key.startsWith(`${userId}:`)).map((key) => key.slice(userId.length + 1));
     const socialSums = new Map<string, { sum: number; count: number; users: Set<string> }>();
     for (const visit of localVisits.values()) {
-      if (visit.userId === userId && visit.rating >= 4) {
+      if (visit.userId === userId && visit.rating >= 4 && visit.visibility === 'visible') {
         const place = places.find((item) => item.id === visit.placeId);
         if (place) {
           tasteSamples += 1;
@@ -160,7 +161,7 @@ export async function getRecommendations(userId?: string): Promise<ApiPlace[]> {
         }
         for (const value of [place?.name, place?.style, ...(place?.tags ?? []), ...visit.tacoIds.map((id) => place?.tacos.find((taco) => taco.id === id)?.name)]) for (const token of tokenise(String(value ?? ''))) preferenceTokens.add(token);
       }
-      if (followedIds.includes(visit.userId)) {
+      if (followedIds.includes(visit.userId) && visit.visibility === 'visible') {
         const current = socialSums.get(visit.placeId) ?? { sum: 0, count: 0, users: new Set<string>() };
         current.sum += visit.rating;
         current.count += 1;
@@ -194,14 +195,14 @@ export async function getTasteProfile(userId: string): Promise<TasteProfile> {
         AVG((b.flavor_profile->>'traditional')::numeric) AS traditional,
         AVG((b.flavor_profile->>'texture')::numeric) AS texture,
         AVG((b.flavor_profile->>'value')::numeric) AS value
-      FROM visits v JOIN branches b ON b.id = v.branch_id WHERE v.user_id = $1
+      FROM visits v JOIN branches b ON b.id = v.branch_id WHERE v.user_id = $1 AND v.visibility = 'visible'
     `, [userId]);
     const row = result.rows[0];
     visits = Number(row?.visits ?? 0);
     if (visits) for (const key of Object.keys(sums) as Array<keyof FlavorProfile>) sums[key] = Number(row[key] ?? defaultTaste.profile[key]);
   } else {
     for (const visit of localVisits.values()) {
-      if (visit.userId !== userId) continue;
+      if (visit.userId !== userId || visit.visibility !== 'visible') continue;
       const place = places.find((item) => item.id === visit.placeId);
       if (!place) continue;
       visits += 1;
@@ -228,12 +229,13 @@ export async function findPlace(id: string): Promise<ApiPlace | undefined> {
       ST_X(b.location::geometry) AS longitude, NULL::numeric AS distance_km,
       COALESCE(json_agg(json_build_object('id', m.id, 'name', m.name, 'rating', COALESCE((
         SELECT ((COUNT(*) * AVG(vi.rating)) + (5 * 4.2)) / (COUNT(*) + 5)
-        FROM visit_items vi WHERE vi.menu_item_id = m.id AND vi.rating IS NOT NULL
+        FROM visit_items vi JOIN visits vv ON vv.id = vi.visit_id
+        WHERE vi.menu_item_id = m.id AND vi.rating IS NOT NULL AND vv.visibility = 'visible'
       ), m.rating),
         'price', m.price, 'note', m.note)) FILTER (WHERE m.id IS NOT NULL), '[]') AS tacos
     FROM branches b JOIN taquerias t ON t.id = b.taqueria_id
       LEFT JOIN LATERAL (SELECT COUNT(*)::numeric AS review_count, AVG(v.rating)::numeric AS average_rating
-        FROM visits v WHERE v.branch_id = b.id) reviews ON true
+        FROM visits v WHERE v.branch_id = b.id AND v.visibility = 'visible') reviews ON true
       LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
     WHERE b.id = $1 AND b.is_active = true GROUP BY b.id, t.name, reviews.review_count, reviews.average_rating
   `, [id]);
