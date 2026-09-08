@@ -72,7 +72,7 @@ export default function RegisterScreen() {
       await createVisit({ placeId, tacoIds, rating, tacoRatings, price: price ? Number(price) : undefined, note: note.trim() || undefined, photoUrl: uploaded?.url }, token);
       setSaved(true);
     } catch {
-      setError('No pudimos guardar la visita. Revisa tu conexión e inténtalo de nuevo.');
+      setError(photo ? 'No pudimos subir la foto. Revisa la conexión o quítala para guardar la visita sin imagen.' : 'No pudimos guardar la visita. Revisa tu conexión e inténtalo de nuevo.');
     } finally {
       setSaving(false);
     }
