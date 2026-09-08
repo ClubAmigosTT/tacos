@@ -29,7 +29,7 @@ const nearby = await request('/v1/discover?lat=19.3869&lng=-99.1571&limit=3');
 if (nearby.places?.[0]?.id !== 'vilsito') throw new Error('Nearby discovery did not prioritize El Vilsito');
 
 await request(`/v1/users/${bob.user.id}/follow`, { method: 'POST', body: JSON.stringify({}), token: alice.token });
-await request('/v1/visits', {
+const visit = await request('/v1/visits', {
   method: 'POST',
   body: JSON.stringify({ placeId: 'vilsito', tacoIds: ['vilsito-pastor'], tacoRatings: { 'vilsito-pastor': 5 }, rating: 5, price: 44, note: 'Smoke test' }),
   token: bob.token
@@ -43,6 +43,10 @@ const recommendations = await request('/v1/recommendations', { token: bob.token 
 if (typeof recommendations.places?.[0]?.tasteMatch !== 'number') throw new Error('Taste-aware recommendation score missing');
 const taste = await request('/v1/me/taste', { token: bob.token });
 if (!taste.taste?.title) throw new Error('Taste profile missing');
+const report = await request('/v1/reports', { method: 'POST', body: JSON.stringify({ visitId: visit.id, reason: 'other' }), token: alice.token }, 201);
+if (report.status !== 'created') throw new Error('Report was not created');
+const duplicateReport = await request('/v1/reports', { method: 'POST', body: JSON.stringify({ visitId: visit.id, reason: 'other' }), token: alice.token });
+if (duplicateReport.status !== 'duplicate') throw new Error('Duplicate report was not deduplicated');
 const list = await request('/v1/lists', {
   method: 'POST',
   body: JSON.stringify({ title: 'Smoke route', description: 'Lista de prueba' }),

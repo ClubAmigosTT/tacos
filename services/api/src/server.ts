@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListItemForUser, authenticateUser, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getDiary, getFeed, getListDetails, getLists, getRecommendations, getTasteProfile, registerUser, searchUsers, unfollowUser, type PublicUser } from './repository.js';
+import { addListItemForUser, authenticateUser, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getDiary, getFeed, getListDetails, getLists, getRecommendations, getTasteProfile, registerUser, reportVisitForUser, searchUsers, unfollowUser, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
 import { uploadVisitImage } from './storage.js';
 
@@ -172,6 +172,15 @@ app.get('/v1/feed', async (request, reply) => {
   const user = await requireUser(request, reply);
   if (!user) return;
   return { items: await getFeed(user.id) };
+});
+
+app.post('/v1/reports', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const body = z.object({ visitId: z.string().uuid(), reason: z.enum(['spam', 'inappropriate', 'wrong_place', 'other']), details: z.string().max(500).optional() }).parse(request.body);
+  const result = await reportVisitForUser(body, user.id);
+  if (result === 'not_found') return reply.code(404).send({ error: 'VISIT_NOT_FOUND' });
+  return reply.code(result === 'created' ? 201 : 200).send({ status: result, visitId: body.visitId });
 });
 
 const port = Number(process.env.PORT ?? 4000);

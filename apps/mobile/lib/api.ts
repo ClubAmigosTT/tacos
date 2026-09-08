@@ -143,3 +143,7 @@ export async function unfollowUser(userId: string, token: string) {
 export async function feed(token: string) {
   return request<{ items: FeedItem[] }>('/v1/feed', undefined, token);
 }
+
+export async function reportVisit(input: { visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details?: string }, token: string) {
+  return request<{ status: string; visitId: string }>('/v1/reports', { method: 'POST', body: JSON.stringify(input) }, token);
+}

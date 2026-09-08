@@ -8,6 +8,7 @@ const pool = process.env.DATABASE_URL
 
 type DiscoverQuery = { q?: string; lat?: number; lng?: number; limit: number };
 type VisitInput = { placeId: string; tacoIds: string[]; rating: number; tacoRatings?: Record<string, number>; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number };
+type ReportInput = { visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details?: string };
 export type PublicUser = { id: string; email: string; displayName: string };
 
 type LocalUser = PublicUser & { passwordHash: string };
@@ -15,6 +16,7 @@ const localUsers = new Map<string, LocalUser>();
 const localVisits = new Map<string, { userId: string; placeId: string; tacoIds: string[]; tacoRatings?: Record<string, number>; rating: number; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number; createdAt: string }>();
 const localFollows = new Set<string>();
 const localLists = new Map<string, { id: string; ownerId: string; title: string; description: string; visibility: 'public' | 'private'; coverImage: string; placeIds: string[]; createdAt: string }>();
+const localReports = new Set<string>();
 
 const defaultTaste: TasteProfile = {
   title: 'Pastor nocturno',
@@ -478,7 +480,7 @@ export async function getFeed(userId: string) {
       FROM follows f JOIN visits v ON v.user_id = f.followed_id
       JOIN users u ON u.id = v.user_id JOIN branches b ON b.id = v.branch_id
       LEFT JOIN visit_items vi ON vi.visit_id = v.id LEFT JOIN menu_items m ON m.id = vi.menu_item_id
-      WHERE f.follower_id = $1 GROUP BY v.id, v.photo_url, u.id, b.id ORDER BY v.visited_at DESC LIMIT 50
+      WHERE f.follower_id = $1 AND v.visibility = 'visible' GROUP BY v.id, v.photo_url, u.id, b.id ORDER BY v.visited_at DESC LIMIT 50
     `, [userId]);
     return result.rows;
   }
@@ -489,4 +491,24 @@ export async function getFeed(userId: string) {
     const tacos = visit.tacoIds.map((tacoId) => place?.tacos.find((taco) => taco.id === tacoId)?.name ?? tacoId).join(', ');
     return { id, visited_at: visit.createdAt, rating: visit.rating, user_id: visit.userId, display_name: user?.displayName ?? 'Tacos', place_id: visit.placeId, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', image_url: visit.photoUrl ?? place?.image ?? '', tacos };
   });
+}
+
+export async function reportVisitForUser(input: ReportInput, reporterId: string): Promise<'created' | 'duplicate' | 'not_found'> {
+  if (pool) {
+    const visit = await pool.query('SELECT id FROM visits WHERE id = $1 AND user_id <> $2 AND visibility = \'visible\'', [input.visitId, reporterId]);
+    if (!visit.rowCount) return 'not_found';
+    const result = await pool.query(`
+      INSERT INTO reports (id, reporter_id, visit_id, reason, details)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (reporter_id, visit_id) DO NOTHING
+      RETURNING id
+    `, [crypto.randomUUID(), reporterId, input.visitId, input.reason, input.details?.trim() ?? '']);
+    return result.rowCount ? 'created' : 'duplicate';
+  }
+  const visit = localVisits.get(input.visitId);
+  if (!visit || visit.userId === reporterId) return 'not_found';
+  const key = `${reporterId}:${input.visitId}`;
+  if (localReports.has(key)) return 'duplicate';
+  localReports.add(key);
+  return 'created';
 }
