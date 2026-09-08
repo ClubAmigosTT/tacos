@@ -57,14 +57,23 @@ export async function discoverPlaces(query: DiscoverQuery): Promise<ApiPlace[]> 
   if (query.lat != null && query.lng != null) values.push(query.lng, query.lat);
   values.push(query.limit);
   const result = await pool.query(`
-    SELECT b.id, b.name, b.neighborhood, b.open_until, b.rating, b.match_score, b.style,
+    SELECT b.id, b.name, b.neighborhood, b.open_until,
+      CASE WHEN COALESCE(reviews.review_count, 0) = 0 THEN b.rating
+        ELSE ((reviews.review_count * reviews.average_rating) + (10 * 4.2)) / (reviews.review_count + 10) END AS rating,
+      b.match_score, b.style,
       b.image_url, b.description, b.tags, ST_Y(b.location::geometry) AS latitude,
       ST_X(b.location::geometry) AS longitude, ${distanceSelect},
-      COALESCE(json_agg(json_build_object('id', m.id, 'name', m.name, 'rating', m.rating,
+      COALESCE(json_agg(json_build_object('id', m.id, 'name', m.name, 'rating', COALESCE((
+        SELECT ((COUNT(*) * AVG(vi.rating)) + (5 * 4.2)) / (COUNT(*) + 5)
+        FROM visit_items vi WHERE vi.menu_item_id = m.id AND vi.rating IS NOT NULL
+      ), m.rating),
         'price', m.price, 'note', m.note)) FILTER (WHERE m.id IS NOT NULL), '[]') AS tacos
-    FROM branches b LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
+    FROM branches b
+      LEFT JOIN LATERAL (SELECT COUNT(*)::numeric AS review_count, AVG(v.rating)::numeric AS average_rating
+        FROM visits v WHERE v.branch_id = b.id) reviews ON true
+      LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
     WHERE ${predicates.join(' AND ')}
-    GROUP BY b.id ORDER BY b.rating DESC LIMIT $${values.length}
+    GROUP BY b.id, reviews.review_count, reviews.average_rating ORDER BY rating DESC LIMIT $${values.length}
   `, values);
   return result.rows.map(normalizePlace);
 }
@@ -109,13 +118,22 @@ export async function findPlace(id: string): Promise<ApiPlace | undefined> {
   const fallback = places.find((place) => place.id === id);
   if (!pool) return fallback;
   const result = await pool.query(`
-    SELECT b.id, b.name, b.neighborhood, b.open_until, b.rating, b.match_score, b.style,
+    SELECT b.id, b.name, b.neighborhood, b.open_until,
+      CASE WHEN COALESCE(reviews.review_count, 0) = 0 THEN b.rating
+        ELSE ((reviews.review_count * reviews.average_rating) + (10 * 4.2)) / (reviews.review_count + 10) END AS rating,
+      b.match_score, b.style,
       b.image_url, b.description, b.tags, ST_Y(b.location::geometry) AS latitude,
       ST_X(b.location::geometry) AS longitude, NULL::numeric AS distance_km,
-      COALESCE(json_agg(json_build_object('id', m.id, 'name', m.name, 'rating', m.rating,
+      COALESCE(json_agg(json_build_object('id', m.id, 'name', m.name, 'rating', COALESCE((
+        SELECT ((COUNT(*) * AVG(vi.rating)) + (5 * 4.2)) / (COUNT(*) + 5)
+        FROM visit_items vi WHERE vi.menu_item_id = m.id AND vi.rating IS NOT NULL
+      ), m.rating),
         'price', m.price, 'note', m.note)) FILTER (WHERE m.id IS NOT NULL), '[]') AS tacos
-    FROM branches b LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
-    WHERE b.id = $1 AND b.is_active = true GROUP BY b.id
+    FROM branches b
+      LEFT JOIN LATERAL (SELECT COUNT(*)::numeric AS review_count, AVG(v.rating)::numeric AS average_rating
+        FROM visits v WHERE v.branch_id = b.id) reviews ON true
+      LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
+    WHERE b.id = $1 AND b.is_active = true GROUP BY b.id, reviews.review_count, reviews.average_rating
   `, [id]);
   return result.rows[0] ? normalizePlace(result.rows[0]) : undefined;
 }
