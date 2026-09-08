@@ -118,6 +118,10 @@ export async function createVisit(input: { placeId: string; tacoIds: string[]; r
   return request('/v1/visits', { method: 'POST', body: JSON.stringify(input) }, token);
 }
 
+export async function updateVisit(visitId: string, input: { rating?: number; tacoRatings?: Record<string, number>; price?: number | null; note?: string }, token: string) {
+  return request<{ id: string; status: string }>(`/v1/visits/${encodeURIComponent(visitId)}`, { method: 'PATCH', body: JSON.stringify(input) }, token);
+}
+
 export async function uploadImage(input: { base64: string; contentType: 'image/jpeg' | 'image/png' | 'image/webp' }, token: string) {
   return request<{ key: string; url: string }>('/v1/media/images', { method: 'POST', body: JSON.stringify(input) }, token);
 }

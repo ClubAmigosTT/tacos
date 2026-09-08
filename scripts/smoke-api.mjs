@@ -57,6 +57,24 @@ const feed = await request('/v1/feed', { token: alice.token });
 if (feed.items?.length !== 1 || feed.items?.[0]?.note !== 'Smoke test') throw new Error(`Expected one feed item with its note, got ${feed.items?.length ?? 0}`);
 const diary = await request('/v1/diary', { token: bob.token });
 if (diary.entries?.[0]?.price !== 44 || diary.entries?.[0]?.note !== 'Smoke test') throw new Error('Diary context was not persisted');
+const editedVisit = await request(`/v1/visits/${visit.id}`, {
+  method: 'PATCH',
+  body: JSON.stringify({ rating: 4, price: 52, note: 'Edited smoke' }),
+  token: bob.token
+});
+if (editedVisit.status !== 'updated') throw new Error('Visit owner could not edit the diary entry');
+await request(`/v1/visits/${visit.id}`, {
+  method: 'PATCH',
+  body: JSON.stringify({ rating: 3 }),
+  token: alice.token
+}, 404);
+await request(`/v1/visits/${visit.id}`, {
+  method: 'PATCH',
+  body: JSON.stringify({ tacoRatings: { 'oriente-suadero': 5 } }),
+  token: bob.token
+}, 400);
+const editedDiary = await request('/v1/diary', { token: bob.token });
+if (editedDiary.entries?.[0]?.rating !== 4 || editedDiary.entries?.[0]?.price !== 52 || editedDiary.entries?.[0]?.note !== 'Edited smoke') throw new Error('Edited diary context was not persisted');
 const recommendations = await request('/v1/recommendations', { token: bob.token });
 if (typeof recommendations.places?.[0]?.tasteMatch !== 'number') throw new Error('Taste-aware recommendation score missing');
 const taste = await request('/v1/me/taste', { token: bob.token });

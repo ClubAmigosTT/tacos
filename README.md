@@ -67,6 +67,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 37. Health con timeout: las comprobaciones de PostgreSQL fallan rápido para que Render pueda reemplazar una instancia degradada.
 38. Cliente resiliente: las peticiones móviles cancelan solicitudes colgadas después de 15 segundos y activan los fallbacks existentes.
 39. Listas editables: el propietario puede cambiar título, descripción y visibilidad desde una pantalla móvil dedicada; la API mantiene autorización y consistencia del progreso.
+40. Diario editable: una visita propia permite corregir rating, precio y nota desde una pantalla dedicada; los cambios invalidan diario, feed y recomendaciones.
 
 ## Verificación
 

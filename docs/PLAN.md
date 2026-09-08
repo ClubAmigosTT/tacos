@@ -62,8 +62,9 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 2. Rechazar tacos de otra sucursal, duplicados y ratings no seleccionados.
 3. Subir fotos validadas por firma y tamaño a S3-compatible; guardar sólo la URL en PostgreSQL.
 4. Mostrar diario, Taste ID, Passport y Wrapped; compartir el resumen mediante la hoja nativa.
+5. Permitir que el propietario corrija rating, precio y nota sin alterar la sucursal ni los tacos registrados.
 
-**Aceptación:** una visita aparece en diario, feed y estadísticas; una foto inválida no se persiste; una falla de media permite guardar sin foto.
+**Aceptación:** una visita aparece en diario, feed y estadísticas; una foto inválida no se persiste; una falla de media permite guardar sin foto; una edición propia persiste y una edición ajena responde 404.
 
 ### Fase 6 — Grafo social y recomendaciones (4–7 días)
 
@@ -129,5 +130,5 @@ Lo único que no puede completarse desde este entorno es la conexión de cuentas
 
 - Medir latencia y volumen antes de separar recomendaciones, búsqueda o media en microservicios.
 - Añadir eventos de analítica anónimos, pruebas de carga y backups/restores de PostgreSQL.
-- Incorporar edición de visitas, comentarios moderados, listas colaborativas y detección asistida por cámara sólo después de validar el hábito de registro.
+- Incorporar comentarios moderados, listas colaborativas y detección asistida por cámara sólo después de validar el hábito de registro; la edición de visitas ya está incluida en el MVP.
 - Mantener el score bayesiano como guardrail aunque se añadan embeddings o collaborative filtering.

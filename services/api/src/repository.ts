@@ -336,6 +336,50 @@ export async function createVisitForUser(input: VisitInput, userId: string) {
   return { id, ...input, createdAt, status: 'recorded' };
 }
 
+type VisitUpdateInput = { rating?: number; tacoRatings?: Record<string, number>; price?: number | null; note?: string };
+
+export async function updateVisitForUser(visitId: string, input: VisitUpdateInput, userId: string): Promise<'not_found' | 'invalid_taco' | { id: string; status: 'updated' }> {
+  if (pool) {
+    const owned = await pool.query('SELECT id FROM visits WHERE id = $1 AND user_id = $2', [visitId, userId]);
+    if (!owned.rowCount) return 'not_found';
+    if (input.tacoRatings) {
+      const selected = await pool.query('SELECT menu_item_id FROM visit_items WHERE visit_id = $1', [visitId]);
+      const selectedIds = new Set(selected.rows.map((row) => row.menu_item_id));
+      if (Object.keys(input.tacoRatings).some((tacoId) => !selectedIds.has(tacoId))) return 'invalid_taco';
+    }
+    const values: unknown[] = [visitId, userId];
+    const assignments: string[] = [];
+    if (input.rating !== undefined) { values.push(input.rating); assignments.push(`rating = $${values.length}`); }
+    if (input.price !== undefined) { values.push(input.price); assignments.push(`price = $${values.length}`); }
+    if (input.note !== undefined) { values.push(input.note.trim()); assignments.push(`note = $${values.length}`); }
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      if (assignments.length) await client.query(`UPDATE visits SET ${assignments.join(', ')}, updated_at = now() WHERE id = $1 AND user_id = $2`, values);
+      if (input.tacoRatings) {
+        for (const [tacoId, rating] of Object.entries(input.tacoRatings)) {
+          await client.query('UPDATE visit_items SET rating = $3 WHERE visit_id = $1 AND menu_item_id = $2', [visitId, tacoId, rating]);
+        }
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+    return { id: visitId, status: 'updated' };
+  }
+  const visit = localVisits.get(visitId);
+  if (!visit || visit.userId !== userId) return 'not_found';
+  if (input.tacoRatings && Object.keys(input.tacoRatings).some((tacoId) => !visit.tacoIds.includes(tacoId))) return 'invalid_taco';
+  if (input.rating !== undefined) visit.rating = input.rating;
+  if (input.price !== undefined) visit.price = input.price ?? undefined;
+  if (input.note !== undefined) visit.note = input.note.trim();
+  if (input.tacoRatings) visit.tacoRatings = { ...(visit.tacoRatings ?? {}), ...input.tacoRatings };
+  return { id: visitId, status: 'updated' };
+}
+
 export async function registerUser(input: { email: string; password: string; displayName: string }): Promise<PublicUser> {
   const email = input.email.trim().toLowerCase();
   const displayName = input.displayName.trim();

@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getAdminReports, getDiary, getFeed, getHealth, getListDetails, getLists, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, registerUser, removeListItemForUser, reportVisitForUser, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, type PublicUser } from './repository.js';
+import { addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getAdminReports, getDiary, getFeed, getHealth, getListDetails, getLists, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, registerUser, removeListItemForUser, reportVisitForUser, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updateVisitForUser, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
 import { uploadVisitImage } from './storage.js';
 
@@ -141,6 +141,17 @@ app.post('/v1/visits', async (request, reply) => {
     return reply.code(400).send({ error: 'TACO_RATING_NOT_SELECTED' });
   }
   return reply.code(201).send(await createVisitForUser(body, user.id));
+});
+
+app.patch('/v1/visits/:id', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const params = z.object({ id: z.string() }).parse(request.params);
+  const body = z.object({ rating: z.number().min(1).max(5).optional(), tacoRatings: z.record(z.string(), z.number().min(1).max(5)).optional(), price: z.number().min(0).max(100000).nullable().optional(), note: z.string().trim().max(500).optional() }).refine((value) => Object.keys(value).length > 0, { message: 'At least one field is required' }).parse(request.body);
+  const updated = await updateVisitForUser(params.id, body, user.id);
+  if (updated === 'not_found') return reply.code(404).send({ error: 'VISIT_NOT_FOUND' });
+  if (updated === 'invalid_taco') return reply.code(400).send({ error: 'TACO_RATING_NOT_SELECTED' });
+  return updated;
 });
 
 app.post('/v1/media/images', async (request, reply) => {
