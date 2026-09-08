@@ -43,6 +43,7 @@ export default function MapScreen() {
     if (active === 'Abierto ahora') return source.filter((place) => isOpenNow(place.openUntil));
     return source;
   }, [active, data]);
+  const suggestion = sorted[0] ?? data[0];
 
   return (
     <View style={styles.screen}>
@@ -50,7 +51,7 @@ export default function MapScreen() {
       <View style={styles.topOverlay}><Pressable style={styles.backButton} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable><View style={styles.mapTitle}><Text style={styles.mapKicker}>EXPLORAR</Text><Text style={styles.mapHeading}>Tu mapa</Text></View><Pressable style={[styles.locate, coordinates && styles.locateActive]} onPress={() => void loadLocation()}><Ionicons name="navigate" size={18} color={coordinates ? colors.background : colors.ink} /></Pressable></View>
       <View style={styles.searchBar}><Ionicons name="search" size={17} color={colors.muted} /><TextInput value={search} onChangeText={setSearch} placeholder="Pastor, suadero, Roma…" placeholderTextColor={colors.muted} style={styles.searchInput} returnKeyType="search" /></View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters} contentContainerStyle={styles.filterContent}>{filters.map((filter) => <Pressable key={filter} onPress={() => setActive(filter)} style={[styles.filter, filter === active && styles.filterActive]}><Text style={[styles.filterText, filter === active && styles.filterTextActive]}>{filter}</Text></Pressable>)}</ScrollView>
-      <View style={styles.sheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><View><Text style={styles.sheetEyebrow}>{sorted.length} LUGARES EN ESTA ZONA</Text><Text style={styles.sheetTitle}>{active === 'Pastor' ? 'Pastor que vale la pena' : active}</Text></View><Pressable><Text style={styles.listLink}>Lista ↗</Text></Pressable></View><ScrollView horizontal showsHorizontalScrollIndicator={false}>{sorted.map((place) => <Pressable key={place.id} style={styles.resultCard} onPress={() => router.push(`/place/${place.id}`)}><View style={styles.resultTop}><Text style={styles.resultName} numberOfLines={1}>{place.name}</Text><RatingBadge rating={active === 'Pastor' ? place.tacos.find((taco) => taco.name === 'Pastor')?.rating ?? place.rating : place.rating} /></View><Text style={styles.resultMeta}>{place.neighborhood} · {place.distance}</Text><Text style={styles.resultStyle}>{place.style}</Text></Pressable>)}</ScrollView></View>
+      <View style={styles.sheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><View><Text style={styles.sheetEyebrow}>{sorted.length} LUGARES EN ESTA ZONA</Text><Text style={styles.sheetTitle}>{active === 'Pastor' ? 'Pastor que vale la pena' : active}</Text></View><Pressable style={styles.magicButton} disabled={!suggestion} onPress={() => suggestion && router.push(`/place/${suggestion.id}`)}><Ionicons name="sparkles-outline" size={14} color={colors.background} /><Text style={styles.magicText}>Para mí</Text></Pressable></View><ScrollView horizontal showsHorizontalScrollIndicator={false}>{sorted.map((place) => <Pressable key={place.id} style={styles.resultCard} onPress={() => router.push(`/place/${place.id}`)}><View style={styles.resultTop}><Text style={styles.resultName} numberOfLines={1}>{place.name}</Text><RatingBadge rating={active === 'Pastor' ? place.tacos.find((taco) => taco.name === 'Pastor')?.rating ?? place.rating : place.rating} /></View><Text style={styles.resultMeta}>{place.neighborhood} · {place.distance}</Text><Text style={styles.resultStyle}>{place.style}</Text></Pressable>)}</ScrollView></View>
       {locationDenied ? <Pressable style={styles.locationHint} onPress={() => void loadLocation()}><Ionicons name="location-outline" size={14} color={colors.warm} /><Text style={styles.locationHintText}>Activa ubicación para calcular distancias reales</Text></Pressable> : null}
     </View>
   );
@@ -81,7 +82,8 @@ const styles = StyleSheet.create({
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: spacing.md },
   sheetEyebrow: { color: colors.accent, fontSize: 9, letterSpacing: 1.4, fontWeight: '900', marginBottom: 5 },
   sheetTitle: { color: colors.ink, fontSize: 23, fontWeight: '900', letterSpacing: -0.6 },
-  listLink: { color: colors.muted, fontWeight: '800', fontSize: 12 },
+  magicButton: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.accent, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 8 },
+  magicText: { color: colors.background, fontWeight: '900', fontSize: 10 },
   resultCard: { width: 230, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: radii.md, padding: spacing.md, marginRight: spacing.sm },
   resultTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
   resultName: { color: colors.ink, fontSize: 15, fontWeight: '900', flex: 1 },
