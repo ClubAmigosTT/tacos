@@ -2,21 +2,23 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, router } from 'expo-router';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { discover } from '@/lib/api';
+import { recommendations } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 import { PlaceCard } from '@/components/PlaceCard';
 import { SectionTitle } from '@/components/SectionTitle';
 import { RatingBadge } from '@/components/RatingBadge';
 
 export default function HomeScreen() {
-  const { data = [] } = useQuery({ queryKey: ['discover'], queryFn: () => discover() });
+  const { token, user } = useAuth();
+  const { data = [] } = useQuery({ queryKey: ['recommendations', token], queryFn: () => recommendations(token) });
   const featured = data[0];
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.kicker}>CDMX · MARTES 23:48</Text>
+          <Text style={styles.kicker}>{user ? `PARA ${user.displayName.toUpperCase()} · CDMX` : 'CDMX · MARTES 23:48'}</Text>
           <Text style={styles.logo}>tacos<Text style={styles.logoDot}>.</Text></Text>
         </View>
         <Pressable style={styles.avatar} onPress={() => router.push('/(tabs)/profile')}><Text style={styles.avatarText}>M</Text></Pressable>

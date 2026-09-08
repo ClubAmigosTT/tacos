@@ -69,6 +69,42 @@ export async function discoverPlaces(query: DiscoverQuery): Promise<ApiPlace[]> 
   return result.rows.map(normalizePlace);
 }
 
+function tokenise(value: string) {
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter((token) => token.length > 2);
+}
+
+export async function getRecommendations(userId?: string): Promise<ApiPlace[]> {
+  const candidates = await discoverPlaces({ limit: 50 });
+  if (!userId) return candidates;
+
+  const preferenceTokens = new Set<string>();
+  if (pool) {
+    const history = await pool.query(`
+      SELECT v.rating, b.name, b.style, b.tags, m.name AS taco_name
+      FROM visits v JOIN branches b ON b.id = v.branch_id
+      LEFT JOIN visit_items vi ON vi.visit_id = v.id
+      LEFT JOIN menu_items m ON m.id = vi.menu_item_id
+      WHERE v.user_id = $1 AND v.rating >= 4
+    `, [userId]);
+    for (const row of history.rows) {
+      for (const value of [row.name, row.style, row.taco_name, ...(row.tags ?? [])]) for (const token of tokenise(String(value ?? ''))) preferenceTokens.add(token);
+    }
+  } else {
+    for (const visit of localVisits.values()) {
+      if (visit.userId !== userId || visit.rating < 4) continue;
+      const place = places.find((item) => item.id === visit.placeId);
+      for (const value of [place?.name, place?.style, ...(place?.tags ?? []), ...visit.tacoIds.map((id) => place?.tacos.find((taco) => taco.id === id)?.name)]) for (const token of tokenise(String(value ?? ''))) preferenceTokens.add(token);
+    }
+  }
+  if (!preferenceTokens.size) return candidates;
+  return candidates.map((place) => {
+    const placeTokens = new Set(tokenise([place.name, place.style, ...place.tags, ...place.tacos.map((taco) => taco.name)].join(' ')));
+    const overlap = [...placeTokens].filter((token) => preferenceTokens.has(token)).length;
+    const personalMatch = Math.min(99, Math.round(place.match + Math.min(15, overlap * 4)));
+    return { ...place, match: personalMatch };
+  }).sort((a, b) => b.match - a.match || b.rating - a.rating);
+}
+
 export async function findPlace(id: string): Promise<ApiPlace | undefined> {
   const fallback = places.find((place) => place.id === id);
   if (!pool) return fallback;

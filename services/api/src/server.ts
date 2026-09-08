@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListItemForUser, authenticateUser, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getDiary, getFeed, getLists, registerUser, searchUsers, unfollowUser, type PublicUser } from './repository.js';
+import { addListItemForUser, authenticateUser, createListForUser, createVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getDiary, getFeed, getLists, getRecommendations, registerUser, searchUsers, unfollowUser, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
 
 const app = Fastify({ logger: true });
@@ -64,6 +64,11 @@ app.get('/v1/me', async (request, reply) => {
 app.get('/v1/discover', async (request) => {
   const query = z.object({ q: z.string().optional(), lat: z.coerce.number().optional(), lng: z.coerce.number().optional(), limit: z.coerce.number().int().min(1).max(50).default(20) }).parse(request.query);
   return { places: await discoverPlaces(query), context: { query: query.q ?? null, generatedAt: new Date().toISOString() } };
+});
+
+app.get('/v1/recommendations', async (request) => {
+  const user = await resolveUser(request);
+  return { places: await getRecommendations(user?.id), context: { personalized: Boolean(user), generatedAt: new Date().toISOString() } };
 });
 
 app.get('/v1/branches/:id', async (request, reply) => {

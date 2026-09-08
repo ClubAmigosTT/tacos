@@ -37,6 +37,15 @@ export async function discover(options: { q?: string; lat?: number; lng?: number
   }
 }
 
+export async function recommendations(token?: string): Promise<Place[]> {
+  try {
+    const result = await request<{ places: Place[] }>('/v1/recommendations', undefined, token);
+    return result.places;
+  } catch {
+    return places;
+  }
+}
+
 export async function getPlace(id: string): Promise<Place> {
   try {
     return await request<Place>(`/v1/branches/${id}`);
