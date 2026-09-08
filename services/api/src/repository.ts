@@ -47,11 +47,25 @@ function normalizePlace(row: any): ApiPlace {
   };
 }
 
+function haversineKm(from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }) {
+  const earthRadiusKm = 6371;
+  const latitudeDelta = (to.latitude - from.latitude) * Math.PI / 180;
+  const longitudeDelta = (to.longitude - from.longitude) * Math.PI / 180;
+  const latitudeA = from.latitude * Math.PI / 180;
+  const latitudeB = to.latitude * Math.PI / 180;
+  const a = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(latitudeA) * Math.cos(latitudeB) * Math.sin(longitudeDelta / 2) ** 2;
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export async function discoverPlaces(query: DiscoverQuery): Promise<ApiPlace[]> {
   if (!pool) {
     const normalized = query.q?.trim().toLowerCase();
     const filtered = normalized ? places.filter((place) => `${place.name} ${place.neighborhood} ${place.style} ${place.tags.join(' ')} ${place.tacos.map((taco) => taco.name).join(' ')}`.toLowerCase().includes(normalized)) : places;
-    return filtered.slice(0, query.limit);
+    if (query.lat == null || query.lng == null) return filtered.slice(0, query.limit);
+    return filtered
+      .map((place) => ({ ...place, distance: `${haversineKm({ latitude: query.lat!, longitude: query.lng! }, place.coordinates).toFixed(1)} km` }))
+      .sort((a, b) => Number.parseFloat(a.distance) - Number.parseFloat(b.distance))
+      .slice(0, query.limit);
   }
 
   const values: unknown[] = [];
