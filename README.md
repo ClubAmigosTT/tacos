@@ -45,6 +45,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 15. Perfil de sabor por sucursal (intensidad, picante, tradicional, textura y valor) servido desde PostgreSQL y renderizado dinámicamente en la ficha.
 16. Taste ID personalizado desde `/v1/me/taste`, calculado a partir de las sucursales visitadas y sus perfiles de sabor.
 17. Recomendaciones con señal social: ratings y visitas de personas seguidas se combinan con el gusto propio y la calidad global.
+18. Registro contextual: detecta ubicación, prioriza los tres lugares más cercanos y guarda coordenadas de la visita.
 
 ## Verificación
 

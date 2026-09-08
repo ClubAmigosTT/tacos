@@ -65,6 +65,7 @@ export async function discoverPlaces(query: DiscoverQuery): Promise<ApiPlace[]> 
     : 'NULL::numeric AS distance_km';
   if (query.lat != null && query.lng != null) values.push(query.lng, query.lat);
   values.push(query.limit);
+  const orderBy = query.lat != null && query.lng != null ? 'distance_km ASC NULLS LAST, rating DESC' : 'rating DESC';
   const result = await pool.query(`
     SELECT b.id, b.name, b.neighborhood, b.open_until,
       CASE WHEN COALESCE(reviews.review_count, 0) = 0 THEN b.rating
@@ -82,7 +83,7 @@ export async function discoverPlaces(query: DiscoverQuery): Promise<ApiPlace[]> 
         FROM visits v WHERE v.branch_id = b.id) reviews ON true
       LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
     WHERE ${predicates.join(' AND ')}
-    GROUP BY b.id, reviews.review_count, reviews.average_rating ORDER BY rating DESC LIMIT $${values.length}
+    GROUP BY b.id, reviews.review_count, reviews.average_rating ORDER BY ${orderBy} LIMIT $${values.length}
   `, values);
   return result.rows.map(normalizePlace);
 }
