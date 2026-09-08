@@ -9,7 +9,7 @@ import { SectionTitle } from '@/components/SectionTitle';
 import { RatingBadge } from '@/components/RatingBadge';
 
 export default function HomeScreen() {
-  const { data = [] } = useQuery({ queryKey: ['discover'], queryFn: discover });
+  const { data = [] } = useQuery({ queryKey: ['discover'], queryFn: () => discover() });
   const featured = data[0];
 
   return (

@@ -16,12 +16,22 @@ async function request<T>(path: string, options?: RequestInit, token?: string): 
   return response.json() as Promise<T>;
 }
 
-export async function discover(): Promise<Place[]> {
+export async function discover(options: { q?: string; lat?: number; lng?: number; limit?: number } = {}): Promise<Place[]> {
   try {
-    const result = await request<{ places: Place[] }>('/v1/discover');
+    const params = new URLSearchParams();
+    if (options.q?.trim()) params.set('q', options.q.trim());
+    if (options.lat != null) params.set('lat', String(options.lat));
+    if (options.lng != null) params.set('lng', String(options.lng));
+    if (options.limit != null) params.set('limit', String(options.limit));
+    const query = params.toString();
+    const result = await request<{ places: Place[] }>(`/v1/discover${query ? `?${query}` : ''}`);
     return result.places;
   } catch {
-    return places;
+    const normalized = options.q?.trim().toLowerCase();
+    const filtered = normalized
+      ? places.filter((place) => `${place.name} ${place.neighborhood} ${place.style} ${place.tags.join(' ')} ${place.tacos.map((taco) => taco.name).join(' ')}`.toLowerCase().includes(normalized))
+      : places;
+    return filtered.slice(0, options.limit ?? 20);
   }
 }
 
