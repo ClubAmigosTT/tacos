@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Place } from '@/data/fixtures';
 import { colors } from '@/theme';
 
-export function MapCanvas({ places, active, onSelect }: { places: Place[]; active: string; onSelect: (id: string) => void }) {
+export function MapCanvas({ places, active, onSelect }: { places: Place[]; active: string; onSelect: (id: string) => void; userCoordinates?: { latitude: number; longitude: number } }) {
   return <View style={styles.webMap}><View style={styles.roadOne} /><View style={styles.roadTwo} /><View style={styles.roadThree} /><Text style={[styles.label, { top: '25%', left: '19%' }]}>NARVARTE</Text><Text style={[styles.label, { top: '44%', left: '57%' }]}>ROMA SUR</Text><Text style={[styles.label, { top: '67%', left: '72%' }]}>CONDESA</Text>{places.map((place, index) => <Pressable key={place.id} onPress={() => onSelect(place.id)} style={[styles.pinPosition, { top: `${31 + index * 16}%`, left: `${29 + index * 22}%` }]}><View style={[styles.pin, active === '92% para mí' && styles.pinAccent]}><Text style={[styles.pinText, active === '92% para mí' && styles.pinTextAccent]}>{active === 'Pastor' ? place.tacos.find((taco) => taco.name === 'Pastor')?.rating.toFixed(1) ?? place.rating.toFixed(1) : place.rating.toFixed(1)}</Text></View></Pressable>)}</View>;
 }
 

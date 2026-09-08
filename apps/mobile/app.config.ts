@@ -19,11 +19,17 @@ const config: ExpoConfig = {
     package: 'com.tacos.app',
     adaptiveIcon: {
       backgroundColor: '#0B0D0C'
-    },
-    permissions: ['ACCESS_COARSE_LOCATION', 'ACCESS_FINE_LOCATION']
+    }
   },
   plugins: [
     'expo-router',
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission:
+          'Usamos tu ubicación para mostrar taquerías cercanas y personalizar el mapa.'
+      }
+    ],
     [
       'react-native-maps',
       {
