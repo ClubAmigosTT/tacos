@@ -5,7 +5,7 @@ import { addListItemForUser, authenticateUser, createListForUser, createVisitFor
 import { issueToken, verifyToken } from './auth.js';
 import { uploadVisitImage } from './storage.js';
 
-const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 });
+const app = Fastify({ logger: true, bodyLimit: 12 * 1024 * 1024 });
 await app.register(cors, { origin: true });
 
 app.setErrorHandler((error, request, reply) => {
@@ -91,7 +91,7 @@ app.post('/v1/visits', async (request, reply) => {
 app.post('/v1/media/images', async (request, reply) => {
   const user = await requireUser(request, reply);
   if (!user) return;
-  const body = z.object({ base64: z.string().min(1).max(10_000_000), contentType: z.enum(['image/jpeg', 'image/png', 'image/webp']) }).parse(request.body);
+  const body = z.object({ base64: z.string().min(1).max(11_000_000), contentType: z.enum(['image/jpeg', 'image/png', 'image/webp']) }).parse(request.body);
   try {
     return await uploadVisitImage({ userId: user.id, ...body });
   } catch (error) {
