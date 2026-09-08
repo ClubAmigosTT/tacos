@@ -244,12 +244,34 @@ const tacoReputationSelect = `(
         ) stats
       )`;
 
+function localReputation(place: ApiPlace): ApiPlace {
+  const reviews = [...localVisits.values()]
+    .filter((visit) => visit.placeId === place.id && visit.visibility === 'visible')
+    .map((visit) => ({ rating: visit.rating, userId: visit.userId, createdAt: visit.createdAt }));
+  if (!reviews.length) return place;
+  const average = reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
+  const variance = reviews.reduce((sum, review) => sum + (review.rating - average) ** 2, 0) / reviews.length;
+  const dispersion = Math.sqrt(variance);
+  const now = Date.now();
+  const weights = reviews.map((review) => 0.5 ** (Math.max(0, now - Date.parse(review.createdAt)) / (180 * 24 * 60 * 60 * 1000)));
+  const weightTotal = weights.reduce((sum, weight) => sum + weight, 0);
+  const recent = reviews.reduce((sum, review, index) => sum + review.rating * weights[index], 0) / weightTotal;
+  const effectiveCount = Math.max(1, Math.min(reviews.length, Math.max(1, new Set(reviews.map((review) => review.userId)).size * 3)));
+  const score = Math.max(1, Math.min(5,
+    ((effectiveCount * (average * 0.65 + recent * 0.35)) + (10 * 4.2)) / (effectiveCount + 10)
+      - Math.min(0.25, dispersion * 0.08)
+      + Math.min(0.08, Math.max(0, recent - average) * 0.12)
+  ));
+  return { ...place, rating: Number(score.toFixed(2)), reviewCount: reviews.length };
+}
+
 export async function discoverPlaces(query: DiscoverQuery): Promise<ApiPlace[]> {
   if (!pool) {
     const normalized = query.q?.trim().toLowerCase();
     const filtered = normalized ? places.filter((place) => `${place.name} ${place.neighborhood} ${place.style} ${place.tags.join(' ')} ${place.tacos.map((taco) => taco.name).join(' ')}`.toLowerCase().includes(normalized)) : places;
-    if (query.lat == null || query.lng == null) return filtered.slice(0, query.limit);
-    return filtered
+    const scored = filtered.map(localReputation);
+    if (query.lat == null || query.lng == null) return scored.slice(0, query.limit);
+    return scored
       .map((place) => ({ ...place, distance: `${haversineKm({ latitude: query.lat!, longitude: query.lng! }, place.coordinates).toFixed(1)} km` }))
       .sort((a, b) => Number.parseFloat(a.distance) - Number.parseFloat(b.distance))
       .slice(0, query.limit);
@@ -394,7 +416,7 @@ export async function getTasteProfile(userId: string): Promise<TasteProfile> {
 
 export async function findPlace(id: string): Promise<ApiPlace | undefined> {
   const fallback = places.find((place) => place.id === id);
-  if (!pool) return fallback;
+  if (!pool) return fallback ? localReputation(fallback) : fallback;
   const result = await pool.query(`
     SELECT b.id, b.taqueria_id, t.name AS taqueria_name, b.name, b.neighborhood, b.open_until,
       ${reputationSelect}

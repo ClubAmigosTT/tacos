@@ -89,6 +89,7 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 59. Migraciones seguras en Render: el pre-deploy usa un cliente dedicado y un lock advisory para impedir carreras entre deploys y garantizar transacciones reales por archivo.
 60. Deploy protegido: los servicios de Render esperan los checks de GitHub Actions antes de auto-desplegar (`autoDeployTrigger: checksPass`).
 61. Releases móviles reproducibles: cada perfil EAS fija su entorno y las actualizaciones OTA apuntan explícitamente a `production`.
+62. Paridad de fallback: sin `DATABASE_URL`, las visitas visibles también recalculan reputación, recencia, dispersión y volumen de reseñas para mantener el mismo comportamiento del MVP.
 
 ## Verificación
 
