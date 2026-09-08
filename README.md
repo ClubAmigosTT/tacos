@@ -40,7 +40,8 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 10. Permiso de ubicación en iOS/Android y distancias PostGIS cuando el dispositivo comparte coordenadas.
 11. Taco Passport: progreso por colonias desbloqueadas a partir de las visitas del diario.
 12. Reputación bayesiana en consultas PostgreSQL: prior conservador para sucursal y taco, evitando que pocas reseñas perfectas dominen el ranking.
-13. Contexto de visita: precio, nota, foto futura y coordenadas opcionales, más resumen anual compartible.
+13. Contexto de visita: precio, nota, foto opcional y coordenadas, más resumen anual compartible.
+14. Fotos opcionales desde cámara/galería: se suben por `/v1/media/images` a un bucket S3-compatible y nunca se escriben en el disco de Render.
 
 ## Verificación
 
@@ -57,7 +58,7 @@ pnpm --filter @tacos/mobile exec expo export --platform web
 1. Sube este repositorio a GitHub.
 2. En Render elige **New → Blueprint**, selecciona el repositorio y confirma `render.yaml`.
 3. Render creará `tacos-api`, `tacos-worker`, `tacos-nightly`, `tacos-keyvalue` y `tacos-postgres`.
-4. El `JWT_SECRET` se genera automáticamente; agrega `STORAGE_BUCKET_URL` cuando conectes el proveedor de imágenes.
+4. El `JWT_SECRET` se genera automáticamente; configura `STORAGE_BUCKET_URL`, `S3_BUCKET`, `S3_ACCESS_KEY_ID` y `S3_SECRET_ACCESS_KEY` para activar las fotos. `S3_ENDPOINT` permite usar R2, MinIO u otro proveedor compatible.
 5. Comprueba `https://<tu-api>.onrender.com/health`.
 
 El servicio ejecuta las migraciones antes de cada deploy mediante `preDeployCommand`; no hay que conectarse a esta computadora para mantenerlo activo.
