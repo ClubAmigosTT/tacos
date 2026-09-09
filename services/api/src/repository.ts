@@ -734,15 +734,19 @@ export async function getUserProfile(userId: string, viewerId?: string) {
       following = localFollows.has(`${viewerId}:${userId}`);
     }
   }
-  // Public profile aggregates must not count content hidden by moderation.
-  const entries = await getDiary(userId, false);
+  // Public profile aggregates are activity signals too. A user may still
+  // inspect their own complete diary, but other viewers should see a neutral
+  // profile when that user disabled social activity sharing.
+  const privacy = await getPrivacyForUser(userId);
+  const canViewActivity = viewerId === userId || privacy?.shareActivity !== false;
+  const entries = canViewActivity ? await getDiary(userId, false) : [];
   const ratings = entries.map((entry) => Number(entry.rating)).filter(Number.isFinite);
   const allLists = await getLists(viewerId === userId ? userId : viewerId);
   const lists = allLists.filter((list) => list.owner.id === userId && (list.visibility !== 'private' || viewerId === userId));
   return {
     user: { id: user.id, displayName: user.displayName, following },
     stats: { visits: entries.length, averageRating: ratings.length ? Number((ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length).toFixed(2)) : null, listCount: lists.length },
-    taste: await getTasteProfile(userId),
+    taste: canViewActivity ? await getTasteProfile(userId) : { ...defaultTaste, profile: { ...defaultTaste.profile }, tags: [...defaultTaste.tags] },
     lists
   };
 }

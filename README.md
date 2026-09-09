@@ -156,6 +156,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 121. Producción sin memoria accidental: la API y el hook de migraciones se niegan a ejecutarse en `NODE_ENV=production` si falta `DATABASE_URL`, evitando desplegar un Render efímero que pierda visitas al reiniciarse.
 122. Credenciales acotadas: registro y login rechazan contraseñas de más de 128 caracteres y correos mayores al límite práctico antes de ejecutar autenticación.
 123. Errores de recursos honestos: listas, perfiles, taquerías y edición distinguen un 404 real de una caída temporal y ofrecen reintento sin simular que el contenido fue borrado.
+124. Perfil respetuoso de privacidad: al desactivar actividad, las visitas y el promedio dejan de aparecer en el perfil público; el propietario conserva su lectura completa.
 
 ## Verificación
 
