@@ -28,7 +28,10 @@ const config: ExpoConfig = {
     package: 'com.tacos.app',
     adaptiveIcon: {
       backgroundColor: '#0B0D0C'
-    }
+    },
+    // The app never records audio; keep Expo's broad development permissions
+    // from leaking into native production builds.
+    blockedPermissions: ['android.permission.RECORD_AUDIO']
   },
   plugins: [
     'expo-router',

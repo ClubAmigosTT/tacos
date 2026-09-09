@@ -77,6 +77,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 21. Proteger deep links personales (Radar, Passport, Wrapped, Privacidad, edición y comentarios) durante la restauración de sesión.
 22. Sincronizar el estado de Ajustes tras restaurar el usuario y bloquear consultas privadas hasta contar con un token válido.
 23. Mantener el catálogo seed alineado con el fallback móvil mediante migraciones idempotentes.
+24. Mantener permisos nativos mínimos y no solicitar audio para una app que sólo usa ubicación, cámara y galería.
 **Aceptación:** “Pastor”, “Abierto ahora”, “Barato” y “Para mí” producen resultados ordenados; negar ubicación no rompe el catálogo.
 
 ### Fase 5 — Visitas, diario y media (3–5 días)
