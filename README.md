@@ -175,6 +175,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 140. Grafo social coherente: seguir o dejar de seguir desde Personas invalida feed, recomendaciones y perfil para que las señales cambien sin recargar manualmente.
 141. Roster privado: el detalle público de una lista sólo expone el conteo de colaboradores; nombres y roles quedan reservados al propietario o a un colaborador autorizado.
 142. Carga autenticada honesta: Mapa y Registro no muestran fixtures mientras esperan el catálogo real; presentan un estado de consulta y conservan sólo una sucursal explícita de un deep link.
+143. Registro por cámara más fluido: al confirmar la sucursal sugerida se preselecciona también su taco mejor valorado, manteniendo la confirmación manual antes de cambiar la visita.
 
 ## Verificación
 
