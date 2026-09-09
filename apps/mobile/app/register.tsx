@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth';
 import { places } from '@/data/fixtures';
 import { colors, radii, spacing } from '@/theme';
 import { AsyncErrorState } from '@/components/AsyncErrorState';
+import { parseOptionalPrice } from '@/lib/validation';
 
 export default function RegisterScreen() {
   const { token, loading } = useAuth();
@@ -123,11 +124,16 @@ export default function RegisterScreen() {
 
   async function save() {
     if (!token) return;
+    const parsedPrice = parseOptionalPrice(price);
+    if (parsedPrice === undefined) {
+      setError('El precio debe ser un número entre $0 y $100,000 MXN (máximo dos decimales).');
+      return;
+    }
     setSaving(true);
     setError('');
     try {
       const uploaded = photo ? await uploadImage({ base64: photo.base64, contentType: photo.contentType }, token) : undefined;
-      await createVisit({ placeId, tacoIds, rating, tacoRatings, price: price ? Number(price) : undefined, note: note.trim() || undefined, photoUrl: uploaded?.url, latitude: coordinates?.latitude, longitude: coordinates?.longitude }, token);
+      await createVisit({ placeId, tacoIds, rating, tacoRatings, price: parsedPrice ?? undefined, note: note.trim() || undefined, photoUrl: uploaded?.url, latitude: coordinates?.latitude, longitude: coordinates?.longitude }, token);
       void trackEvent('visit_saved', { place_id: placeId }, token);
       void queryClient.invalidateQueries({ queryKey: ['diary'] });
       void queryClient.invalidateQueries({ queryKey: ['feed'] });

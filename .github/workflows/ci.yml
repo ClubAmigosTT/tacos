@@ -56,6 +56,9 @@ jobs:
       - name: Hours filter smoke test
         run: pnpm smoke:hours
 
+      - name: Input validation smoke test
+        run: pnpm smoke:inputs
+
       - name: Expo production config smoke test
         run: pnpm smoke:config
 

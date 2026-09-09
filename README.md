@@ -150,6 +150,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 115. Builds por plataforma: el guard de production exige Google Maps para Android, pero permite iOS sin esa clave porque usa Apple Maps; ambos casos están cubiertos por CI.
 116. Reseñas públicas de sucursal: las fichas muestran visitas visibles con taco, rating, nota, fecha y autor; el endpoint excluye contenido moderado, cuentas inactivas y usuarios que desactivaron su actividad.
 117. Mapa web interactivo: el preview local permite arrastrar el mapa, conserva la posición de los pines y ofrece “Buscar en esta zona” al soltar, igual que la experiencia nativa.
+118. Entrada numérica segura: el precio de una visita acepta coma decimal, redondea a dos posiciones y bloquea valores no numéricos o fuera de rango antes de persistirlos.
 
 ## Verificación
 
