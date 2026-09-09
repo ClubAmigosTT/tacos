@@ -139,6 +139,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 104. Registro desde enlaces remotos: una sucursal válida de Render se carga antes de registrar la visita, sin sustituirla por el primer lugar del catálogo local; un enlace inválido ofrece reintento.
 105. Perfil honesto: Diario, Listas y Taste ID ya no se degradan a ceros o fixtures cuando falla una consulta autenticada; el Perfil ofrece reintento conjunto.
 106. Errores HTTP precisos: JSON inválido devuelve 400 y cuerpos que superan el límite del API devuelven 413, con cobertura en el smoke test.
+107. Colaboración recuperable: la búsqueda de colaboradores muestra reintento explícito cuando falla, sin ocultar el estado de la lista.
 
 ## Verificación
 

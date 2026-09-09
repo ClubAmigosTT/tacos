@@ -143,6 +143,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 12. Derivar periodos y resúmenes del Diario desde las fechas reales para que el producto no dependa de un año fijo.
 13. Mantener la pantalla de Listas alineada con el resto de rutas privadas: esperar la sesión, diferenciar error de API de estado vacío y ofrecer reintento.
 14. Traducir errores de parser de Fastify a respuestas 400/413 para que clientes y observabilidad distingan entradas inválidas de fallos internos.
+15. Ofrecer reintento visible en la búsqueda de colaboradores cuando la consulta social no está disponible.
 
 **Aceptación:** un reporte aparece en `/v1/admin/reports`, un admin puede ocultarlo, el feed deja de mostrarlo, el perfil público no lo cuenta y `pnpm smoke:admin` confirma que no contamina recomendaciones.
 
