@@ -144,6 +144,9 @@ pnpm install
 copy .env.example .env
 pnpm dev:api
 pnpm dev:mobile
+pnpm dev:expo       # Expo Go / QR
+pnpm dev:ios        # simulador iOS
+pnpm dev:android    # emulador Android
 pnpm dev:local
 pnpm typecheck
 pnpm build:api
