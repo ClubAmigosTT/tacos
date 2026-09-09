@@ -35,6 +35,10 @@ await request('/v1/events', {
   method: 'POST',
   body: '{"eventName":'
 }, 400);
+await request('/v1/auth/register', {
+  method: 'POST',
+  body: JSON.stringify({ email: `oversized-${suffix}@example.com`, password: 'x'.repeat(129), displayName: 'Input Smoke' })
+}, 400);
 
 const alice = await createUser('Ana Smoke', 'ana');
 const bobDisplayName = `Beto Smoke ${suffix}`;

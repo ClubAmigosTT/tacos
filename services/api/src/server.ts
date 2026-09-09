@@ -72,7 +72,7 @@ app.post('/v1/events', async (request, reply) => {
 });
 
 app.post('/v1/auth/register', async (request, reply) => {
-  const body = z.object({ email: z.string().trim().email(), password: z.string().min(8), displayName: z.string().trim().min(2).max(40) }).parse(request.body);
+  const body = z.object({ email: z.string().trim().email().max(320), password: z.string().min(8).max(128), displayName: z.string().trim().min(2).max(40) }).parse(request.body);
   try {
     const user = await registerUser(body);
     return reply.code(201).send({ user, token: await issueToken(user) });
@@ -83,7 +83,7 @@ app.post('/v1/auth/register', async (request, reply) => {
 });
 
 app.post('/v1/auth/login', async (request, reply) => {
-  const body = z.object({ email: z.string().email(), password: z.string().min(1) }).parse(request.body);
+  const body = z.object({ email: z.string().email().max(320), password: z.string().min(1).max(128) }).parse(request.body);
   const user = await authenticateUser(body);
   if (!user) return reply.code(401).send({ error: 'INVALID_CREDENTIALS' });
   return { user, token: await issueToken(user) };
