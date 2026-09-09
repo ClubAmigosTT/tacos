@@ -5,10 +5,12 @@ on:
     branches: [main, master]
     paths:
       - render.yaml
+      - render.free-demo.yaml
       - .github/workflows/render-blueprint.yml
   pull_request:
     paths:
       - render.yaml
+      - render.free-demo.yaml
       - .github/workflows/render-blueprint.yml
 
 permissions:
@@ -42,10 +44,12 @@ jobs:
           render --version
 
       - name: Validate YAML locally
-        run: ruby -e "require 'yaml'; YAML.load_file('render.yaml'); YAML.load_file('.github/workflows/render-blueprint.yml'); puts 'Blueprint YAML syntax passed'"
+        run: ruby -e "require 'yaml'; YAML.load_file('render.yaml'); YAML.load_file('render.free-demo.yaml'); YAML.load_file('.github/workflows/render-blueprint.yml'); puts 'Blueprint YAML syntax passed'"
 
       # The remote validator also checks conflicts against a Render workspace.
       # Keep it opt-in so public forks and first-time local CI stay green.
       - name: Validate Blueprint with Render
         if: ${{ env.RENDER_API_KEY != '' && env.RENDER_WORKSPACE_ID != '' }}
-        run: render blueprints validate render.yaml --workspace "$RENDER_WORKSPACE_ID"
+        run: |
+          render blueprints validate render.yaml --workspace "$RENDER_WORKSPACE_ID"
+          render blueprints validate render.free-demo.yaml --workspace "$RENDER_WORKSPACE_ID"
