@@ -7,6 +7,14 @@ import { diary as diaryRequest, lists as listsRequest, taste as tasteRequest, tr
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 
+const profileTabs = [
+  { label: 'Diario', path: '/(tabs)/diary' },
+  { label: 'Reviews', path: '/reviews' },
+  { label: 'Listas', path: '/lists' },
+  { label: 'Mapa', path: '/(tabs)/map' },
+  { label: 'Estadísticas', path: '/stats' }
+] as const;
+
 export default function ProfileScreen() {
   const { user, token, loading, signOut } = useAuth();
   useEffect(() => { void trackEvent('profile_open', {}, token); }, [token]);
@@ -26,6 +34,9 @@ export default function ProfileScreen() {
       {!user ? <Pressable style={styles.loginCard} onPress={() => router.push('/auth')}><View style={styles.loginIcon}><Ionicons name="person-add-outline" size={18} color={colors.background} /></View><View style={{ flex: 1 }}><Text style={styles.loginTitle}>Guarda tu historia</Text><Text style={styles.loginDetail}>Entra para registrar visitas y crear listas.</Text></View><Ionicons name="chevron-forward" size={17} color={colors.muted} /></Pressable> : <Pressable style={styles.logout} onPress={() => void signOut()}><Text style={styles.logoutText}>Cerrar sesión</Text></Pressable>}
       <View style={styles.taste}><Text style={styles.tasteEyebrow}>TU TASTE ID</Text><Text style={styles.tasteTitle}>{tasteId?.title ?? 'Pastor nocturno'}</Text><Text style={styles.tasteDescription}>{tasteId?.description ?? 'Picante alto · precio sensible · explorador de lugares callejeros'}</Text><View style={styles.tags}>{(tasteId?.tags ?? ['PASTOR 92%', 'PICANTE 84%', 'NOCHE 78%']).map((tag) => <Text style={styles.tag} key={tag}>{tag}</Text>)}</View></View>
       <View style={styles.stats}><View><Text style={styles.statNumber}>{visits}</Text><Text style={styles.statLabel}>VISITAS</Text></View><View><Text style={styles.statNumber}>{listCount}</Text><Text style={styles.statLabel}>LISTAS</Text></View><View><Text style={styles.statNumber}>{average}</Text><Text style={styles.statLabel}>PROMEDIO</Text></View></View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.profileTabs} style={styles.profileTabsScroll}>
+        {profileTabs.map((tab, index) => <Pressable key={tab.label} style={[styles.profileTab, index === 0 && styles.profileTabActive]} onPress={() => router.push(tab.path)}><Text style={[styles.profileTabText, index === 0 && styles.profileTabTextActive]}>{tab.label}</Text></Pressable>)}
+      </ScrollView>
       <Text style={styles.sectionTitle}>Tu identidad gastronómica</Text>
       <View style={styles.menu}><MenuRow icon="book-outline" title="Diario" detail={`${visits} visitas registradas`} onPress={() => router.push('/(tabs)/diary')} /><MenuRow icon="chatbubble-ellipses-outline" title="Reviews" detail="Tus ratings y notas personales" onPress={() => router.push('/reviews')} /><MenuRow icon="stats-chart-outline" title="Estadísticas" detail="Tu ritmo, zonas y tacos favoritos" onPress={() => router.push('/stats')} /><MenuRow icon="list-outline" title="Listas" detail={`${listCount} listas públicas`} onPress={() => router.push('/lists')} /><MenuRow icon="bookmark-outline" title="Quiero ir" detail="Tu radar de lugares pendientes" onPress={() => router.push('/saved')} /><MenuRow icon="people-outline" title="Actividad" detail="Sigue a gente con criterio" onPress={() => router.push('/feed')} /><MenuRow icon="map-outline" title="Mapa personal" detail={`${exploredZones} colonias exploradas`} onPress={() => router.push('/(tabs)/map')} /><MenuRow icon="compass-outline" title="Taco Passport" detail="Desbloquea zonas de la ciudad" onPress={() => router.push('/passport')} /><MenuRow icon="sparkles-outline" title="Resumen anual" detail="Tus tacos en una sola historia" onPress={() => router.push('/wrapped')} />{user?.role === 'admin' ? <MenuRow icon="shield-checkmark-outline" title="Moderación" detail="Revisa reportes de la comunidad" onPress={() => router.push('/admin')} /> : null}<MenuRow icon="shield-checkmark-outline" title="Privacidad" detail="Controla si tus visitas aparecen en Actividad" onPress={() => router.push('/privacy')} last /></View>
     </ScrollView>
@@ -56,6 +67,12 @@ const styles = StyleSheet.create({
   stats: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: colors.surface, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginBottom: spacing.xl },
   statNumber: { color: colors.ink, fontSize: 24, fontWeight: '900' },
   statLabel: { color: colors.muted, fontSize: 9, fontWeight: '900', letterSpacing: 1, marginTop: 4 },
+  profileTabsScroll: { marginBottom: spacing.xl },
+  profileTabs: { gap: 8 },
+  profileTab: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: radii.pill, paddingHorizontal: 14, paddingVertical: 10 },
+  profileTabActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  profileTabText: { color: colors.muted, fontSize: 11, fontWeight: '900' },
+  profileTabTextActive: { color: colors.background },
   sectionTitle: { color: colors.ink, fontSize: 20, fontWeight: '900', marginBottom: spacing.md },
   menu: { backgroundColor: colors.surface, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: spacing.md },
