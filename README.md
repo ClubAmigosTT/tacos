@@ -122,6 +122,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 88. Mapa web geográfico: los pins usan coordenadas de sucursal y no cambian de colonia cuando cambia el orden del ranking.
 89. Fichas resilientes: un ID de sucursal inválido deja de cargar indefinidamente y ofrece volver al mapa.
 90. Consultas inteligentes: los 4xx no se reintentan; sólo se repiten una vez fallos de red o errores 5xx recuperables.
+91. Directorio claro: buscar personas requiere token y una sesión anónima recibe una invitación a entrar, no un falso “sin resultados”.
 78. Cierre del registro: guardar una visita invalida diario, feed, recomendaciones, mapa y ficha, y el CTA vuelve al mapa sin duplicar la pantalla de formulario.
 
 ## Verificación
