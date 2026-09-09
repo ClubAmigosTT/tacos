@@ -13,7 +13,7 @@ export default function ListsScreen() {
   const { token, user, loading: authLoading } = useAuth();
   const { placeId } = useLocalSearchParams<{ placeId?: string }>();
   const queryClient = useQueryClient();
-  const { data, isError, refetch } = useQuery({ queryKey: ['lists', token], queryFn: () => listsRequest(token), enabled: true });
+  const { data, isError, refetch } = useQuery({ queryKey: ['lists', token], queryFn: () => listsRequest(token), enabled: !authLoading });
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');

@@ -18,18 +18,18 @@ const profileTabs = [
 ] as const;
 
 export default function ProfileScreen() {
-  const { user, token, loading, signOut } = useAuth();
+  const { user, token, loading: authLoading, signOut } = useAuth();
   useEffect(() => { void trackEvent('profile_open', {}, token); }, [token]);
-  const { data, isError: diaryError, refetch: refetchDiary } = useQuery({ queryKey: ['diary', 'profile', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
-  const { data: listData, isError: listsError, refetch: refetchLists } = useQuery({ queryKey: ['lists', 'profile', token], queryFn: () => listsRequest(token), enabled: true });
-  const { data: tasteData, isError: tasteError, refetch: refetchTaste } = useQuery({ queryKey: ['taste', token], queryFn: () => tasteRequest(token!), enabled: Boolean(token) });
+  const { data, isError: diaryError, refetch: refetchDiary } = useQuery({ queryKey: ['diary', 'profile', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token && !authLoading) });
+  const { data: listData, isError: listsError, refetch: refetchLists } = useQuery({ queryKey: ['lists', 'profile', token], queryFn: () => listsRequest(token), enabled: Boolean(token && !authLoading) });
+  const { data: tasteData, isError: tasteError, refetch: refetchTaste } = useQuery({ queryKey: ['taste', token], queryFn: () => tasteRequest(token!), enabled: Boolean(token && !authLoading) });
   const entries = data?.entries ?? [];
   const visits = user ? entries.length : 17;
   const average = user ? (entries.length ? (entries.reduce((sum, entry) => sum + Number(entry.rating), 0) / entries.length).toFixed(2) : '—') : '4.21';
   const listCount = user ? (listData?.lists.filter((list) => list.owner.id === user.id).length ?? 0) : 12;
   const exploredZones = user ? new Set(entries.map((entry) => entry.neighborhood).filter(Boolean)).size : 3;
   const tasteId = tasteData?.taste;
-  if (loading) return <View style={styles.loading}><Text style={styles.loadingText}>Cargando tu perfil…</Text></View>;
+  if (authLoading) return <View style={styles.loading}><Text style={styles.loadingText}>Cargando tu perfil…</Text></View>;
   if (user && (diaryError || listsError || tasteError)) return <AsyncErrorState title="No pudimos cargar tu perfil" detail="Tu diario y tus listas siguen guardados. Comprueba la conexión e inténtalo de nuevo." onAction={() => { void refetchDiary(); void refetchLists(); void refetchTaste(); }} />;
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
