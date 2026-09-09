@@ -105,6 +105,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 12. Permitir eliminar una visita propia con confirmación y limpiar sus señales derivadas sin afectar entradas ajenas.
 13. Proponer la sucursal más cercana después de usar la cámara, manteniendo la selección explícita del usuario hasta confirmar.
 14. Mantener la sucursal elegida al entrar al registro desde una ficha, aunque la consulta de cercanía se actualice después.
+15. Diferenciar una falla temporal del API de un diario vacío en Diario, Reviews, Estadísticas, Passport y Wrapped, con reintento explícito.
 
 **Aceptación:** una visita aparece en diario, feed y estadísticas; una foto inválida no se persiste; una falla de media permite guardar sin foto; una edición propia persiste y una edición ajena responde 404.
 
@@ -117,6 +118,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 5. Mostrar notas de visitas en el feed y llevar al perfil desde avatar/nombre.
 6. Exponer desde el Perfil una lectura de estadísticas basada en visitas reales: tacos recurrentes, zonas, gasto, promedio y ritmo mensual.
 7. Separar en el Perfil las reviews (rating, taco y nota) del timeline del Diario, manteniendo edición sólo para el propietario.
+8. Ofrecer navegación rápida entre Diario, Reviews, Listas, Mapa y Estadísticas desde el Perfil.
 
 **Aceptación:** el smoke test confirma follow, unfollow, feed con nota, perfil público, exclusión de listas privadas y edición autorizada de listas.
 
