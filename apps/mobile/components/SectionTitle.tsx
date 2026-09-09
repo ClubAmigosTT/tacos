@@ -1,14 +1,14 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, spacing } from '@/theme';
 
-export function SectionTitle({ eyebrow, title, action }: { eyebrow?: string; title: string; action?: string }) {
+export function SectionTitle({ eyebrow, title, action, onAction }: { eyebrow?: string; title: string; action?: string; onAction?: () => void }) {
   return (
     <View style={styles.row}>
       <View>
         {eyebrow ? <Text style={styles.eyebrow}>{eyebrow.toUpperCase()}</Text> : null}
         <Text style={styles.title}>{title}</Text>
       </View>
-      {action ? <Text style={styles.action}>{action}</Text> : null}
+      {action ? onAction ? <Pressable accessibilityRole="button" accessibilityLabel={action.replace(/→/g, '').trim()} onPress={onAction} hitSlop={8}><Text style={styles.action}>{action}</Text></Pressable> : <Text style={styles.action}>{action}</Text> : null}
     </View>
   );
 }
