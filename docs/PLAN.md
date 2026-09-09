@@ -142,6 +142,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 18. Convertir el Taste ID del Perfil en una firma visual compacta, con barras de intensidad, picante, tradición, textura y valor calculadas desde el perfil real.
 19. Reutilizar la firma visual del Taste ID en perfiles públicos para mantener la misma lectura de gusto en todo el grafo social.
 20. Esperar la restauración de sesión antes de consultar Perfil y Listas, diferenciando el catálogo público del estado privado autenticado.
+21. Compartir el componente visual de `MapPin` entre las implementaciones nativa y web para mantener consistente el rating contextual.
 
 **Aceptación:** el smoke test confirma follow, unfollow, feed con nota, perfil público, exclusión de listas privadas y edición autorizada de listas.
 

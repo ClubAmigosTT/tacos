@@ -180,6 +180,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 145. Taste ID legible de un vistazo: el Perfil transforma el vector de sabor real en una firma visual compacta de intensidad, picante, tradición, textura y valor.
 146. Taste ID consistente: la firma visual se comparte entre el perfil propio y los perfiles públicos mediante un componente reutilizable.
 147. Sesión sin carreras: Perfil y Listas esperan a restaurar la autenticación antes de consultar, evitando mezclar respuestas anónimas con datos privados.
+148. Pins consistentes: el rating contextual del mapa usa un `MapPin` compartido entre web, iOS y Android.
 
 ## Verificación
 
