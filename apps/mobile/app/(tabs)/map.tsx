@@ -11,7 +11,7 @@ import { RatingBadge } from '@/components/RatingBadge';
 import { MapCanvas } from '@/components/MapCanvas';
 import { AsyncErrorState } from '@/components/AsyncErrorState';
 import { useAuth } from '@/lib/auth';
-import { applyRadar, radarDistances, radarHunger, radarMoods, radarPrices, type RadarDistance, type RadarHunger, type RadarMood, type RadarPrice } from '@/lib/radar';
+import { applyRadar, normalizeRadarText, radarDistances, radarHunger, radarMoods, radarPrices, type RadarDistance, type RadarHunger, type RadarMood, type RadarPrice } from '@/lib/radar';
 const filters = ['Pastor', 'Abierto ahora', 'Barato', '92% para mí'];
 const defaultMapCenter = { latitude: 19.402, longitude: -99.163 };
 
@@ -60,11 +60,11 @@ export default function MapScreen() {
   // appear while an authenticated catalog query is still in flight.
   const discoveryPlaces = token ? (data ?? []) : (data ?? places);
   const requestedTaco = useMemo(() => {
-    const normalized = searchQuery.trim().toLowerCase();
+    const normalized = normalizeRadarText(searchQuery.trim());
     if (normalized.length < 3) return undefined;
     const tacoNames = [...new Set(discoveryPlaces.flatMap((place) => place.tacos.map((taco) => taco.name)))];
-    return tacoNames.find((name) => normalized.includes(name.toLowerCase()))
-      ?? tacoNames.find((name) => name.toLowerCase().includes(normalized));
+    return tacoNames.find((name) => normalized.includes(normalizeRadarText(name)))
+      ?? tacoNames.find((name) => normalizeRadarText(name).includes(normalized));
   }, [discoveryPlaces, searchQuery]);
   const hasFreeTextSearch = searchQuery.trim().length > 0;
   // "Pastor" is the visual default for an empty map, not a hidden query

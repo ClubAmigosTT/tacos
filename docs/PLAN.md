@@ -145,6 +145,8 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 21. Compartir el componente visual de `MapPin` entre las implementaciones nativa y web para mantener consistente el rating contextual.
 22. Comunicar fallos de seguimiento en el perfil público con estado accesible y reintento directo.
 23. Bloquear consultas privadas hasta completar la restauración de sesión en las rutas de Diario, Social, Passport, Wrapped, Radar, Privacidad, Comentarios y edición.
+24. Normalizar acentos en la detección y filtrado contextual del Radar, con una prueba que confirme la exclusión de sucursales sin el taco solicitado.
+25. Mantener el motor del Radar ejecutable en Node para que CI pruebe la misma implementación que consume Expo.
 
 **Aceptación:** el smoke test confirma follow, unfollow, feed con nota, perfil público, exclusión de listas privadas y edición autorizada de listas.
 

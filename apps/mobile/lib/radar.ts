@@ -1,5 +1,5 @@
 import type { Place } from '@/data/fixtures';
-import { isOpenNow } from '@/lib/hours';
+import { isOpenNow } from './hours.ts';
 
 export const radarDistances = ['Cerca', 'En la zona', 'Toda la ciudad'] as const;
 export const radarPrices = ['Barato', 'Medio', 'Cualquier precio'] as const;
@@ -26,6 +26,10 @@ function distanceKm(distance: string) {
   return Number.isFinite(value) ? value : Number.POSITIVE_INFINITY;
 }
 
+export function normalizeRadarText(value: string) {
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 function lowestPrice(place: Place) {
   return Math.min(...place.tacos.map((taco) => taco.price), Number.POSITIVE_INFINITY);
 }
@@ -37,7 +41,7 @@ function lowestPrice(place: Place) {
  */
 export function applyRadar({ places, active, contextualTaco, distance, price, mood, hunger }: RadarOptions) {
   const tacoFiltered = contextualTaco
-    ? places.filter((place) => place.tacos.some((taco) => taco.name.toLowerCase() === contextualTaco.toLowerCase()))
+    ? places.filter((place) => place.tacos.some((taco) => normalizeRadarText(taco.name) === normalizeRadarText(contextualTaco)))
     : places;
   const source = [...tacoFiltered];
   const distanceLimit = distance === 'Cerca' ? 2 : distance === 'En la zona' ? 5 : Number.POSITIVE_INFINITY;
@@ -74,8 +78,8 @@ export function applyRadar({ places, active, contextualTaco, distance, price, mo
   if (active === 'Barato') return moodFiltered.sort((a, b) => (lowestPrice(a) - lowestPrice(b)) || contextualSort(a, b));
   if (active === '92% para mí') return moodFiltered.sort((a, b) => (b.match - a.match) || contextualSort(a, b));
   if (active === 'Pastor') return moodFiltered.sort((a, b) => {
-    const aRating = a.tacos.find((taco) => taco.name.toLowerCase() === contextualTaco?.toLowerCase())?.rating ?? a.rating;
-    const bRating = b.tacos.find((taco) => taco.name.toLowerCase() === contextualTaco?.toLowerCase())?.rating ?? b.rating;
+    const aRating = a.tacos.find((taco) => contextualTaco && normalizeRadarText(taco.name) === normalizeRadarText(contextualTaco))?.rating ?? a.rating;
+    const bRating = b.tacos.find((taco) => contextualTaco && normalizeRadarText(taco.name) === normalizeRadarText(contextualTaco))?.rating ?? b.rating;
     return (bRating - aRating) || contextualSort(a, b);
   });
   if (active === 'Abierto ahora') return moodFiltered.filter((place) => isOpenNow(place.openUntil)).sort(contextualSort);

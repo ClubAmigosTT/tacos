@@ -183,6 +183,8 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 148. Pins consistentes: el rating contextual del mapa usa un `MapPin` compartido entre web, iOS y Android.
 149. Seguimiento recuperable: el perfil público anuncia errores de Seguir/Dejar de seguir y mantiene la acción lista para reintentar.
 150. Consultas privadas sincronizadas: Diario, Reviews, Estadísticas, Passport, Wrapped, Radar, Comentarios, Personas, Privacidad y edición de listas esperan a que termine la restauración de sesión, incluidos el Diario principal y los detalles del radar.
+151. Radar con acentos: la búsqueda contextual normaliza diacríticos y excluye sucursales que no ofrecen el taco solicitado; el smoke lo protege en CI.
+152. Radar testeable fuera de Expo: el módulo usa imports ESM explícitos y el smoke ejecuta la misma lógica sin depender del alias del bundler.
 
 ## Verificación
 

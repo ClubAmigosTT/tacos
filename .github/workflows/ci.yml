@@ -56,6 +56,9 @@ jobs:
       - name: Hours filter smoke test
         run: pnpm smoke:hours
 
+      - name: Radar filter smoke test
+        run: pnpm smoke:radar
+
       - name: Input validation smoke test
         run: pnpm smoke:inputs
 
