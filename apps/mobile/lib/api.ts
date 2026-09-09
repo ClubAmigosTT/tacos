@@ -214,8 +214,9 @@ export async function diary(token: string) {
 }
 
 export async function lists(token?: string) {
+  if (token) return request<{ lists: ApiList[] }>('/v1/lists', undefined, token);
   try {
-    return await request<{ lists: ApiList[] }>('/v1/lists', undefined, token);
+    return await request<{ lists: ApiList[] }>('/v1/lists');
   } catch {
     return { lists: [] as ApiList[] };
   }
@@ -250,11 +251,7 @@ export async function removeListItem(listId: string, branchId: string, token: st
 }
 
 export async function searchUsers(query: string, token?: string) {
-  try {
-    return await request<{ users: AuthUser[] }>(`/v1/users/search?q=${encodeURIComponent(query)}`, undefined, token);
-  } catch {
-    return { users: [] as AuthUser[] };
-  }
+  return request<{ users: AuthUser[] }>(`/v1/users/search?q=${encodeURIComponent(query)}`, undefined, token);
 }
 
 export async function userProfile(userId: string, token?: string) {
