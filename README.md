@@ -139,7 +139,7 @@ pnpm smoke:api # requiere la API activa en http://127.0.0.1:4000
 pnpm smoke:admin # requiere la API activa con ADMIN_EMAILS=admin-smoke@example.com
 ```
 
-Cada push y pull request a `main` o `master` ejecuta estos checks en GitHub Actions (`.github/workflows/ci.yml`). Render sólo debería desplegar commits que pasen esta verificación.
+Cada push y pull request a `main` o `master` ejecuta estos checks en GitHub Actions (`.github/workflows/ci.yml`). Los cambios en `render.yaml` además pasan la validación oficial de Blueprint en `.github/workflows/render-blueprint.yml`. Render sólo debería desplegar commits que pasen esta verificación.
 
 ## Deploy
 

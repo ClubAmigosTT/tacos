@@ -1,0 +1,40 @@
+name: Validate Render Blueprint
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - render.yaml
+      - .github/workflows/render-blueprint.yml
+  pull_request:
+    paths:
+      - render.yaml
+      - .github/workflows/render-blueprint.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      RENDER_CLI_VERSION: v2.7.0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Render CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${RENDER_CLI_VERSION#v}"
+          curl -sSfL "https://github.com/render-oss/cli/releases/download/${RENDER_CLI_VERSION}/cli_${version}_linux_amd64.zip" -o /tmp/render.zip
+          mkdir -p /tmp/render
+          unzip -q /tmp/render.zip -d /tmp/render
+          sudo mv "/tmp/render/cli_${RENDER_CLI_VERSION}" /usr/local/bin/render
+          sudo chmod +x /usr/local/bin/render
+          render --version
+
+      - name: Validate Blueprint
+        run: render blueprints validate render.yaml
