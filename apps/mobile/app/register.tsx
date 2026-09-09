@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -132,8 +132,20 @@ export default function RegisterScreen() {
     setSaving(true);
     setError('');
     try {
-      const uploaded = photo ? await uploadImage({ base64: photo.base64, contentType: photo.contentType }, token) : undefined;
-      await createVisit({ placeId, tacoIds, rating, tacoRatings, price: parsedPrice ?? undefined, note: note.trim() || undefined, photoUrl: uploaded?.url, latitude: coordinates?.latitude, longitude: coordinates?.longitude }, token);
+      let photoUrl: string | undefined;
+      let photoUploadFailed = false;
+      if (photo) {
+        try {
+          const uploaded = await uploadImage({ base64: photo.base64, contentType: photo.contentType }, token);
+          photoUrl = uploaded.url;
+        } catch {
+          // Media is best-effort: a storage outage must not discard the
+          // visit and its ratings when the photo is optional.
+          photoUploadFailed = true;
+        }
+      }
+      await createVisit({ placeId, tacoIds, rating, tacoRatings, price: parsedPrice ?? undefined, note: note.trim() || undefined, photoUrl, latitude: coordinates?.latitude, longitude: coordinates?.longitude }, token);
+      if (photoUploadFailed) Alert.alert('Visita guardada', 'La foto no pudo guardarse, pero la visita sí quedó registrada sin imagen.');
       void trackEvent('visit_saved', { place_id: placeId }, token);
       void queryClient.invalidateQueries({ queryKey: ['diary'] });
       void queryClient.invalidateQueries({ queryKey: ['feed'] });
@@ -144,7 +156,7 @@ export default function RegisterScreen() {
       void queryClient.invalidateQueries({ queryKey: ['taste'] });
       setSaved(true);
     } catch {
-      setError(photo ? 'No pudimos subir la foto. Revisa la conexión o quítala para guardar la visita sin imagen.' : 'No pudimos guardar la visita. Revisa tu conexión e inténtalo de nuevo.');
+      setError('No pudimos guardar la visita. Revisa tu conexión e inténtalo de nuevo.');
     } finally {
       setSaving(false);
     }
