@@ -3,23 +3,25 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { followUser, unfollowUser, userProfile } from '@/lib/api';
+import { ApiError, followUser, unfollowUser, userProfile } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
+import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { token, user } = useAuth();
   const queryClient = useQueryClient();
   const [following, setFollowing] = useState(false);
-  const { data: profile, isLoading, isError } = useQuery({ queryKey: ['user-profile', id, token], queryFn: () => userProfile(id, token), enabled: Boolean(id) });
+  const { data: profile, isLoading, isError, error, refetch } = useQuery({ queryKey: ['user-profile', id, token], queryFn: () => userProfile(id, token), enabled: Boolean(id) });
   useEffect(() => { if (profile) setFollowing(Boolean(profile.user.following)); }, [profile]);
   const followMutation = useMutation({
     mutationFn: () => following ? unfollowUser(id, token!) : followUser(id, token!),
     onSuccess: () => { setFollowing((value) => !value); void queryClient.invalidateQueries({ queryKey: ['user-profile', id] }); void queryClient.invalidateQueries({ queryKey: ['people'] }); void queryClient.invalidateQueries({ queryKey: ['feed'] }); void queryClient.invalidateQueries({ queryKey: ['recommendations'] }); }
   });
   if (isLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando perfil…</Text></View>;
-  if (isError || !profile) return <View style={styles.center}><Text style={styles.title}>Perfil no disponible</Text><Text style={styles.muted}>Puede que esta cuenta ya no esté activa.</Text><Pressable style={styles.backButton} onPress={() => router.back()}><Text style={styles.backText}>Volver</Text></Pressable></View>;
+  if (isError && !(error instanceof ApiError && error.status === 404)) return <AsyncErrorState title="No pudimos cargar el perfil" detail="La cuenta no se modificó. Revisa la conexión e inténtalo de nuevo." onAction={() => void refetch()} />;
+  if (!profile) return <View style={styles.center}><Text style={styles.title}>Perfil no disponible</Text><Text style={styles.muted}>Puede que esta cuenta ya no esté activa.</Text><Pressable style={styles.backButton} onPress={() => router.back()}><Text style={styles.backText}>Volver</Text></Pressable></View>;
   const average = profile.stats.averageRating == null ? '—' : profile.stats.averageRating.toFixed(2);
   return <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
     <View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable><Text style={styles.eyebrow}>IDENTIDAD GASTRONÓMICA</Text><Ionicons name="person-circle-outline" size={22} color={colors.accent} /></View>

@@ -7,12 +7,13 @@ import { deleteVisit, diary, trackEvent, updateVisit } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 import { parseOptionalPrice } from '@/lib/validation';
+import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 export default function VisitEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { token, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
-  const { data, isLoading, isError } = useQuery({ queryKey: ['diary', token], queryFn: () => diary(token!), enabled: Boolean(token && id) });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['diary', token], queryFn: () => diary(token!), enabled: Boolean(token && id) });
   const entry = data?.entries.find((item) => item.id === id);
   const [rating, setRating] = useState(5);
   const [price, setPrice] = useState('');
@@ -37,7 +38,8 @@ export default function VisitEditScreen() {
   if (authLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando tu registro…</Text></View>;
   if (!token) return <View style={styles.center}><Text style={styles.title}>Entra para editar tu diario</Text><Text style={styles.muted}>Tus registros sólo se pueden cambiar desde tu cuenta.</Text><Pressable style={styles.secondary} onPress={() => router.push('/auth')}><Text style={styles.secondaryText}>Entrar</Text></Pressable></View>;
   if (isLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando registro…</Text></View>;
-  if (isError || !entry) return <View style={styles.center}><Text style={styles.title}>Registro no disponible</Text><Text style={styles.muted}>Puede que haya sido ocultado o eliminado.</Text><Pressable style={styles.secondary} onPress={() => router.back()}><Text style={styles.secondaryText}>Volver</Text></Pressable></View>;
+  if (isError) return <AsyncErrorState title="No pudimos cargar tu registro" detail="Tu diario sigue intacto. Revisa la conexión e inténtalo de nuevo." onAction={() => void refetch()} />;
+  if (!entry) return <View style={styles.center}><Text style={styles.title}>Registro no disponible</Text><Text style={styles.muted}>Puede que haya sido ocultado o eliminado.</Text><Pressable style={styles.secondary} onPress={() => router.back()}><Text style={styles.secondaryText}>Volver</Text></Pressable></View>;
 
   function confirmDelete() {
     Alert.alert('¿Eliminar visita?', 'Se quitará de tu diario y dejará de alimentar tus recomendaciones.', [

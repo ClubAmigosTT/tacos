@@ -155,6 +155,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 120. Radar sin escapes: “Para mí” queda deshabilitado cuando los filtros no encuentran lugares y nunca abre una sucursal fuera de la combinación elegida.
 121. Producción sin memoria accidental: la API y el hook de migraciones se niegan a ejecutarse en `NODE_ENV=production` si falta `DATABASE_URL`, evitando desplegar un Render efímero que pierda visitas al reiniciarse.
 122. Credenciales acotadas: registro y login rechazan contraseñas de más de 128 caracteres y correos mayores al límite práctico antes de ejecutar autenticación.
+123. Errores de recursos honestos: listas, perfiles, taquerías y edición distinguen un 404 real de una caída temporal y ofrecen reintento sin simular que el contenido fue borrado.
 
 ## Verificación
 

@@ -2,15 +2,17 @@ import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getTaqueria } from '@/lib/api';
+import { ApiError, getTaqueria } from '@/lib/api';
 import { colors, radii, spacing } from '@/theme';
 import { PlaceCard } from '@/components/PlaceCard';
+import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 export default function TaqueriaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: taqueria, isLoading, isError } = useQuery({ queryKey: ['taqueria', id], queryFn: () => getTaqueria(id), enabled: Boolean(id) });
+  const { data: taqueria, isLoading, isError, error, refetch } = useQuery({ queryKey: ['taqueria', id], queryFn: () => getTaqueria(id), enabled: Boolean(id) });
   if (isLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando taquería…</Text></View>;
-  if (isError || !taqueria) return <View style={styles.center}><Text style={styles.title}>Taquería no disponible</Text><Pressable style={styles.backButton} onPress={() => router.back()}><Text style={styles.backText}>Volver</Text></Pressable></View>;
+  if (isError && !(error instanceof ApiError && error.status === 404)) return <AsyncErrorState title="No pudimos cargar la taquería" detail="La información no se modificó. Revisa la conexión e inténtalo de nuevo." onAction={() => void refetch()} />;
+  if (!taqueria) return <View style={styles.center}><Text style={styles.title}>Taquería no disponible</Text><Pressable style={styles.backButton} onPress={() => router.back()}><Text style={styles.backText}>Volver</Text></Pressable></View>;
   return <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable><Text style={styles.eyebrow}>TAQUERÍA</Text><Ionicons name="restaurant-outline" size={20} color={colors.accent} /></View><Text style={styles.title}>{taqueria.name}</Text><Text style={styles.description}>{taqueria.description}</Text><View style={styles.meta}><Text style={styles.metaAccent}>{taqueria.branchCount} {taqueria.branchCount === 1 ? 'SUCURSAL' : 'SUCURSALES'}</Text><Text style={styles.muted}>misma casa, experiencias distintas</Text></View><Text style={styles.sectionTitle}>Sucursales</Text>{taqueria.branches.map((branch) => <View key={branch.id} style={styles.branch}><PlaceCard place={branch} compact /></View>)}</ScrollView>;
 }
 

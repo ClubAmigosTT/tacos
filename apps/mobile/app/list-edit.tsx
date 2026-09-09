@@ -3,15 +3,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { listDetails, updateList } from '@/lib/api';
+import { ApiError, listDetails, updateList } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
+import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 export default function ListEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { token, user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
-  const { data: list, isLoading, isError } = useQuery({ queryKey: ['list', id, token], queryFn: () => listDetails(id, token), enabled: Boolean(id && token) });
+  const { data: list, isLoading, isError, error, refetch } = useQuery({ queryKey: ['list', id, token], queryFn: () => listDetails(id, token), enabled: Boolean(id && token) });
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
@@ -21,7 +22,8 @@ export default function ListEditScreen() {
   });
   useEffect(() => { if (!list) return; setTitle(list.title); setDescription(list.description); setVisibility(list.visibility ?? 'public'); }, [list]);
   if (authLoading || isLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando lista…</Text></View>;
-  if (isError || !list || !token || list.owner.id !== user?.id) return <View style={styles.center}><Text style={styles.title}>No puedes editar esta lista</Text><Text style={styles.muted}>Sólo el propietario puede cambiar su curaduría.</Text><Pressable style={styles.secondary} onPress={() => router.back()}><Text style={styles.secondaryText}>Volver</Text></Pressable></View>;
+  if (isError && !(error instanceof ApiError && error.status === 404)) return <AsyncErrorState title="No pudimos cargar la lista" detail="La curaduría no se modificó. Revisa la conexión e inténtalo de nuevo." onAction={() => void refetch()} />;
+  if (!list || !token || list.owner.id !== user?.id) return <View style={styles.center}><Text style={styles.title}>No puedes editar esta lista</Text><Text style={styles.muted}>Sólo el propietario puede cambiar su curaduría.</Text><Pressable style={styles.secondary} onPress={() => router.back()}><Text style={styles.secondaryText}>Volver</Text></Pressable></View>;
   return <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"><View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable><View><Text style={styles.eyebrow}>CURADURÍA PERSONAL</Text><Text style={styles.headerTitle}>Editar lista</Text></View><Ionicons name="create-outline" size={21} color={colors.accent} /></View><Text style={styles.label}>TÍTULO</Text><TextInput value={title} onChangeText={setTitle} style={styles.input} maxLength={80} placeholder="Nombre de la lista" placeholderTextColor={colors.dim} /><Text style={styles.label}>DESCRIPCIÓN</Text><TextInput value={description} onChangeText={setDescription} style={[styles.input, styles.descriptionInput]} maxLength={240} multiline placeholder="Qué hace especial esta selección" placeholderTextColor={colors.dim} /><Text style={styles.label}>VISIBILIDAD</Text><View style={styles.options}><Pressable onPress={() => setVisibility('public')} style={[styles.option, visibility === 'public' && styles.optionActive]}><Ionicons name="globe-outline" size={15} color={visibility === 'public' ? colors.background : colors.muted} /><Text style={[styles.optionText, visibility === 'public' && styles.optionTextActive]}>Pública</Text></Pressable><Pressable onPress={() => setVisibility('private')} style={[styles.option, visibility === 'private' && styles.optionActive]}><Ionicons name="lock-closed-outline" size={15} color={visibility === 'private' ? colors.background : colors.muted} /><Text style={[styles.optionText, visibility === 'private' && styles.optionTextActive]}>Privada</Text></Pressable></View>{mutation.isError ? <Text style={styles.error}>No pudimos actualizar la lista.</Text> : null}<Pressable style={[styles.primary, (!title.trim() || mutation.isPending) && styles.disabled]} disabled={!title.trim() || mutation.isPending} onPress={() => mutation.mutate()}><Text style={styles.primaryText}>{mutation.isPending ? 'Guardando…' : 'Guardar cambios'}</Text><Ionicons name="checkmark" size={18} color={colors.background} /></Pressable></ScrollView>;
 }
 

@@ -155,6 +155,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 18. Mantener la recomendación contextual dentro del conjunto filtrado del Radar, incluyendo un estado sin resultados sin fallback silencioso.
 19. Fallar explícitamente si la API o el migrador se ejecutan en producción sin `DATABASE_URL`, conservando el repositorio en memoria sólo para desarrollo y smoke local.
 20. Limitar email y contraseña en los esquemas de autenticación antes de ejecutar bcrypt, con una regresión en el smoke del API.
+21. Separar 404 de fallas transitorias en detalle de listas, perfiles, taquerías y edición, usando un reintento explícito sólo cuando la red o el API fallan.
 
 **Aceptación:** un reporte aparece en `/v1/admin/reports`, un admin puede ocultarlo, el feed deja de mostrarlo, el perfil público no lo cuenta y `pnpm smoke:admin` confirma que no contamina recomendaciones.
 
