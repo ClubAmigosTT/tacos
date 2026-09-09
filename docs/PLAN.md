@@ -135,6 +135,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 12. Mantener el Perfil autenticado consistente cuando fallan en conjunto sus consultas de Diario, Listas o Taste ID, con un reintento coordinado.
 13. Evitar que Inicio sustituya recomendaciones autenticadas por fixtures cuando el API falla; mostrar un estado de error recuperable y conservar el fallback local sólo para visitantes anónimos.
 14. Diferenciar en Inicio un feed autenticado vacío de una falla temporal y ofrecer reintento en la tarjeta de Actividad.
+15. Alimentar la tarjeta editorial de Inicio desde listas públicas reales, sin filtrar listas privadas ni reemplazar una falla autenticada por contenido demo.
 
 **Aceptación:** el smoke test confirma follow, unfollow, feed con nota, perfil público, exclusión de listas privadas y edición autorizada de listas.
 

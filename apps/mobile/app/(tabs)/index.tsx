@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { Link, router } from 'expo-router';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { feed as feedRequest, recommendations } from '@/lib/api';
+import { lists as fixtureLists } from '@/data/fixtures';
+import { feed as feedRequest, lists as listsRequest, recommendations } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 import { PlaceCard } from '@/components/PlaceCard';
@@ -16,12 +17,15 @@ export default function HomeScreen() {
   const [search, setSearch] = useState('');
   const { data = [], isError: recommendationsError, refetch: refetchRecommendations } = useQuery({ queryKey: ['recommendations', token], queryFn: () => recommendations(token) });
   const { data: feedData, isError: feedError, refetch: refetchFeed } = useQuery({ queryKey: ['feed', 'home', token], queryFn: () => feedRequest(token!), enabled: Boolean(token), staleTime: 60_000 });
+  const { data: listData, isError: listsError, refetch: refetchLists } = useQuery({ queryKey: ['lists', 'home', token], queryFn: () => listsRequest(token), enabled: true, staleTime: 60_000 });
   const featured = data[0];
   const featuredTaco = featured?.tacos.reduce((best, taco) => taco.rating > (best?.rating ?? 0) ? taco : best, featured.tacos[0]);
   const hour = new Date().getHours();
   const moment = hour >= 22 || hour < 4 ? 'DE MADRUGADA' : hour < 12 ? 'PARA DESAYUNAR' : 'AHORA';
   const activityItems = feedData?.items ?? [];
   const activityNeighborhoods = [...new Set(activityItems.map((item) => item.neighborhood).filter(Boolean))].slice(0, 2).join(' / ');
+  const homeList = listData?.lists.find((list) => list.visibility !== 'private') ?? (!token ? fixtureLists[0] : undefined);
+  const listOwner = homeList?.owner.displayName ? `Por @${homeList.owner.displayName.toLowerCase().replace(/\s+/g, '')}` : 'Curaduría de la comunidad';
 
   function submitSearch() {
     const query = search.trim();
@@ -64,7 +68,7 @@ export default function HomeScreen() {
 
       <View style={styles.section}><SectionTitle eyebrow="actividad" title="Lo que está pasando" />{token && feedError ? <View style={styles.activityError}><View style={styles.activityErrorIcon}><Ionicons name="cloud-offline-outline" size={17} color={colors.background} /></View><View style={styles.activityCopy}><Text style={styles.activityTitle}>No pudimos cargar tu actividad</Text><Text style={styles.activityMeta}>Tus conexiones siguen intactas.</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Reintentar actividad" style={styles.activityRetry} onPress={() => void refetchFeed()}><Text style={styles.activityRetryText}>Reintentar</Text></Pressable></View> : <Pressable style={styles.activity} onPress={() => router.push('/feed')}><View style={styles.activityAvatars}>{token && activityItems.length ? activityItems.slice(0, 3).map((item, index) => <View key={`${item.user_id}-${index}`} style={[styles.miniAvatar, { backgroundColor: ['#DF7E54', '#728BC1', '#C08A54'][index] }]}><Text>{item.display_name.slice(0, 1).toUpperCase()}</Text></View>) : <><View style={[styles.miniAvatar, { backgroundColor: '#DF7E54' }]}><Text>J</Text></View><View style={[styles.miniAvatar, { backgroundColor: '#728BC1' }]}><Text>A</Text></View><View style={[styles.miniAvatar, { backgroundColor: '#C08A54' }]}><Text>R</Text></View></>}</View><View style={styles.activityCopy}><Text style={styles.activityTitle}>{token ? (activityItems.length ? 'Tu círculo está comiendo' : 'Encuentra gente con criterio') : 'Tus amigos están comiendo'}</Text><Text style={styles.activityMeta}>{token ? (activityItems.length ? `${activityItems.length} registros nuevos${activityNeighborhoods ? ` · ${activityNeighborhoods}` : ''}` : 'Sigue personas para llenar tu mapa social') : '3 registros nuevos · Roma / Narvarte'}</Text></View><Ionicons name="arrow-forward" size={17} color={colors.muted} /></Pressable>}</View>
 
-      <View style={styles.section}><SectionTitle eyebrow="selección editorial" title="Listas para esta noche" /><Pressable style={styles.listCard} onPress={() => router.push('/lists')}><View style={styles.listNumber}><Text style={styles.listNumberText}>07</Text><Text style={styles.listNumberLabel}>LUGARES</Text></View><View style={styles.listCopy}><Text style={styles.listTitle}>Pastor después de medianoche</Text><Text style={styles.listMeta}>Por @comelocal · 4.72 promedio</Text></View><Ionicons name="chevron-forward" size={19} color={colors.muted} /></Pressable></View>
+      <View style={styles.section}><SectionTitle eyebrow="selección editorial" title="Listas para esta noche" />{token && listsError ? <View style={styles.listError}><View style={styles.listErrorIcon}><Ionicons name="cloud-offline-outline" size={17} color={colors.background} /></View><View style={styles.listCopy}><Text style={styles.listTitle}>No pudimos cargar las listas</Text><Text style={styles.listMeta}>La curaduría sigue intacta.</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Reintentar listas" style={styles.listRetry} onPress={() => void refetchLists()}><Text style={styles.listRetryText}>Reintentar</Text></Pressable></View> : <Pressable style={styles.listCard} onPress={() => router.push('/lists')}><View style={styles.listNumber}><Text style={styles.listNumberText}>{homeList ? String(homeList.itemCount).padStart(2, '0') : '—'}</Text><Text style={styles.listNumberLabel}>LUGARES</Text></View><View style={styles.listCopy}><Text style={styles.listTitle}>{homeList?.title ?? 'Descubre las listas de la comunidad'}</Text><Text style={styles.listMeta}>{homeList ? `${listOwner} · ${homeList.visitedCount}/${homeList.itemCount} visitados` : 'Crea una selección para volver a ella.'}</Text></View><Ionicons name="chevron-forward" size={19} color={colors.muted} /></Pressable>}</View>
     </ScrollView>
   );
 }
@@ -111,5 +115,9 @@ const styles = StyleSheet.create({
   listNumberLabel: { color: colors.background, fontSize: 7, fontWeight: '900', letterSpacing: 0.8 },
   listCopy: { flex: 1 },
   listTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
-  listMeta: { color: colors.muted, fontSize: 11, marginTop: 5 }
+  listMeta: { color: colors.muted, fontSize: 11, marginTop: 5 },
+  listError: { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: colors.surface, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
+  listErrorIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.warm, alignItems: 'center', justifyContent: 'center' },
+  listRetry: { borderRadius: radii.pill, backgroundColor: colors.accent, paddingHorizontal: 11, paddingVertical: 8 },
+  listRetryText: { color: colors.background, fontSize: 10, fontWeight: '900' }
 });
