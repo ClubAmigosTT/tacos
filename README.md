@@ -151,6 +151,8 @@ Cada push y pull request a `main` o `master` ejecuta estos checks en GitHub Acti
 4. El `JWT_SECRET` se genera automáticamente; configura `STORAGE_BUCKET_URL`, `S3_BUCKET`, `S3_ACCESS_KEY_ID` y `S3_SECRET_ACCESS_KEY` para activar las fotos. `S3_ENDPOINT` permite usar R2, MinIO u otro proveedor compatible.
 5. Comprueba `https://<tu-api>.onrender.com/health`.
 
+Para que CI ejecute además la validación remota del Blueprint, añade los secretos `RENDER_API_KEY` y `RENDER_WORKSPACE_ID` en GitHub. Sin ellos, el workflow mantiene la validación de sintaxis local y no intenta autenticarse.
+
 Después de aplicar la migración `009_admin_roles.sql`, puedes promover una cuenta existente desde la consola SQL de Render con `UPDATE users SET role = 'admin' WHERE email_lower = 'tu-correo@example.com';`. Para el primer registro también puedes definir `ADMIN_EMAILS` antes de crear la cuenta.
 
 El servicio ejecuta las migraciones antes de cada deploy mediante `preDeployCommand`; no hay que conectarse a esta computadora para mantenerlo activo.
