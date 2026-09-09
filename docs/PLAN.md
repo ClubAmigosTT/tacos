@@ -116,6 +116,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 19. Persistir un perfil mínimo junto al token y conservarlo durante fallas transitorias del API; limpiar ambos sólo ante una sesión rechazada.
 20. Validar el precio opcional en cliente con formato MXN y límites idénticos al API antes de guardar o editar una visita.
 21. Tratar la subida de foto como best-effort: si el bucket no está disponible, conservar la visita y sus ratings sin imagen y comunicar la degradación.
+22. Cargar “Quiero ir” de forma parcial: distinguir sucursales eliminadas de fallas transitorias, mantener los guardados válidos y ofrecer actualización explícita.
 
 **Aceptación:** una visita aparece en diario, feed y estadísticas; una foto inválida no se persiste; una falla de media permite guardar sin foto; una edición propia persiste y una edición ajena responde 404.
 
