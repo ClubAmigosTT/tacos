@@ -65,9 +65,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     let cachedProfileLoaded = false;
+    let persistedToken: string | null = null;
     void (async () => {
       try {
         const [saved, cachedUser] = await Promise.all([readToken(), readUser()]);
+        persistedToken = saved;
         if (!saved) return;
         cachedProfileLoaded = Boolean(cachedUser);
         if (active) { setToken(saved); if (cachedUser) setUser(cachedUser); }
@@ -82,9 +84,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try { await writeToken(null); await writeUser(null); } catch { /* storage can be unavailable */ }
           if (active) { setToken(undefined); setUser(undefined); }
         } else if (active && !cachedProfileLoaded) {
-          // Without a cached profile, avoid rendering private screens with an
-          // unresolved user while keeping the token for the next launch.
-          setToken(undefined);
+          // Keep the token in memory too. Private queries can surface their
+          // own recoverable error state while the API is unavailable; dropping
+          // it here would make a valid session look signed out until restart.
+          setToken(persistedToken ?? undefined);
         }
       } finally {
         if (active) setLoading(false);
