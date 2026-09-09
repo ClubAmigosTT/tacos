@@ -1,9 +1,10 @@
 name: Tacos CI
 
 on:
-  push:
-    branches: [main, master]
-  pull_request:
+  # Keep the verification suite available without consuming the private
+  # repository's free Actions allowance on every push. Re-enable push/PR
+  # triggers when the monthly allowance resets if desired.
+  workflow_dispatch:
 
 concurrency:
   group: tacos-ci-${{ github.ref }}

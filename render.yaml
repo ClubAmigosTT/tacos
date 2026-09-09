@@ -26,7 +26,10 @@ services:
     # Free web services do not support Render's paid-only preDeployCommand.
     # Run idempotent migrations before starting the API instead.
     startCommand: pnpm --filter @tacos/api migrate && pnpm --filter @tacos/api start
-    autoDeployTrigger: checksPass
+    # GitHub-hosted Actions for this private repository share the account's
+    # monthly allowance. Deploy directly from each commit so production does
+    # not stop when that free allowance is exhausted.
+    autoDeployTrigger: commit
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
@@ -34,9 +37,10 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        fromDatabase:
-          name: tacos-postgres
-          property: connectionString
+        # Use the persistent Supabase PostgreSQL/PostGIS connection string.
+        # Keeping the database outside Render avoids the 30-day lifetime of
+        # Render's free PostgreSQL instances.
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: ADMIN_EMAILS
@@ -91,9 +95,3 @@ services:
         sync: false
       - key: ALLOW_DEMO_CATALOG
         value: "false"
-databases:
-  - name: tacos-postgres
-    region: ohio
-    # Free Postgres is temporary (30 days), 1 GB, and has no backups.
-    plan: free
-    postgresMajorVersion: "18"

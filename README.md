@@ -9,7 +9,8 @@ El repositorio ya contiene un MVP ejecutable para iOS, Android y web: mapa conte
 - `apps/mobile`: Expo Router + React Native (iOS/Android/web), con un sistema visual compartido.
 - `services/api`: Fastify + TypeScript, autenticación JWT, búsqueda y visitas.
 - `database/migrations`: PostgreSQL + PostGIS, con datos iniciales y usuarios.
-- `render.yaml`: Blueprint gratuito de API web y PostgreSQL para el MVP. Los
+- `render.yaml`: Blueprint gratuito de frontend estático y API web en Render,
+  conectado a PostgreSQL/PostGIS persistente de Supabase. Los
   trabajos de mantenimiento se ejecutan manualmente o desde GitHub Actions;
   no se crean workers, cron ni Redis en Render.
 - `render.free-demo.yaml`: Blueprint aislado para una demo gratuita sin
@@ -97,7 +98,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 57. Reputación robusta: el score combina prior bayesiano, recencia con vida media de 180 días, dispersión y un límite de influencia por revisor; la ficha muestra el volumen de reseñas visibles.
 58. Índices de reputación: las consultas por sucursal y taco tienen índices parciales sobre visitas visibles y ratings de menú para sostener el crecimiento del diario en PostgreSQL.
 59. Migraciones seguras en Render: el pre-deploy usa un cliente dedicado y un lock advisory para impedir carreras entre deploys y garantizar transacciones reales por archivo.
-60. Deploy protegido: los servicios de Render esperan los checks de GitHub Actions antes de auto-desplegar (`autoDeployTrigger: checksPass`).
+60. Deploy gratuito: Render publica cada commit directamente (`autoDeployTrigger: commit`) para que el repositorio privado no dependa de minutos adicionales de GitHub Actions.
 61. Releases móviles reproducibles: cada perfil EAS fija su entorno y las actualizaciones OTA apuntan explícitamente a `production`.
 62. Paridad de fallback: sin `DATABASE_URL`, las visitas visibles también recalculan reputación, recencia, dispersión y volumen de reseñas para mantener el mismo comportamiento del MVP.
 63. Deep links compartibles: fichas, listas y Wrapped generan URLs `tacos://...` para abrir directamente el contenido compartido en la app.
@@ -213,7 +214,7 @@ pnpm smoke:api # requiere la API activa en http://127.0.0.1:4000
 pnpm smoke:admin # requiere la API activa con ADMIN_EMAILS=admin-smoke@example.com
 ```
 
-Cada push y pull request a `main` o `master` ejecuta estos checks en GitHub Actions (`.github/workflows/ci.yml`). Los cambios en `render.yaml` además pasan una validación YAML local; si el repositorio tiene `RENDER_API_KEY` y `RENDER_WORKSPACE_ID`, `.github/workflows/render-blueprint.yml` ejecuta también la validación oficial de Blueprint. Render sólo debería desplegar commits que pasen esta verificación.
+Los checks de GitHub Actions quedan disponibles bajo `workflow_dispatch`, sin ejecutarse automáticamente mientras el repositorio privado comparte la cuota mensual gratuita. Antes de publicar se ejecutan localmente `pnpm typecheck`, los smoke tests y la exportación web. El workflow de Blueprint puede lanzarse manualmente cuando haya minutos disponibles.
 
 ## Deploy
 
@@ -221,8 +222,9 @@ Cada push y pull request a `main` o `master` ejecuta estos checks en GitHub Acti
 
 1. Sube este repositorio a GitHub.
 2. En Render elige **New → Blueprint**, selecciona el repositorio y confirma `render.yaml`.
-3. Render creará `tacos-web` (frontend estático), `tacos-api` y
-   `tacos-postgres`, todos en el plan **Free**. El frontend recibe la URL de la
+3. Crea antes un proyecto gratuito en Supabase, habilita PostGIS y copia su
+   cadena PostgreSQL en `DATABASE_URL`. Render creará `tacos-web` (frontend
+   estático) y `tacos-api`, ambos en el plan **Free**. El frontend recibe la URL de la
    API automáticamente y sirve las rutas de Expo para verificación y recuperación.
    No se requiere tarjeta mientras el Blueprint no incluya recursos de pago.
 4. El `JWT_SECRET` se genera automáticamente. Las fotos son opcionales en el
@@ -265,9 +267,10 @@ El servicio gratuito no admite el `preDeployCommand` de Render. Por eso el
 `startCommand` ejecuta migraciones idempotentes y después inicia la API. Esto
 permite desplegar sin un worker pagado y sin depender de esta computadora.
 
-El PostgreSQL Free de Render es temporal: tiene 1 GB, no incluye backups y
-expira a los 30 días. Antes de usar datos reales de usuarios, programa una
-exportación y migra la base a un proveedor persistente o a un plan pagado.
+La producción usa Supabase PostgreSQL/PostGIS porque el PostgreSQL Free de
+Render es temporal y expira. Conserva la cadena de conexión únicamente en las
+variables secretas de Render y ejecuta las migraciones antes de importar el
+catálogo real.
 
 ### Demo gratuita sin proveedor de correo
 
