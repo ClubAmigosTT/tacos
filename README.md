@@ -134,6 +134,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 99. Búsqueda tolerante a acentos: el fallback local y PostgreSQL normalizan nombres y consultas en español de forma consistente.
 100. Prior de reputación estable: una primera reseña ya no degrada artificialmente la puntuación seed de una sucursal o taco; el smoke test lo protege.
 101. Listas resilientes: la pantalla de curaduría espera la sesión, diferencia una falla autenticada del estado vacío y permite reintentar sin mostrar fixtures como si fueran datos reales.
+102. Errores propagados: las consultas autenticadas de Listas y Personas ya no convierten una caída del API en un array vacío, por lo que el reintento visible se activa de verdad.
 
 ## Verificación
 
