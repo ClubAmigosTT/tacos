@@ -16,11 +16,13 @@ export default function CommentsScreen() {
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['comments', visitId, token], queryFn: () => visitComments(visitId!, token!), enabled: Boolean(token && visitId && !authLoading) });
   const createMutation = useMutation({
     mutationFn: () => createComment(visitId!, body.trim(), token!),
-    onSuccess: () => { setBody(''); void queryClient.invalidateQueries({ queryKey: ['comments', visitId] }); void queryClient.invalidateQueries({ queryKey: ['feed'] }); }
+    onSuccess: () => { setBody(''); void queryClient.invalidateQueries({ queryKey: ['comments', visitId] }); void queryClient.invalidateQueries({ queryKey: ['feed'] }); },
+    onError: () => Alert.alert('No pudimos publicar la nota', 'Revisa la conexión e inténtalo de nuevo.')
   });
   const deleteMutation = useMutation({
     mutationFn: (commentId: string) => deleteComment(commentId, token!),
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['comments', visitId] }); void queryClient.invalidateQueries({ queryKey: ['feed'] }); }
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['comments', visitId] }); void queryClient.invalidateQueries({ queryKey: ['feed'] }); },
+    onError: () => Alert.alert('No pudimos borrar la nota', 'Revisa la conexión e inténtalo de nuevo.')
   });
 
   if (authLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando conversación…</Text></View>;
