@@ -16,6 +16,14 @@ const profileTabs = [
   { label: 'Estadísticas', path: '/stats' }
 ] as const;
 
+const tasteDimensions = [
+  { key: 'intensity', label: 'Intensidad' },
+  { key: 'spicy', label: 'Picante' },
+  { key: 'traditional', label: 'Tradición' },
+  { key: 'texture', label: 'Textura' },
+  { key: 'value', label: 'Valor' }
+] as const;
+
 export default function ProfileScreen() {
   const { user, token, loading, signOut } = useAuth();
   useEffect(() => { void trackEvent('profile_open', {}, token); }, [token]);
@@ -28,13 +36,14 @@ export default function ProfileScreen() {
   const listCount = user ? (listData?.lists.filter((list) => list.owner.id === user.id).length ?? 0) : 12;
   const exploredZones = user ? new Set(entries.map((entry) => entry.neighborhood).filter(Boolean)).size : 3;
   const tasteId = tasteData?.taste;
+  const tasteProfile = tasteId?.profile ?? { intensity: 86, spicy: 72, traditional: 94, texture: 88, value: 78 };
   if (loading) return <View style={styles.loading}><Text style={styles.loadingText}>Cargando tu perfil…</Text></View>;
   if (user && (diaryError || listsError || tasteError)) return <AsyncErrorState title="No pudimos cargar tu perfil" detail="Tu diario y tus listas siguen guardados. Comprueba la conexión e inténtalo de nuevo." onAction={() => { void refetchDiary(); void refetchLists(); void refetchTaste(); }} />;
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.top}><View style={styles.avatar}><Text style={styles.avatarText}>{(user?.displayName ?? 'M').slice(0, 1).toUpperCase()}</Text></View><View style={styles.topCopy}><Text style={styles.name}>{user?.displayName ?? 'Marcelo'}</Text><Text style={styles.location}>{user?.email ?? 'Ciudad de México · 2026'}</Text></View>{user ? <Pressable accessibilityRole="button" accessibilityLabel="Abrir ajustes" onPress={() => router.push('/settings')}><Ionicons name="settings-outline" size={21} color={colors.muted} /></Pressable> : <Ionicons name="settings-outline" size={21} color={colors.muted} />}</View>
       {!user ? <Pressable accessibilityRole="button" accessibilityLabel="Entrar o crear cuenta" style={styles.loginCard} onPress={() => router.push('/auth')}><View style={styles.loginIcon}><Ionicons name="person-add-outline" size={18} color={colors.background} /></View><View style={{ flex: 1 }}><Text style={styles.loginTitle}>Guarda tu historia</Text><Text style={styles.loginDetail}>Entra para registrar visitas y crear listas.</Text></View><Ionicons name="chevron-forward" size={17} color={colors.muted} /></Pressable> : <Pressable accessibilityRole="button" accessibilityLabel="Cerrar sesión" style={styles.logout} onPress={() => void signOut()}><Text style={styles.logoutText}>Cerrar sesión</Text></Pressable>}
-      <View style={styles.taste}><Text style={styles.tasteEyebrow}>TU TASTE ID</Text><Text style={styles.tasteTitle}>{tasteId?.title ?? 'Pastor nocturno'}</Text><Text style={styles.tasteDescription}>{tasteId?.description ?? 'Picante alto · precio sensible · explorador de lugares callejeros'}</Text><View style={styles.tags}>{(tasteId?.tags ?? ['PASTOR 92%', 'PICANTE 84%', 'NOCHE 78%']).map((tag) => <Text style={styles.tag} key={tag}>{tag}</Text>)}</View></View>
+      <View style={styles.taste}><Text style={styles.tasteEyebrow}>TU TASTE ID</Text><Text style={styles.tasteTitle}>{tasteId?.title ?? 'Pastor nocturno'}</Text><Text style={styles.tasteDescription}>{tasteId?.description ?? 'Picante alto · precio sensible · explorador de lugares callejeros'}</Text><View style={styles.tags}>{(tasteId?.tags ?? ['PASTOR 92%', 'PICANTE 84%', 'NOCHE 78%']).map((tag) => <Text style={styles.tag} key={tag}>{tag}</Text>)}</View><View accessibilityLabel="Firma de sabor" style={styles.tasteSignature}>{tasteDimensions.map(({ key, label }) => <View key={key} style={styles.tasteDimension}><Text style={styles.tasteDimensionLabel}>{label}</Text><View style={styles.tasteTrack}><View style={[styles.tasteFill, { width: `${tasteProfile[key]}%` as any }]} /></View><Text style={styles.tasteValue}>{tasteProfile[key]}</Text></View>)}</View></View>
       <View style={styles.stats}><View><Text style={styles.statNumber}>{visits}</Text><Text style={styles.statLabel}>VISITAS</Text></View><View><Text style={styles.statNumber}>{listCount}</Text><Text style={styles.statLabel}>LISTAS</Text></View><View><Text style={styles.statNumber}>{average}</Text><Text style={styles.statLabel}>PROMEDIO</Text></View></View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.profileTabs} style={styles.profileTabsScroll}>
         {profileTabs.map((tab, index) => <Pressable key={tab.label} accessibilityRole="tab" accessibilityLabel={`Abrir ${tab.label}`} accessibilityState={{ selected: index === 0 }} style={[styles.profileTab, index === 0 && styles.profileTabActive]} onPress={() => router.push(tab.path)}><Text style={[styles.profileTabText, index === 0 && styles.profileTabTextActive]}>{tab.label}</Text></Pressable>)}
@@ -66,6 +75,12 @@ const styles = StyleSheet.create({
   tasteDescription: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 5, maxWidth: 270 },
   tags: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 18 },
   tag: { color: colors.background, backgroundColor: colors.accent, borderRadius: radii.pill, paddingHorizontal: 9, paddingVertical: 6, fontSize: 9, fontWeight: '900' },
+  tasteSignature: { marginTop: spacing.lg, gap: 9 },
+  tasteDimension: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tasteDimensionLabel: { color: colors.muted, fontSize: 9, fontWeight: '800', width: 68 },
+  tasteTrack: { flex: 1, height: 6, backgroundColor: colors.surface, borderRadius: 4, overflow: 'hidden' },
+  tasteFill: { height: '100%', backgroundColor: colors.accent, borderRadius: 4 },
+  tasteValue: { color: colors.ink, width: 24, textAlign: 'right', fontSize: 10, fontWeight: '900' },
   stats: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: colors.surface, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginBottom: spacing.xl },
   statNumber: { color: colors.ink, fontSize: 24, fontWeight: '900' },
   statLabel: { color: colors.muted, fontSize: 9, fontWeight: '900', letterSpacing: 1, marginTop: 4 },
