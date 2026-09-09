@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { ApiError, login as loginRequest, me, register as registerRequest, updateProfile as updateProfileRequest, type AuthUser } from '@/lib/api';
+import { ApiError, login as loginRequest, me, logout as logoutRequest, register as registerRequest, updateProfile as updateProfileRequest, type AuthUser } from '@/lib/api';
 
 const TOKEN_KEY = 'tacos.session.token';
 const USER_KEY = 'tacos.session.user';
@@ -10,7 +10,8 @@ type AuthContextValue = {
   token?: string;
   loading: boolean;
   signIn: (input: { email: string; password: string }) => Promise<void>;
-  signUp: (input: { email: string; password: string; displayName: string }) => Promise<void>;
+  signUp: (input: { email: string; password: string; displayName: string }) => Promise<{ verificationRequired: boolean; verificationToken?: string }>;
+  completeSession: (result: { token: string; user: AuthUser }) => Promise<void>;
   updateProfile: (input: { displayName: string }) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -40,7 +41,7 @@ async function readUser(): Promise<AuthUser | undefined> {
     if (!raw) return undefined;
     const parsed = JSON.parse(raw) as Partial<AuthUser>;
     if (typeof parsed.id !== 'string' || typeof parsed.email !== 'string' || typeof parsed.displayName !== 'string') return undefined;
-    return { id: parsed.id, email: parsed.email, displayName: parsed.displayName, role: parsed.role, following: parsed.following };
+    return { id: parsed.id, email: parsed.email, displayName: parsed.displayName, role: parsed.role, following: parsed.following, emailVerified: parsed.emailVerified };
   } catch {
     return undefined;
   }
@@ -99,9 +100,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(() => ({
     user, token, loading,
     async signIn(input) { const result = await loginRequest(input); await writeToken(result.token); await writeUser(result.user); setToken(result.token); setUser(result.user); },
-    async signUp(input) { const result = await registerRequest(input); await writeToken(result.token); await writeUser(result.user); setToken(result.token); setUser(result.user); },
+    async signUp(input) {
+      const result = await registerRequest(input);
+      if (!result.token) return { verificationRequired: true, verificationToken: result.verificationToken };
+      await writeToken(result.token); await writeUser(result.user); setToken(result.token); setUser(result.user);
+      return { verificationRequired: false };
+    },
+    async completeSession(result) { await writeToken(result.token); await writeUser(result.user); setToken(result.token); setUser(result.user); },
     async updateProfile(input) { if (!token) throw new Error('UNAUTHORIZED'); const result = await updateProfileRequest(input, token); await writeUser(result.user); setUser(result.user); },
-    async signOut() { await writeToken(null); await writeUser(null); setToken(undefined); setUser(undefined); }
+    async signOut() { if (token) { try { await logoutRequest(token); } catch { /* local sign-out must still work during an outage */ } } await writeToken(null); await writeUser(null); setToken(undefined); setUser(undefined); }
   }), [loading, token, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

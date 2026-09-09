@@ -4,6 +4,13 @@ const bucket = process.env.S3_BUCKET;
 const publicBase = process.env.STORAGE_BUCKET_URL?.replace(/\/$/, '');
 const accessKeyId = process.env.S3_ACCESS_KEY_ID;
 const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
+const storageRequired = process.env.NODE_ENV === 'production' && process.env.STORAGE_REQUIRED !== 'false';
+if (storageRequired && (!bucket || !accessKeyId || !secretAccessKey || !publicBase)) {
+  throw new Error('S3/R2 storage is required in production (S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, STORAGE_BUCKET_URL)');
+}
+if (storageRequired && !publicBase?.startsWith('https://')) {
+  throw new Error('STORAGE_BUCKET_URL must be HTTPS in production');
+}
 const client = bucket && accessKeyId && secretAccessKey
   ? new S3Client({
       region: process.env.S3_REGION ?? 'us-east-1',

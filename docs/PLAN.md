@@ -205,6 +205,9 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 11. Cubrir en CI por separado los dos fallos de configuración de una build production: URL de API no HTTPS y ausencia de la clave de Google Maps.
 12. Aplicar la exigencia de Google Maps sólo al perfil Android y verificar que la configuración iOS pueda compilar con Apple Maps sin esa clave.
 13. Exponer reseñas públicas por sucursal a partir de visitas visibles, respetando `share_activity` y sin filtrar correo u otros campos privados.
+14. Aplicar `021_auth_security.sql`: sesiones de 7 días revocables, verificación y recuperación por token de un solo uso, exportación/eliminación y rate limiting persistido.
+15. Aplicar `022_catalog_sources.sql` e importar `catalog/branches.json` desde una fuente autorizada; rechazar fotos sin licencia/atribución y marcar duplicados para revisión.
+16. Configurar `PUBLIC_API_URL`, `APP_WEB_URL`, `CORS_ORIGINS`, Resend y R2 antes de activar tráfico de producción.
 
 **Aceptación:** la API responde desde `https://…onrender.com`, la app se conecta sin esta computadora encendida y el smoke test corre en CI.
 
@@ -237,15 +240,21 @@ pnpm --filter @tacos/mobile exec expo export --platform web
 | `EXPO_PUBLIC_API_URL` | `http://localhost:4000` | URL HTTPS de `tacos-api` |
 | `GOOGLE_MAPS_API_KEY` | opcional | secreto de EAS para Android |
 | `S3_*` / `STORAGE_BUCKET_URL` | opcional | credenciales del bucket |
+| `STORAGE_REQUIRED` / `ALLOW_DEMO_CATALOG` | `false` / `true` | `true` / `false` en producción |
 | `ADMIN_EMAILS` | opcional | lista controlada de bootstrap |
+| `PUBLIC_API_URL` / `APP_WEB_URL` | `http://localhost:4000` / `http://localhost:8081` | URLs HTTPS de Render y del cliente web |
+| `CORS_ORIGINS` | `http://localhost:8081` | dominios web permitidos, separados por coma |
+| `RESEND_API_KEY` / `EMAIL_FROM` | opcional | correo transaccional de verificación y recuperación |
+| `REQUIRE_EMAIL_VERIFICATION` | `false` | `true` en Render antes de entregar sesiones |
+| `CATALOG_FEED_URL` / `CATALOG_SOURCE_*` | opcional | feed HTTPS, procedencia y licencia del catálogo |
 
 ## 5. Estado actual y siguiente paso externo
 
-El repositorio ya contiene el MVP funcional de las fases 1–7: mapa contextual, detalle normalizado, registro, fotos, diario, Taste ID, Radar, listas públicas/privadas, guardados, grafo social, perfiles, recomendaciones, feed, moderación y CI.
+El repositorio ya contiene el MVP funcional de las fases 1–7, más la base de seguridad de cuentas y el importador auditable de catálogo: mapa contextual, detalle normalizado, registro, fotos, diario, Taste ID, Radar, listas públicas/privadas, guardados, grafo social, perfiles, recomendaciones, feed, moderación y CI.
 
 Para desarrollo local, `pnpm dev:local` levanta API y preview web en paralelo; la app queda disponible en `http://localhost:8081/` y el health check en `http://localhost:4000/health`.
 
-Lo único que no puede completarse desde este entorno es la conexión de cuentas externas: crear el repositorio remoto, autorizar Render/EAS, pegar las claves S3/Maps y ejecutar el primer deploy. Una vez configuradas esas credenciales, la secuencia de la Fase 8 deja la app operando sin depender de esta computadora.
+Lo único que no puede completarse desde este entorno es la conexión de cuentas externas y la carga de datos reales: autorizar Render/EAS, pegar las claves R2/Resend/Maps, elegir el dominio HTTPS y proporcionar un feed de sucursales con licencia. Una vez configuradas esas credenciales, la secuencia de la Fase 8 deja la app operando sin depender de esta computadora.
 
 ## 6. Evolución después del MVP
 

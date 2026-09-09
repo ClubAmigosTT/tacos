@@ -1,0 +1,46 @@
+{
+  "branches": [
+    {
+      "id": "source-branch-id",
+      "taqueriaId": "source-taqueria-id",
+      "taqueriaName": "Nombre verificado",
+      "name": "Nombre de la sucursal",
+      "neighborhood": "Colonia",
+      "address": "Calle y número, ciudad",
+      "phone": "+52 55 0000 0000",
+      "latitude": 19.4000,
+      "longitude": -99.1600,
+      "weeklyHours": {
+        "mon": [{ "open": "12:00", "close": "23:00" }],
+        "tue": [{ "open": "12:00", "close": "23:00" }],
+        "wed": [{ "open": "12:00", "close": "23:00" }],
+        "thu": [{ "open": "12:00", "close": "23:00" }],
+        "fri": [{ "open": "12:00", "close": "01:00" }],
+        "sat": [{ "open": "12:00", "close": "01:00" }],
+        "sun": [{ "open": "12:00", "close": "22:00" }]
+      },
+      "priceMin": 20,
+      "priceMax": 80,
+      "openUntil": "01:00",
+      "style": "Clásico callejero",
+      "description": "Descripción redactada a partir de la fuente autorizada.",
+      "tags": ["pastor", "noche"],
+      "rating": 0,
+      "matchScore": 80,
+      "sourcePlaceId": "provider-place-id",
+      "sourceUpdatedAt": "2026-01-01T00:00:00.000Z",
+      "photos": [
+        {
+          "url": "https://example.com/photo.jpg",
+          "sourceUrl": "https://example.com/source",
+          "license": "CC BY 4.0",
+          "attribution": "Autor · fuente",
+          "isPrimary": true
+        }
+      ],
+      "tacos": [
+        { "id": "source-taco-id", "name": "Pastor", "note": "", "price": 25, "rating": 0 }
+      ]
+    }
+  ]
+}

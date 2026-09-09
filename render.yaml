@@ -22,6 +22,18 @@ services:
         generateValue: true
       - key: ADMIN_EMAILS
         sync: false
+      - key: PUBLIC_API_URL
+        value: https://tacos-api.onrender.com
+      - key: APP_WEB_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: REQUIRE_EMAIL_VERIFICATION
+        value: "true"
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
       - key: REDIS_URL
         fromService:
           type: keyvalue
@@ -32,7 +44,7 @@ services:
       - key: S3_ENDPOINT
         sync: false
       - key: S3_REGION
-        value: us-east-1
+        sync: false
       - key: S3_BUCKET
         sync: false
       - key: S3_ACCESS_KEY_ID
@@ -40,6 +52,20 @@ services:
       - key: S3_SECRET_ACCESS_KEY
         sync: false
       - key: S3_FORCE_PATH_STYLE
+        value: "false"
+      - key: STORAGE_REQUIRED
+        value: "true"
+      - key: CATALOG_FILE
+        value: catalog/branches.json
+      - key: CATALOG_FEED_URL
+        sync: false
+      - key: CATALOG_SOURCE_NAME
+        sync: false
+      - key: CATALOG_SOURCE_URL
+        sync: false
+      - key: CATALOG_SOURCE_LICENSE
+        sync: false
+      - key: ALLOW_DEMO_CATALOG
         value: "false"
   - type: worker
     name: tacos-worker
@@ -86,6 +112,34 @@ services:
         fromDatabase:
           name: tacos-postgres
           property: connectionString
+  - type: cron
+    name: tacos-catalog-sync
+    runtime: node
+    region: ohio
+    plan: 0.5c-512mb
+    schedule: "30 8 * * *"
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @tacos/api build
+    startCommand: pnpm catalog:import
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tacos-postgres
+          property: connectionString
+      - key: CATALOG_FEED_URL
+        sync: false
+      - key: CATALOG_SOURCE_NAME
+        sync: false
+      - key: CATALOG_SOURCE_URL
+        sync: false
+      - key: CATALOG_SOURCE_LICENSE
+        sync: false
+      - key: CATALOG_REPLACE_DEMO
+        value: "true"
   - type: keyvalue
     name: tacos-keyvalue
     region: ohio

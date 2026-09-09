@@ -276,4 +276,21 @@ if (peopleAfterUnfollow.users?.[0]?.following !== false) throw new Error('Unfoll
 const profileAfterUnfollow = await request(`/v1/users/${bob.user.id}/profile`, { token: alice.token });
 if (profileAfterUnfollow.user?.following !== false) throw new Error('Profile follow state was not refreshed after unfollow');
 
+const aliceSessions = await request('/v1/me/sessions', { token: alice.token });
+if (!aliceSessions.sessions?.length) throw new Error('Session listing was empty');
+const aliceSecondLogin = await request('/v1/auth/login', { method: 'POST', body: JSON.stringify({ email: alice.user.email, password: 'password123' }) });
+const aliceSessionsAfterLogin = await request('/v1/me/sessions', { token: alice.token });
+if (aliceSessionsAfterLogin.sessions?.length < 2) throw new Error('A second login did not create a revocable session');
+await request('/v1/me/sessions/revoke-all', { method: 'POST', token: alice.token });
+await request('/v1/me', { token: aliceSecondLogin.token }, 401);
+const resetRequest = await request('/v1/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email: bob.user.email }) });
+if (!resetRequest.resetToken) throw new Error('Development password reset token was not returned');
+await request('/v1/auth/reset-password', { method: 'POST', body: JSON.stringify({ token: resetRequest.resetToken, password: 'new-password123' }) });
+const bobAfterReset = await request('/v1/auth/login', { method: 'POST', body: JSON.stringify({ email: bob.user.email, password: 'new-password123' }) });
+const exportData = await request('/v1/me/export', { token: bobAfterReset.token });
+if (!exportData.user?.email || !Array.isArray(exportData.visits)) throw new Error('Account export did not include user data');
+const disposable = await createUser('Disposable Smoke', 'disposable');
+await request('/v1/me', { method: 'DELETE', body: JSON.stringify({ confirmation: 'ELIMINAR' }), token: disposable.token });
+await request('/v1/me', { token: disposable.token }, 401);
+
 console.log(`API smoke passed: ${baseUrl}`);

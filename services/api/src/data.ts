@@ -7,6 +7,12 @@ export type ApiPlace = {
   taqueriaName?: string;
   name: string;
   neighborhood: string;
+  address?: string;
+  phone?: string;
+  weeklyHours?: Record<string, Array<{ open: string; close: string }>>;
+  priceMin?: number;
+  priceMax?: number;
+  source?: { name?: string; url?: string; license?: string; attribution?: string; updatedAt?: string };
   distance: string;
   openUntil: string;
   rating: number;

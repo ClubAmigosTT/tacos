@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { places, type Place } from '@/data/fixtures';
 
-export type AuthUser = { id: string; email: string; displayName: string; role?: 'user' | 'admin'; following?: boolean };
+export type AuthUser = { id: string; email: string; displayName: string; role?: 'user' | 'admin'; following?: boolean; emailVerified?: boolean };
 export type ApiList = { id: string; title: string; description: string; owner: { id: string; displayName: string }; itemCount: number; visitedCount: number; coverImage: string; visibility?: 'public' | 'private'; collaboratorCount?: number; canEdit?: boolean };
 export type ApiListCollaborator = { id: string; displayName: string; role: 'editor' | 'viewer' };
 export type ApiListDetail = ApiList & { collaborators?: ApiListCollaborator[]; items: Array<{ branchId: string; note: string; position: number; place: Place }> };
@@ -218,11 +218,47 @@ export async function uploadImage(input: { base64: string; contentType: 'image/j
 }
 
 export async function register(input: { email: string; password: string; displayName: string }) {
-  return request<{ user: AuthUser; token: string }>('/v1/auth/register', { method: 'POST', body: JSON.stringify(input) });
+  return request<{ user: AuthUser; token?: string; verificationRequired?: boolean; verificationToken?: string }>('/v1/auth/register', { method: 'POST', body: JSON.stringify(input) });
 }
 
 export async function login(input: { email: string; password: string }) {
   return request<{ user: AuthUser; token: string }>('/v1/auth/login', { method: 'POST', body: JSON.stringify(input) });
+}
+
+export async function verifyEmail(token: string) {
+  return request<{ user: AuthUser; token: string }>('/v1/auth/verify-email', { method: 'POST', body: JSON.stringify({ token }) });
+}
+
+export async function resendVerification(email: string) {
+  return request<{ status: string; verificationToken?: string }>('/v1/auth/resend-verification', { method: 'POST', body: JSON.stringify({ email }) });
+}
+
+export async function forgotPassword(email: string) {
+  return request<{ status: string; resetToken?: string }>('/v1/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) });
+}
+
+export async function resetPassword(token: string, password: string) {
+  return request<{ status: string }>('/v1/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) });
+}
+
+export async function logout(token: string) {
+  return request<{ status: string }>('/v1/auth/logout', { method: 'POST' }, token);
+}
+
+export async function sessions(token: string) {
+  return request<{ sessions: Array<{ id: string; createdAt: string; expiresAt: string; userAgent?: string; ip?: string }> }>('/v1/me/sessions', undefined, token);
+}
+
+export async function revokeAllSessions(token: string) {
+  return request<{ status: string; count: number }>('/v1/me/sessions/revoke-all', { method: 'POST' }, token);
+}
+
+export async function exportAccount(token: string) {
+  return request<Record<string, unknown>>('/v1/me/export', undefined, token);
+}
+
+export async function deleteAccount(token: string) {
+  return request<{ status: string }>('/v1/me', { method: 'DELETE', body: JSON.stringify({ confirmation: 'ELIMINAR' }) }, token);
 }
 
 export async function me(token: string) {

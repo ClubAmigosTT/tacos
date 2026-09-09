@@ -71,6 +71,9 @@ jobs:
       - name: Production environment guard smoke test
         run: pnpm smoke:production
 
+      - name: Auth security smoke test
+        run: pnpm smoke:security
+
       - name: Apply PostgreSQL migrations
         run: pnpm --filter @tacos/api migrate
 

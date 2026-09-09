@@ -216,9 +216,35 @@ Cada push y pull request a `main` o `master` ejecuta estos checks en GitHub Acti
 
 1. Sube este repositorio a GitHub.
 2. En Render elige **New → Blueprint**, selecciona el repositorio y confirma `render.yaml`.
-3. Render creará `tacos-api`, `tacos-worker`, `tacos-nightly`, `tacos-keyvalue` y `tacos-postgres`.
+3. Render creará `tacos-api`, `tacos-worker`, `tacos-nightly`, `tacos-catalog-sync`, `tacos-keyvalue` y `tacos-postgres`.
 4. El `JWT_SECRET` se genera automáticamente; configura `STORAGE_BUCKET_URL`, `S3_BUCKET`, `S3_ACCESS_KEY_ID` y `S3_SECRET_ACCESS_KEY` para activar las fotos. `S3_ENDPOINT` permite usar R2, MinIO u otro proveedor compatible.
 5. Comprueba `https://<tu-api>.onrender.com/health`.
+
+Para Cloudflare R2 usa `S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`,
+`S3_REGION=auto`, `S3_FORCE_PATH_STYLE=false` y un dominio público HTTPS en
+`STORAGE_BUCKET_URL`. En Render configura también `RESEND_API_KEY`,
+`EMAIL_FROM`, `APP_WEB_URL` y conserva `REQUIRE_EMAIL_VERIFICATION=true`.
+Render entrega HTTPS automáticamente en `https://tacos-api.onrender.com`; si
+conectas un dominio propio, actualiza `PUBLIC_API_URL`, `APP_WEB_URL`,
+`CORS_ORIGINS` y `EXPO_PUBLIC_API_URL` con ese dominio.
+
+Las cuentas tienen sesiones revocables, verificación de correo, recuperación de
+contraseña, exportación JSON y eliminación. Las rutas de soporte son
+`POST /v1/auth/verify-email`, `POST /v1/auth/forgot-password`,
+`POST /v1/auth/reset-password`, `GET /v1/me/sessions`,
+`POST /v1/me/sessions/revoke-all`, `GET /v1/me/export` y `DELETE /v1/me`.
+
+### Catálogo real
+
+La migración `022_catalog_sources.sql` añade horarios semanales, teléfono,
+rango de precios, procedencia y licencia de cada foto. Copia
+`catalog/branches.json.example` a `catalog/branches.json` y ejecuta
+`pnpm catalog:import` con `DATABASE_URL` y las variables `CATALOG_SOURCE_*`.
+El importador hace upsert por el ID de la fuente, marca duplicados como
+`needs_review`, archiva las tres filas demo sólo con
+`CATALOG_REPLACE_DEMO=true` y registra cada corrida en `catalog_imports`.
+En Render `ALLOW_DEMO_CATALOG=false` evita que una publicación nueva vuelva a
+mostrar las filas demo si todavía no se ha importado el feed real.
 
 Para que CI ejecute además la validación remota del Blueprint, añade los secretos `RENDER_API_KEY` y `RENDER_WORKSPACE_ID` en GitHub. Sin ellos, el workflow mantiene la validación de sintaxis local y no intenta autenticarse.
 

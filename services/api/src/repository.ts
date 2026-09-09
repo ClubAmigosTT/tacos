@@ -1,5 +1,6 @@
 import { Pool } from 'pg';
 import bcrypt from 'bcryptjs';
+import { createHash } from 'node:crypto';
 import { lists as fixtureLists, places, type ApiList, type ApiListDetail, type ApiPlace, type ApiTaqueria, type FlavorProfile, type TasteProfile } from './data.js';
 
 const configuredDatabaseUrl = process.env.DATABASE_URL?.trim();
@@ -10,15 +11,20 @@ if (process.env.NODE_ENV === 'production' && !configuredDatabaseUrl) {
 const pool = configuredDatabaseUrl
   ? new Pool({ connectionString: configuredDatabaseUrl, max: 10, connectionTimeoutMillis: 5_000, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined })
   : null;
+const allowDemoCatalog = process.env.NODE_ENV !== 'production' || process.env.ALLOW_DEMO_CATALOG === 'true';
 
 type DiscoverQuery = { q?: string; lat?: number; lng?: number; limit: number };
 type VisitInput = { placeId: string; tacoIds: string[]; rating: number; tacoRatings?: Record<string, number>; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number };
 type ReportInput = { visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details?: string };
-export type PublicUser = { id: string; email: string; displayName: string; role: 'user' | 'admin'; following?: boolean };
+export type PublicUser = { id: string; email: string; displayName: string; role: 'user' | 'admin'; following?: boolean; emailVerified?: boolean };
 export type AdminReport = { id: string; visitId: string; reason: ReportInput['reason']; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string; reporter: { id: string; displayName: string }; author: { id: string; displayName: string }; place: { id: string; name: string }; rating: number; visitedAt: string };
 
-type LocalUser = PublicUser & { passwordHash: string; shareActivity: boolean };
+type LocalUser = PublicUser & { passwordHash: string; shareActivity: boolean; emailVerifiedAt?: string };
 const localUsers = new Map<string, LocalUser>();
+const localSessions = new Map<string, { id: string; userId: string; tokenHash: string; createdAt: string; expiresAt: string; revokedAt?: string; userAgent?: string; ip?: string }>();
+const localVerificationTokens = new Map<string, { userId: string; tokenHash: string; expiresAt: string }>();
+const localPasswordResetTokens = new Map<string, { userId: string; tokenHash: string; expiresAt: string }>();
+const localAuthRateLimits = new Map<string, { windowStartedAt: number; attempts: number }>();
 const localVisits = new Map<string, { userId: string; placeId: string; tacoIds: string[]; tacoRatings?: Record<string, number>; rating: number; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number; createdAt: string; visibility: 'visible' | 'hidden' }>();
 const localFollows = new Set<string>();
 const localSavedPlaces = new Set<string>();
@@ -27,6 +33,99 @@ const localReports = new Map<string, { id: string; reporterId: string; visitId: 
 const localComments = new Map<string, { id: string; visitId: string; authorId: string; body: string; createdAt: string; visibility: 'visible' | 'hidden' }>();
 const localListCollaborators = new Map<string, { listId: string; userId: string; role: 'editor' | 'viewer'; createdAt: string }>();
 const localProductEvents: Array<{ eventName: string; userId?: string; anonymousId?: string; properties: Record<string, string | number | boolean | null>; createdAt: string }> = [];
+
+function sha256(value: string) {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function authWindow(now = Date.now()) {
+  return Math.floor(now / (15 * 60 * 1000)) * 15 * 60 * 1000;
+}
+
+export type AuthSession = { id: string; userId: string; createdAt: string; expiresAt: string; revokedAt?: string; userAgent?: string; ip?: string };
+
+export async function createSession(userId: string, metadata: { userAgent?: string; ip?: string } = {}): Promise<AuthSession> {
+  const id = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  if (pool) {
+    const result = await pool.query(`
+      INSERT INTO auth_sessions (id, user_id, token_hash, expires_at, user_agent, ip_address)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id, user_id, created_at, expires_at, revoked_at, user_agent, ip_address
+    `, [id, userId, sha256(id), expiresAt, metadata.userAgent ?? null, metadata.ip ?? null]);
+    const row = result.rows[0];
+    return { id: row.id, userId: row.user_id, createdAt: row.created_at.toISOString?.() ?? row.created_at, expiresAt: row.expires_at.toISOString?.() ?? row.expires_at, revokedAt: row.revoked_at?.toISOString?.() ?? row.revoked_at, userAgent: row.user_agent, ip: row.ip_address };
+  }
+  const session = { id, userId, tokenHash: sha256(id), createdAt, expiresAt, userAgent: metadata.userAgent, ip: metadata.ip };
+  localSessions.set(id, session);
+  return session;
+}
+
+export async function isSessionActive(sessionId: string, userId: string) {
+  if (pool) {
+    const result = await pool.query(`SELECT 1 FROM auth_sessions WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL AND expires_at > now()`, [sessionId, userId]);
+    return Boolean(result.rowCount);
+  }
+  const session = localSessions.get(sessionId);
+  return Boolean(session && session.userId === userId && !session.revokedAt && Date.parse(session.expiresAt) > Date.now());
+}
+
+export async function revokeSession(sessionId: string, userId: string) {
+  if (pool) {
+    const result = await pool.query(`UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, now()) WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL`, [sessionId, userId]);
+    return Boolean(result.rowCount);
+  }
+  const session = localSessions.get(sessionId);
+  if (!session || session.userId !== userId) return false;
+  session.revokedAt = new Date().toISOString();
+  return true;
+}
+
+export async function revokeAllSessions(userId: string, exceptSessionId?: string) {
+  if (pool) {
+    const result = await pool.query(`UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, now()) WHERE user_id = $1 AND revoked_at IS NULL ${exceptSessionId ? 'AND id <> $2' : ''}`, exceptSessionId ? [userId, exceptSessionId] : [userId]);
+    return result.rowCount ?? 0;
+  }
+  let count = 0;
+  for (const session of localSessions.values()) {
+    if (session.userId === userId && session.id !== exceptSessionId && !session.revokedAt) { session.revokedAt = new Date().toISOString(); count += 1; }
+  }
+  return count;
+}
+
+export async function listSessions(userId: string): Promise<AuthSession[]> {
+  if (pool) {
+    const result = await pool.query(`SELECT id, user_id, created_at, expires_at, revoked_at, user_agent, ip_address FROM auth_sessions WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now() ORDER BY created_at DESC`, [userId]);
+    return result.rows.map((row) => ({ id: row.id, userId: row.user_id, createdAt: row.created_at.toISOString?.() ?? row.created_at, expiresAt: row.expires_at.toISOString?.() ?? row.expires_at, revokedAt: row.revoked_at?.toISOString?.() ?? row.revoked_at, userAgent: row.user_agent, ip: row.ip_address }));
+  }
+  return [...localSessions.values()].filter((session) => session.userId === userId && !session.revokedAt && Date.parse(session.expiresAt) > Date.now()).map(({ tokenHash: _tokenHash, ...session }) => session);
+}
+
+export async function consumeAuthRateLimit(key: string, limit = 10): Promise<{ allowed: boolean; retryAfterSeconds: number }> {
+  const windowMs = 15 * 60 * 1000;
+  if (pool) {
+    const result = await pool.query(`
+      INSERT INTO auth_rate_limits (key, window_started_at, attempts)
+      VALUES ($1, now(), 1)
+      ON CONFLICT (key) DO UPDATE SET
+        attempts = CASE WHEN auth_rate_limits.window_started_at <= now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END,
+        window_started_at = CASE WHEN auth_rate_limits.window_started_at <= now() - interval '15 minutes' THEN now() ELSE auth_rate_limits.window_started_at END,
+        updated_at = now()
+      RETURNING attempts, EXTRACT(EPOCH FROM (window_started_at + interval '15 minutes' - now()))::int AS retry_after
+    `, [key]);
+    const row = result.rows[0];
+    return { allowed: Number(row.attempts) <= limit, retryAfterSeconds: Math.max(1, Number(row.retry_after ?? 900)) };
+  }
+  const now = Date.now();
+  const current = localAuthRateLimits.get(key);
+  if (!current || now - current.windowStartedAt >= windowMs) {
+    localAuthRateLimits.set(key, { windowStartedAt: authWindow(now), attempts: 1 });
+    return { allowed: true, retryAfterSeconds: 900 };
+  }
+  current.attempts += 1;
+  return { allowed: current.attempts <= limit, retryAfterSeconds: Math.max(1, Math.ceil((current.windowStartedAt + windowMs - now) / 1000)) };
+}
 
 const configuredAdminEmails = new Set((process.env.ADMIN_EMAILS ?? '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean));
 
@@ -81,6 +180,11 @@ export async function runNightlyMaintenance(): Promise<MaintenanceResult> {
     try {
       const purged = await pool.query("DELETE FROM product_events WHERE created_at < now() - ($1::int * interval '1 day')", [retentionDays]);
       purgedEvents = purged.rowCount ?? 0;
+    } catch (error) {
+      if ((error as { code?: string }).code !== '42P01') throw error;
+    }
+    try {
+      await pool.query("DELETE FROM auth_rate_limits WHERE updated_at < now() - interval '2 days'");
     } catch (error) {
       if ((error as { code?: string }).code !== '42P01') throw error;
     }
@@ -148,7 +252,7 @@ export async function getAdminAnalytics(days = 14): Promise<AdminAnalytics> {
 }
 
 function publicUser(user: LocalUser): PublicUser {
-  return { id: user.id, email: user.email, displayName: user.displayName, role: user.role };
+  return { id: user.id, email: user.email, displayName: user.displayName, role: user.role, emailVerified: Boolean(user.emailVerifiedAt) };
 }
 
 function normalizePlace(row: any): ApiPlace {
@@ -159,6 +263,12 @@ function normalizePlace(row: any): ApiPlace {
     taqueriaName: row.taqueria_name ?? row.name,
     name: row.name,
     neighborhood: row.neighborhood,
+    address: row.address ?? undefined,
+    phone: row.phone ?? undefined,
+    weeklyHours: row.weekly_hours ?? undefined,
+    priceMin: row.price_min == null ? undefined : Number(row.price_min),
+    priceMax: row.price_max == null ? undefined : Number(row.price_max),
+    source: row.source_name ? { name: row.source_name, url: row.source_url ?? undefined, license: row.source_license ?? row.image_license ?? undefined, attribution: row.source_attribution ?? row.image_attribution ?? undefined, updatedAt: row.source_updated_at?.toISOString?.() ?? row.source_updated_at ?? undefined } : undefined,
     distance: row.distance_km == null ? 'cerca de ti' : `${Number(row.distance_km).toFixed(1)} km`,
     openUntil: row.open_until ?? '23:00',
     rating: Number(row.rating),
@@ -308,7 +418,8 @@ export async function discoverPlaces(query: DiscoverQuery, userId?: string): Pro
       .slice(0, query.limit);
   } else {
     const values: unknown[] = [];
-    const predicates: string[] = ['b.is_active = true'];
+    const predicates: string[] = ["b.is_active = true", "b.catalog_status = 'active'"];
+    if (!allowDemoCatalog) predicates.push("COALESCE(b.source_name, '') <> 'demo'");
     if (query.q?.trim()) {
       const terms = searchTerms(query.q.trim());
       if (!terms.length) predicates.push('false');
@@ -324,7 +435,7 @@ export async function discoverPlaces(query: DiscoverQuery, userId?: string): Pro
     values.push(query.limit);
     const orderBy = query.lat != null && query.lng != null ? 'distance_km ASC NULLS LAST, rating DESC' : 'rating DESC';
     const result = await pool.query(`
-      SELECT b.id, b.taqueria_id, t.name AS taqueria_name, b.name, b.neighborhood, b.open_until,
+      SELECT b.id, b.taqueria_id, t.name AS taqueria_name, b.name, b.neighborhood, b.address, b.phone, b.weekly_hours, b.price_min, b.price_max, b.source_name, b.source_url, b.source_license, b.source_attribution, b.source_updated_at, b.image_license, b.image_attribution, b.open_until,
       ${reputationSelect}
       b.match_score, b.style,
       b.image_url, b.description, b.tags, b.flavor_profile, ST_Y(b.location::geometry) AS latitude,
@@ -467,7 +578,7 @@ export async function findPlace(id: string, userId?: string): Promise<ApiPlace |
     found = fallback ? localReputation(fallback) : fallback;
   } else {
     const result = await pool.query(`
-    SELECT b.id, b.taqueria_id, t.name AS taqueria_name, b.name, b.neighborhood, b.open_until,
+    SELECT b.id, b.taqueria_id, t.name AS taqueria_name, b.name, b.neighborhood, b.address, b.phone, b.weekly_hours, b.price_min, b.price_max, b.source_name, b.source_url, b.source_license, b.source_attribution, b.source_updated_at, b.image_license, b.image_attribution, b.open_until,
       ${reputationSelect}
       b.match_score, b.style,
       b.image_url, b.description, b.tags, b.flavor_profile, ST_Y(b.location::geometry) AS latitude,
@@ -479,7 +590,7 @@ export async function findPlace(id: string, userId?: string): Promise<ApiPlace |
     FROM branches b JOIN taquerias t ON t.id = b.taqueria_id
       ${reputationJoin}
       LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
-    WHERE b.id = $1 AND b.is_active = true GROUP BY b.id, t.name, reviews.review_count, reviews.score
+    WHERE b.id = $1 AND b.is_active = true AND b.catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(b.source_name, '') <> 'demo'"} GROUP BY b.id, t.name, reviews.review_count, reviews.score
     `, [id]);
     found = result.rows[0] ? normalizePlace(result.rows[0]) : undefined;
   }
@@ -506,7 +617,7 @@ export type ApiBranchReview = {
  */
 export async function getBranchReviews(branchId: string): Promise<ApiBranchReview[] | undefined> {
   if (pool) {
-    const branch = await pool.query('SELECT 1 FROM branches WHERE id = $1 AND is_active = true', [branchId]);
+    const branch = await pool.query(`SELECT 1 FROM branches WHERE id = $1 AND is_active = true AND catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"}`, [branchId]);
     if (!branch.rowCount) return undefined;
     const result = await pool.query(`
       SELECT v.id, v.visited_at, v.rating, v.note, v.photo_url,
@@ -547,13 +658,13 @@ export async function getBranchReviews(branchId: string): Promise<ApiBranchRevie
 
 export async function getTaqueria(id: string): Promise<ApiTaqueria | undefined> {
   if (pool) {
-    const parent = await pool.query(`
+      const parent = await pool.query(`
       SELECT t.id, t.name, t.slug, t.description, COUNT(b.id)::int AS branch_count
-      FROM taquerias t LEFT JOIN branches b ON b.taqueria_id = t.id AND b.is_active = true
+      FROM taquerias t LEFT JOIN branches b ON b.taqueria_id = t.id AND b.is_active = true AND b.catalog_status = 'active'
       WHERE t.id = $1 GROUP BY t.id
     `, [id]);
     if (!parent.rows[0]) return undefined;
-    const branchRows = await pool.query('SELECT id FROM branches WHERE taqueria_id = $1 AND is_active = true ORDER BY neighborhood, name', [id]);
+    const branchRows = await pool.query(`SELECT id FROM branches WHERE taqueria_id = $1 AND is_active = true AND catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"} ORDER BY neighborhood, name`, [id]);
     const branches = (await Promise.all(branchRows.rows.map((row) => findPlace(row.id)))).filter((place): place is ApiPlace => Boolean(place));
     return { id: parent.rows[0].id, name: parent.rows[0].name, slug: parent.rows[0].slug, description: parent.rows[0].description, branchCount: Number(parent.rows[0].branch_count), branches };
   }
@@ -573,7 +684,7 @@ export async function getSavedPlaceIds(userId: string): Promise<string[]> {
 
 export async function savePlaceForUser(placeId: string, userId: string): Promise<'saved' | 'already_saved' | 'not_found'> {
   if (pool) {
-    const branch = await pool.query('SELECT 1 FROM branches WHERE id = $1 AND is_active = true', [placeId]);
+    const branch = await pool.query(`SELECT 1 FROM branches WHERE id = $1 AND is_active = true AND catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"}`, [placeId]);
     if (!branch.rowCount) return 'not_found';
     const result = await pool.query('INSERT INTO saved_places (user_id, branch_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING branch_id', [userId, placeId]);
     return result.rowCount ? 'saved' : 'already_saved';
@@ -682,17 +793,18 @@ export async function deleteVisitForUser(visitId: string, userId: string): Promi
 export async function registerUser(input: { email: string; password: string; displayName: string }): Promise<PublicUser> {
   const email = input.email.trim().toLowerCase();
   const displayName = input.displayName.trim();
+  const autoVerify = process.env.REQUIRE_EMAIL_VERIFICATION !== 'true';
   if (pool) {
     const existing = await pool.query('SELECT id FROM users WHERE email_lower = $1', [email]);
     if (existing.rowCount) throw new Error('EMAIL_TAKEN');
     const id = crypto.randomUUID();
     const passwordHash = await bcrypt.hash(input.password, 12);
     const role = configuredAdminEmails.has(email) ? 'admin' : 'user';
-    const result = await pool.query('INSERT INTO users (id, email, email_lower, password_hash, display_name, role) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, display_name, role', [id, input.email.trim(), email, passwordHash, displayName, role]);
-    return { id: result.rows[0].id, email: result.rows[0].email, displayName: result.rows[0].display_name, role: result.rows[0].role };
+    const result = await pool.query('INSERT INTO users (id, email, email_lower, password_hash, display_name, role, email_verified_at) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, email, display_name, role, email_verified_at', [id, input.email.trim(), email, passwordHash, displayName, role, autoVerify ? new Date() : null]);
+    return { id: result.rows[0].id, email: result.rows[0].email, displayName: result.rows[0].display_name, role: result.rows[0].role, emailVerified: Boolean(result.rows[0].email_verified_at) };
   }
   if ([...localUsers.values()].some((user) => user.email === email)) throw new Error('EMAIL_TAKEN');
-  const user: LocalUser = { id: crypto.randomUUID(), email, displayName, role: configuredAdminEmails.has(email) ? 'admin' : 'user', passwordHash: await bcrypt.hash(input.password, 10), shareActivity: true };
+  const user: LocalUser = { id: crypto.randomUUID(), email, displayName, role: configuredAdminEmails.has(email) ? 'admin' : 'user', passwordHash: await bcrypt.hash(input.password, 10), shareActivity: true, emailVerifiedAt: autoVerify ? new Date().toISOString() : undefined };
   localUsers.set(user.id, user);
   return publicUser(user);
 }
@@ -700,21 +812,170 @@ export async function registerUser(input: { email: string; password: string; dis
 export async function authenticateUser(input: { email: string; password: string }): Promise<PublicUser | undefined> {
   const email = input.email.trim().toLowerCase();
   if (pool) {
-    const result = await pool.query('SELECT id, email, display_name, password_hash, role FROM users WHERE email_lower = $1 AND is_active = true', [email]);
+    const result = await pool.query('SELECT id, email, display_name, password_hash, role, email_verified_at FROM users WHERE email_lower = $1 AND is_active = true', [email]);
     const row = result.rows[0];
     if (!row || !(await bcrypt.compare(input.password, row.password_hash))) return undefined;
-    return { id: row.id, email: row.email, displayName: row.display_name, role: row.role };
+    if (process.env.REQUIRE_EMAIL_VERIFICATION === 'true' && !row.email_verified_at) return undefined;
+    return { id: row.id, email: row.email, displayName: row.display_name, role: row.role, emailVerified: Boolean(row.email_verified_at) };
   }
   const user = [...localUsers.values()].find((item) => item.email === email);
   if (!user || !(await bcrypt.compare(input.password, user.passwordHash))) return undefined;
+  if (process.env.REQUIRE_EMAIL_VERIFICATION === 'true' && !user.emailVerifiedAt) return undefined;
   return publicUser(user);
+}
+
+function createOpaqueToken() {
+  return `${crypto.randomUUID().replaceAll('-', '')}${crypto.randomUUID().replaceAll('-', '')}`;
+}
+
+export async function createEmailVerificationToken(userId: string) {
+  const token = createOpaqueToken();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  if (pool) {
+    await pool.query('DELETE FROM email_verification_tokens WHERE user_id = $1 AND used_at IS NULL', [userId]);
+    await pool.query('INSERT INTO email_verification_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)', [userId, sha256(token), expiresAt]);
+  } else {
+    for (const [key, value] of localVerificationTokens.entries()) if (value.userId === userId) localVerificationTokens.delete(key);
+    localVerificationTokens.set(sha256(token), { userId, tokenHash: sha256(token), expiresAt: expiresAt.toISOString() });
+  }
+  return token;
+}
+
+export async function findUnverifiedUserByEmail(email: string) {
+  const normalized = email.trim().toLowerCase();
+  if (pool) {
+    const result = await pool.query('SELECT id, email, display_name, role, email_verified_at FROM users WHERE email_lower = $1 AND is_active = true', [normalized]);
+    const row = result.rows[0];
+    return row && !row.email_verified_at ? { id: row.id, email: row.email, displayName: row.display_name, role: row.role, emailVerified: false } satisfies PublicUser : undefined;
+  }
+  const user = [...localUsers.values()].find((item) => item.email === normalized && !item.emailVerifiedAt);
+  return user ? publicUser(user) : undefined;
+}
+
+export async function verifyEmailToken(token: string): Promise<PublicUser | undefined> {
+  const tokenHash = sha256(token);
+  if (pool) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(`SELECT u.id FROM email_verification_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = $1 AND t.used_at IS NULL AND t.expires_at > now() AND u.is_active = true FOR UPDATE`, [tokenHash]);
+      const userId = result.rows[0]?.id as string | undefined;
+      if (!userId) { await client.query('ROLLBACK'); return undefined; }
+      await client.query('UPDATE users SET email_verified_at = now(), updated_at = now() WHERE id = $1', [userId]);
+      await client.query('UPDATE email_verification_tokens SET used_at = now() WHERE token_hash = $1', [tokenHash]);
+      await client.query('COMMIT');
+      return findUserById(userId);
+    } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+  }
+  const record = localVerificationTokens.get(tokenHash);
+  if (!record || Date.parse(record.expiresAt) <= Date.now()) return undefined;
+  const user = localUsers.get(record.userId);
+  if (!user) return undefined;
+  user.emailVerifiedAt = new Date().toISOString();
+  localVerificationTokens.delete(tokenHash);
+  return publicUser(user);
+}
+
+export async function createPasswordResetToken(email: string) {
+  const normalized = email.trim().toLowerCase();
+  let userId: string | undefined;
+  if (pool) {
+    const result = await pool.query('SELECT id FROM users WHERE email_lower = $1 AND is_active = true', [normalized]);
+    userId = result.rows[0]?.id;
+  } else {
+    userId = [...localUsers.values()].find((user) => user.email === normalized)?.id;
+  }
+  if (!userId) return undefined;
+  const token = createOpaqueToken();
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+  if (pool) {
+    await pool.query('DELETE FROM password_reset_tokens WHERE user_id = $1 AND used_at IS NULL', [userId]);
+    await pool.query('INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)', [userId, sha256(token), expiresAt]);
+  } else {
+    for (const [key, value] of localPasswordResetTokens.entries()) if (value.userId === userId) localPasswordResetTokens.delete(key);
+    localPasswordResetTokens.set(sha256(token), { userId, tokenHash: sha256(token), expiresAt: expiresAt.toISOString() });
+  }
+  return token;
+}
+
+export async function resetPassword(token: string, password: string) {
+  const tokenHash = sha256(token);
+  if (pool) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const found = await client.query(`SELECT user_id FROM password_reset_tokens WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now() FOR UPDATE`, [tokenHash]);
+      const userId = found.rows[0]?.user_id as string | undefined;
+      if (!userId) { await client.query('ROLLBACK'); return false; }
+      const passwordHash = await bcrypt.hash(password, 12);
+      await client.query('UPDATE users SET password_hash = $2, password_changed_at = now(), updated_at = now() WHERE id = $1 AND is_active = true', [userId, passwordHash]);
+      await client.query('UPDATE password_reset_tokens SET used_at = now() WHERE token_hash = $1', [tokenHash]);
+      await client.query('UPDATE auth_sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL', [userId]);
+      await client.query('COMMIT');
+      return true;
+    } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+  }
+  const record = localPasswordResetTokens.get(tokenHash);
+  if (!record || Date.parse(record.expiresAt) <= Date.now()) return false;
+  const user = localUsers.get(record.userId);
+  if (!user) return false;
+  user.passwordHash = await bcrypt.hash(password, 10);
+  for (const session of localSessions.values()) if (session.userId === user.id) session.revokedAt = new Date().toISOString();
+  localPasswordResetTokens.delete(tokenHash);
+  return true;
+}
+
+export async function exportUserData(userId: string) {
+  if (pool) {
+    const [user, visits, lists, listItems, follows, saved, comments] = await Promise.all([
+      pool.query('SELECT id, email, display_name, role, email_verified_at, created_at FROM users WHERE id = $1 AND is_active = true', [userId]),
+      pool.query('SELECT id, branch_id, rating, visited_at, created_at, price, note, photo_url, visibility FROM visits WHERE user_id = $1 ORDER BY visited_at DESC', [userId]),
+      pool.query('SELECT id, title, description, visibility, created_at, updated_at FROM lists WHERE owner_id = $1 ORDER BY created_at DESC', [userId]),
+      pool.query('SELECT li.list_id, li.branch_id, li.position, li.note, li.created_at FROM list_items li JOIN lists l ON l.id = li.list_id WHERE l.owner_id = $1 ORDER BY li.list_id, li.position', [userId]),
+      pool.query('SELECT follower_id, followed_id, created_at FROM follows WHERE follower_id = $1 OR followed_id = $1 ORDER BY created_at DESC', [userId]),
+      pool.query('SELECT branch_id, created_at FROM saved_places WHERE user_id = $1 ORDER BY created_at DESC', [userId]),
+      pool.query('SELECT id, visit_id, body, visibility, created_at FROM visit_comments WHERE author_id = $1 ORDER BY created_at DESC', [userId])
+    ]);
+    if (!user.rows[0]) return undefined;
+    return { exportedAt: new Date().toISOString(), user: user.rows[0], visits: visits.rows, lists: lists.rows, listItems: listItems.rows, follows: follows.rows, savedPlaces: saved.rows, comments: comments.rows };
+  }
+  const user = localUsers.get(userId);
+  if (!user) return undefined;
+  return {
+    exportedAt: new Date().toISOString(),
+    user: { id: user.id, email: user.email, displayName: user.displayName, role: user.role, emailVerified: Boolean(user.emailVerifiedAt) },
+    visits: [...localVisits.entries()].filter(([, visit]) => visit.userId === userId).map(([id, visit]) => ({ id, ...visit })),
+    lists: [...localLists.values()].filter((list) => list.ownerId === userId),
+    listItems: [...localLists.values()].filter((list) => list.ownerId === userId).flatMap((list) => list.placeIds.map((branchId, position) => ({ listId: list.id, branchId, position }))),
+    follows: [...localFollows].filter((key) => key.startsWith(`${userId}:`) || key.endsWith(`:${userId}`)),
+    savedPlaces: [...localSavedPlaces].filter((key) => key.startsWith(`${userId}:`)),
+    comments: [...localComments.values()].filter((comment) => comment.authorId === userId)
+  };
+}
+
+export async function deleteUserAccount(userId: string) {
+  if (pool) {
+    const result = await pool.query('DELETE FROM users WHERE id = $1 AND is_active = true', [userId]);
+    return Boolean(result.rowCount);
+  }
+  if (!localUsers.has(userId)) return false;
+  localUsers.delete(userId);
+  for (const [key, session] of localSessions.entries()) if (session.userId === userId) localSessions.delete(key);
+  for (const [key, value] of localVerificationTokens.entries()) if (value.userId === userId) localVerificationTokens.delete(key);
+  for (const [key, value] of localPasswordResetTokens.entries()) if (value.userId === userId) localPasswordResetTokens.delete(key);
+  for (const key of [...localFollows]) if (key.startsWith(`${userId}:`) || key.endsWith(`:${userId}`)) localFollows.delete(key);
+  for (const key of [...localSavedPlaces]) if (key.startsWith(`${userId}:`)) localSavedPlaces.delete(key);
+  for (const [key, list] of localLists.entries()) if (list.ownerId === userId) localLists.delete(key);
+  for (const [key, visit] of localVisits.entries()) if (visit.userId === userId) localVisits.delete(key);
+  for (const [key, comment] of localComments.entries()) if (comment.authorId === userId) localComments.delete(key);
+  return true;
 }
 
 export async function findUserById(id: string): Promise<PublicUser | undefined> {
   if (pool) {
-    const result = await pool.query('SELECT id, email, display_name, role FROM users WHERE id = $1 AND is_active = true', [id]);
+    const result = await pool.query('SELECT id, email, display_name, role, email_verified_at FROM users WHERE id = $1 AND is_active = true', [id]);
     const row = result.rows[0];
-    return row ? { id: row.id, email: row.email, displayName: row.display_name, role: row.role } : undefined;
+    return row ? { id: row.id, email: row.email, displayName: row.display_name, role: row.role, emailVerified: Boolean(row.email_verified_at) } : undefined;
   }
   const user = localUsers.get(id);
   return user ? publicUser(user) : undefined;
@@ -822,7 +1083,7 @@ export async function getPassport(userId: string) {
         COUNT(v.id)::int AS visit_count
       FROM branches b
       LEFT JOIN visits v ON v.branch_id = b.id AND v.user_id = $1 AND v.visibility = 'visible'
-      WHERE b.is_active = true
+      WHERE b.is_active = true AND b.catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(b.source_name, '') <> 'demo'"}
       GROUP BY b.neighborhood
       ORDER BY b.neighborhood
     `, [userId]);
@@ -1092,7 +1353,7 @@ export async function addListItemForUser(listId: string, placeId: string, userId
   if (pool) {
     const role = await getListRole(listId, userId);
     if (role !== 'owner' && role !== 'editor') return false;
-    const branch = await pool.query('SELECT 1 FROM branches WHERE id = $1 AND is_active = true', [placeId]);
+    const branch = await pool.query(`SELECT 1 FROM branches WHERE id = $1 AND is_active = true AND catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"}`, [placeId]);
     if (!branch.rowCount) return false;
     await pool.query(`
       INSERT INTO list_items (list_id, branch_id, position, note)

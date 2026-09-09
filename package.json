@@ -11,12 +11,14 @@
     "dev:api": "pnpm --filter @tacos/api dev",
     "typecheck": "pnpm -r typecheck",
     "build:api": "pnpm --filter @tacos/api build",
+    "catalog:import": "node scripts/import-catalog.mjs",
     "smoke:api": "node scripts/smoke-api.mjs",
     "smoke:admin": "node scripts/smoke-admin.mjs",
     "smoke:hours": "node scripts/smoke-hours.mjs",
     "smoke:radar": "node scripts/smoke-radar.mjs",
     "smoke:inputs": "node scripts/smoke-inputs.mjs",
     "smoke:config": "node scripts/smoke-config.mjs",
-    "smoke:production": "node scripts/smoke-production.mjs"
+    "smoke:production": "node scripts/smoke-production.mjs",
+    "smoke:security": "node scripts/smoke-security.mjs"
   }
 }

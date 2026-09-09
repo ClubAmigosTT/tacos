@@ -1,12 +1,17 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListCollaborator, addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitComment, createVisitForUser, deleteVisitComment, deleteVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getAdminAnalytics, getAdminComments, getAdminReports, getBranchReviews, getDiary, getFeed, getHealth, getListDetails, getLists, getPassport, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, getVisitComments, recordProductEvent, registerUser, removeListCollaborator, removeListItemForUser, reportVisitForUser, reviewAdminComment, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateUserProfileForUser, updateVisitForUser, type PublicUser } from './repository.js';
+import { addListCollaborator, addListItemForUser, authenticateUser, closeRepository, consumeAuthRateLimit, createEmailVerificationToken, createListForUser, createPasswordResetToken, createSession, createVisitComment, createVisitForUser, deleteUserAccount, deleteVisitComment, deleteVisitForUser, discoverPlaces, exportUserData, findPlace, findUnverifiedUserByEmail, findUserById, followUser, getAdminAnalytics, getAdminComments, getAdminReports, getBranchReviews, getDiary, getFeed, getHealth, getListDetails, getLists, getPassport, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, getVisitComments, isSessionActive, listSessions, recordProductEvent, registerUser, removeListCollaborator, removeListItemForUser, reportVisitForUser, resetPassword, revokeAllSessions, revokeSession, reviewAdminComment, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateUserProfileForUser, updateVisitForUser, verifyEmailToken, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
 import { uploadVisitImage } from './storage.js';
+import { passwordResetUrl, sendTransactionalEmail, verificationUrl } from './email.js';
 
-const app = Fastify({ logger: true, bodyLimit: 12 * 1024 * 1024 });
-await app.register(cors, { origin: true });
+const app = Fastify({ logger: true, bodyLimit: 12 * 1024 * 1024, trustProxy: true });
+const configuredCorsOrigins = (process.env.CORS_ORIGINS ?? '').split(',').map((value) => value.trim()).filter(Boolean);
+await app.register(cors, {
+  origin: configuredCorsOrigins.length ? configuredCorsOrigins : (process.env.NODE_ENV === 'production' ? false : true),
+  credentials: false
+});
 
 app.setErrorHandler((error, request, reply) => {
   const errorCode = (error as { code?: string }).code;
@@ -30,8 +35,23 @@ declare module 'fastify' {
 async function resolveUser(request: FastifyRequest) {
   const header = request.headers.authorization;
   const token = typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : undefined;
-  const userId = token ? await verifyToken(token) : undefined;
-  return userId ? findUserById(userId) : undefined;
+  const claims = token ? await verifyToken(token) : undefined;
+  if (!claims || !(await isSessionActive(claims.sessionId, claims.userId))) return undefined;
+  return findUserById(claims.userId);
+}
+
+async function enforceAuthRateLimit(request: FastifyRequest, reply: FastifyReply, discriminator: string) {
+  const key = `${request.ip}:${discriminator}`.slice(0, 220);
+  const result = await consumeAuthRateLimit(key);
+  if (result.allowed) return true;
+  reply.header('Retry-After', String(result.retryAfterSeconds));
+  await reply.code(429).send({ error: 'TOO_MANY_ATTEMPTS', retryAfterSeconds: result.retryAfterSeconds });
+  return false;
+}
+
+function authMetadata(request: FastifyRequest) {
+  const userAgent = typeof request.headers['user-agent'] === 'string' ? request.headers['user-agent'].slice(0, 240) : undefined;
+  return { userAgent, ip: request.ip };
 }
 
 async function requireUser(request: FastifyRequest, reply: FastifyReply) {
@@ -73,9 +93,30 @@ app.post('/v1/events', async (request, reply) => {
 
 app.post('/v1/auth/register', async (request, reply) => {
   const body = z.object({ email: z.string().trim().email().max(320), password: z.string().min(8).max(128), displayName: z.string().trim().min(2).max(40) }).parse(request.body);
+  if (!(await enforceAuthRateLimit(request, reply, `register:${body.email.toLowerCase()}`))) return;
   try {
     const user = await registerUser(body);
-    return reply.code(201).send({ user, token: await issueToken(user) });
+    const verificationToken = user.emailVerified ? undefined : await createEmailVerificationToken(user.id);
+    if (verificationToken) {
+      try {
+        await sendTransactionalEmail({
+          to: user.email,
+          subject: 'Confirma tu correo en Tacos',
+          text: `Confirma tu correo abriendo este enlace: ${verificationUrl(verificationToken)}`,
+          html: `<p>Confirma tu correo para activar tu cuenta en Tacos.</p><p><a href="${verificationUrl(verificationToken)}">Confirmar correo</a></p>`
+        });
+      } catch (error) {
+        request.log.error(error);
+        if (process.env.NODE_ENV === 'production') return reply.code(503).send({ error: 'EMAIL_DELIVERY_UNAVAILABLE' });
+      }
+    }
+    // Development and CI keep the original one-step experience. Production
+    // requires the email link before issuing a session token.
+    if (!user.emailVerified && process.env.REQUIRE_EMAIL_VERIFICATION === 'true') {
+      return reply.code(201).send({ user, verificationRequired: true, ...(process.env.NODE_ENV === 'production' ? {} : { verificationToken }) });
+    }
+    const session = await createSession(user.id, authMetadata(request));
+    return reply.code(201).send({ user, token: await issueToken(user, session.id), verificationRequired: false });
   } catch (error) {
     if (error instanceof Error && error.message === 'EMAIL_TAKEN') return reply.code(409).send({ error: 'EMAIL_TAKEN' });
     throw error;
@@ -84,14 +125,129 @@ app.post('/v1/auth/register', async (request, reply) => {
 
 app.post('/v1/auth/login', async (request, reply) => {
   const body = z.object({ email: z.string().email().max(320), password: z.string().min(1).max(128) }).parse(request.body);
+  if (!(await enforceAuthRateLimit(request, reply, `login:${body.email.toLowerCase()}`))) return;
   const user = await authenticateUser(body);
-  if (!user) return reply.code(401).send({ error: 'INVALID_CREDENTIALS' });
-  return { user, token: await issueToken(user) };
+  if (!user) {
+    if (process.env.REQUIRE_EMAIL_VERIFICATION === 'true') {
+      return reply.code(401).send({ error: 'INVALID_CREDENTIALS_OR_UNVERIFIED' });
+    }
+    return reply.code(401).send({ error: 'INVALID_CREDENTIALS' });
+  }
+  const session = await createSession(user.id, authMetadata(request));
+  return { user, token: await issueToken(user, session.id), sessionId: session.id };
+});
+
+app.post('/v1/auth/verify-email', async (request, reply) => {
+  const body = z.object({ token: z.string().min(20).max(160) }).parse(request.body);
+  if (!(await enforceAuthRateLimit(request, reply, 'verify-email'))) return;
+  const user = await verifyEmailToken(body.token);
+  if (!user) return reply.code(400).send({ error: 'INVALID_OR_EXPIRED_TOKEN' });
+  const session = await createSession(user.id, authMetadata(request));
+  return { user, token: await issueToken(user, session.id) };
+});
+
+app.post('/v1/auth/resend-verification', async (request, reply) => {
+  const body = z.object({ email: z.string().trim().email().max(320) }).parse(request.body);
+  if (!(await enforceAuthRateLimit(request, reply, `resend:${body.email.toLowerCase()}`))) return;
+  const user = await findUnverifiedUserByEmail(body.email);
+  let verificationToken: string | undefined;
+  if (user) {
+    verificationToken = await createEmailVerificationToken(user.id);
+    try {
+      await sendTransactionalEmail({
+        to: user.email,
+        subject: 'Confirma tu correo en Tacos',
+        text: `Confirma tu correo abriendo este enlace: ${verificationUrl(verificationToken)}`,
+        html: `<p><a href="${verificationUrl(verificationToken)}">Confirmar correo</a></p>`
+      });
+    } catch (error) { request.log.error(error); }
+  }
+  return { status: 'accepted', ...(verificationToken && process.env.NODE_ENV !== 'production' ? { verificationToken } : {}) };
+});
+
+app.post('/v1/auth/forgot-password', async (request, reply) => {
+  const body = z.object({ email: z.string().trim().email().max(320) }).parse(request.body);
+  if (!(await enforceAuthRateLimit(request, reply, `forgot:${body.email.toLowerCase()}`))) return;
+  const token = await createPasswordResetToken(body.email);
+  if (token) {
+    try {
+      await sendTransactionalEmail({
+        to: body.email.trim().toLowerCase(),
+        subject: 'Restablece tu contraseña de Tacos',
+        text: `Restablece tu contraseña abriendo este enlace: ${passwordResetUrl(token)}`,
+        html: `<p>Solicitaste cambiar tu contraseña en Tacos.</p><p><a href="${passwordResetUrl(token)}">Restablecer contraseña</a></p>`
+      });
+    } catch (error) { request.log.error(error); }
+    // Never disclose whether the email exists. In non-production the token is
+    // returned solely to make local development and smoke tests self-contained.
+    return { status: 'accepted', ...(process.env.NODE_ENV === 'production' ? {} : { resetToken: token }) };
+  }
+  return { status: 'accepted' };
+});
+
+app.post('/v1/auth/reset-password', async (request, reply) => {
+  const body = z.object({ token: z.string().min(20).max(160), password: z.string().min(8).max(128) }).parse(request.body);
+  if (!(await enforceAuthRateLimit(request, reply, 'reset-password'))) return;
+  const reset = await resetPassword(body.token, body.password);
+  if (!reset) return reply.code(400).send({ error: 'INVALID_OR_EXPIRED_TOKEN' });
+  return { status: 'password_updated' };
+});
+
+app.post('/v1/auth/logout', async (request, reply) => {
+  const header = request.headers.authorization;
+  const token = typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : undefined;
+  const claims = token ? await verifyToken(token) : undefined;
+  if (claims) await revokeSession(claims.sessionId, claims.userId);
+  return { status: 'logged_out' };
+});
+
+app.get('/v1/me/sessions', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  return { sessions: await listSessions(user.id) };
+});
+
+app.delete('/v1/me/sessions/:id', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const params = z.object({ id: z.string().uuid() }).parse(request.params);
+  const revoked = await revokeSession(params.id, user.id);
+  if (!revoked) return reply.code(404).send({ error: 'SESSION_NOT_FOUND' });
+  return { status: 'revoked', sessionId: params.id };
+});
+
+app.post('/v1/me/sessions/revoke-all', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const header = request.headers.authorization;
+  const token = typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : undefined;
+  const claims = token ? await verifyToken(token) : undefined;
+  const revoked = await revokeAllSessions(user.id, claims?.sessionId);
+  return { status: 'revoked', count: revoked };
 });
 
 app.get('/v1/me', async (request, reply) => {
   const user = await requireUser(request, reply);
   return user ? { user } : undefined;
+});
+
+app.get('/v1/me/export', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const payload = await exportUserData(user.id);
+  if (!payload) return reply.code(404).send({ error: 'USER_NOT_FOUND' });
+  reply.header('Content-Disposition', `attachment; filename="tacos-account-${user.id}.json"`);
+  reply.type('application/json; charset=utf-8');
+  return payload;
+});
+
+app.delete('/v1/me', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const body = z.object({ confirmation: z.literal('ELIMINAR') }).parse(request.body);
+  const deleted = await deleteUserAccount(user.id);
+  if (!deleted) return reply.code(404).send({ error: 'USER_NOT_FOUND' });
+  return { status: 'deleted', confirmation: body.confirmation };
 });
 
 app.patch('/v1/me/profile', async (request, reply) => {
