@@ -108,6 +108,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 15. Diferenciar una falla temporal del API de un diario vacío en Diario, Reviews, Estadísticas, Passport y Wrapped, con reintento explícito.
 16. Resolver la sucursal explícita desde el API al abrir Registro cuando el enlace proviene de una sucursal que no está en el catálogo demo local.
 17. Invalidar las cachés derivadas de Mapa, Ficha, Listas y Taste ID después de guardar, editar o eliminar una visita.
+18. Conservar el ID de una sucursal remota en el CTA de autenticación del registro para completar el deep link después del acceso.
 
 **Aceptación:** una visita aparece en diario, feed y estadísticas; una foto inválida no se persiste; una falla de media permite guardar sin foto; una edición propia persiste y una edición ajena responde 404.
 

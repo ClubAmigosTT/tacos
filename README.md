@@ -141,6 +141,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 106. Errores HTTP precisos: JSON inválido devuelve 400 y cuerpos que superan el límite del API devuelven 413, con cobertura en el smoke test.
 107. Colaboración recuperable: la búsqueda de colaboradores muestra reintento explícito cuando falla, sin ocultar el estado de la lista.
 108. Cachés derivadas coherentes: guardar, editar o eliminar una visita invalida también Mapa, Ficha, Listas y Taste ID para que los ratings y progresos se actualicen inmediatamente.
+109. Enlaces profundos completos: una sesión anónima conserva el ID de la sucursal remota durante el acceso y vuelve al registro correcto después de autenticar.
 
 ## Verificación
 
