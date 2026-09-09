@@ -792,6 +792,59 @@ export async function getDiary(userId: string, includeHidden = true) {
   });
 }
 
+export type ApiPassportZone = { name: string; note: string; branchCount: number; visitCount: number; unlocked: boolean };
+
+/**
+ * Build the collectible city map from the live branch catalog rather than a
+ * hard-coded list. Only visible visits belonging to the requesting user can
+ * unlock a zone; hidden visits never leak into the passport progress.
+ */
+export async function getPassport(userId: string) {
+  if (pool) {
+    const result = await pool.query(`
+      SELECT b.neighborhood AS name,
+        COUNT(DISTINCT b.id)::int AS branch_count,
+        COUNT(v.id)::int AS visit_count
+      FROM branches b
+      LEFT JOIN visits v ON v.branch_id = b.id AND v.user_id = $1 AND v.visibility = 'visible'
+      WHERE b.is_active = true
+      GROUP BY b.neighborhood
+      ORDER BY b.neighborhood
+    `, [userId]);
+    const zones = result.rows.map((row) => {
+      const visitCount = Number(row.visit_count ?? 0);
+      return {
+        name: row.name,
+        note: visitCount ? 'Visitada' : `${Number(row.branch_count ?? 0)} sucursal${Number(row.branch_count ?? 0) === 1 ? '' : 'es'} por descubrir`,
+        branchCount: Number(row.branch_count ?? 0),
+        visitCount,
+        unlocked: visitCount > 0
+      } satisfies ApiPassportZone;
+    });
+    return { zones, totalZones: zones.length, visitedZones: zones.filter((zone) => zone.unlocked).length };
+  }
+
+  const zoneMap = new Map<string, { branchCount: number; visitCount: number }>();
+  for (const place of places) {
+    const current = zoneMap.get(place.neighborhood) ?? { branchCount: 0, visitCount: 0 };
+    current.branchCount += 1;
+    zoneMap.set(place.neighborhood, current);
+  }
+  for (const visit of localVisits.values()) {
+    if (visit.userId !== userId || visit.visibility !== 'visible') continue;
+    const place = places.find((item) => item.id === visit.placeId);
+    if (place) zoneMap.get(place.neighborhood)!.visitCount += 1;
+  }
+  const zones = [...zoneMap.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, counts]) => ({
+    name,
+    note: counts.visitCount ? 'Visitada' : `${counts.branchCount} sucursal${counts.branchCount === 1 ? '' : 'es'} por descubrir`,
+    branchCount: counts.branchCount,
+    visitCount: counts.visitCount,
+    unlocked: counts.visitCount > 0
+  } satisfies ApiPassportZone));
+  return { zones, totalZones: zones.length, visitedZones: zones.filter((zone) => zone.unlocked).length };
+}
+
 type ListRole = 'owner' | 'editor' | 'viewer';
 
 async function getListRole(listId: string, userId: string): Promise<ListRole | undefined> {

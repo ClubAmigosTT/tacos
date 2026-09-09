@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { colors, radii, spacing } from '@/theme';
 import { useAuth } from '@/lib/auth';
-import { diary as diaryRequest } from '@/lib/api';
+import { passport as passportRequest, type PassportZone } from '@/lib/api';
 import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 const zones = [
@@ -17,17 +17,19 @@ const zones = [
   { name: 'Coyoacán', note: 'Ruta de fin de semana' },
   { name: 'Escandón', note: 'Sabor de culto' },
 ];
+const anonymousZones: PassportZone[] = zones.map((zone) => ({ ...zone, branchCount: 0, visitCount: 0, unlocked: false }));
 
 export default function PassportScreen() {
   const { token, loading: authLoading } = useAuth();
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['diary', 'passport', token],
-    queryFn: () => diaryRequest(token!),
+    queryKey: ['passport', token],
+    queryFn: () => passportRequest(token!),
     enabled: Boolean(token),
   });
-  const visited = new Set((data?.entries ?? []).map((entry) => entry.neighborhood.toLowerCase()));
-  const visitedCount = zones.filter((zone) => visited.has(zone.name.toLowerCase())).length;
-  const progress = Math.round((visitedCount / zones.length) * 100);
+  const displayZones = data?.zones ?? anonymousZones;
+  const visitedCount = data?.visitedZones ?? displayZones.filter((zone) => zone.unlocked).length;
+  const totalZones = data?.totalZones ?? displayZones.length;
+  const progress = totalZones ? Math.round((visitedCount / totalZones) * 100) : 0;
 
   if (authLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando tu pasaporte…</Text></View>;
   if (token && isError) return <AsyncErrorState title="No pudimos cargar tu pasaporte" detail="Tus zonas visitadas siguen guardadas. Revisa la conexión e inténtalo de nuevo." onAction={() => void refetch()} />;
@@ -39,7 +41,7 @@ export default function PassportScreen() {
       </View>
 
       <View style={styles.hero}>
-        <View style={styles.heroTop}><View><Text style={styles.heroEyebrow}>CIUDAD DE MÉXICO</Text><Text style={styles.heroTitle}>{visitedCount} de {zones.length} zonas</Text></View><View style={styles.stamp}><Ionicons name="compass-outline" size={25} color={colors.background} /><Text style={styles.stampText}>CDMX</Text></View></View>
+        <View style={styles.heroTop}><View><Text style={styles.heroEyebrow}>CIUDAD DE MÉXICO</Text><Text style={styles.heroTitle}>{visitedCount} de {totalZones} zonas</Text></View><View style={styles.stamp}><Ionicons name="compass-outline" size={25} color={colors.background} /><Text style={styles.stampText}>CDMX</Text></View></View>
         <Text style={styles.heroCopy}>{isLoading ? 'Cargando tu ruta…' : visitedCount ? 'Cada visita deja una marca. Sigue trazando tu mapa de sabor.' : 'Registra tu primer taco para empezar a desbloquear la ciudad.'}</Text>
         <View style={styles.progressTrack}><View style={[styles.progress, { width: (progress + '%') as any }]} /></View>
         <Text style={styles.progressLabel}>{progress}% explorado</Text>
@@ -47,9 +49,9 @@ export default function PassportScreen() {
 
       <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Tu mapa coleccionable</Text><Text style={styles.sectionMeta}>{visitedCount} desbloqueadas</Text></View>
       <View style={styles.grid}>
-        {zones.map((zone) => {
-          const unlocked = visited.has(zone.name.toLowerCase());
-          return <View key={zone.name} style={[styles.zone, unlocked && styles.zoneUnlocked]}><View style={[styles.zoneIcon, unlocked && styles.zoneIconUnlocked]}><Ionicons name={unlocked ? 'checkmark' : 'lock-closed-outline'} size={17} color={unlocked ? colors.background : colors.dim} /></View><Text style={styles.zoneName}>{zone.name}</Text><Text style={styles.zoneNote}>{unlocked ? 'Visitada' : zone.note}</Text>{unlocked && <View style={styles.badge}><Text style={styles.badgeText}>LISTA</Text></View>}</View>;
+        {displayZones.map((zone) => {
+          const unlocked = zone.unlocked;
+          return <View key={zone.name} style={[styles.zone, unlocked && styles.zoneUnlocked]}><View style={[styles.zoneIcon, unlocked && styles.zoneIconUnlocked]}><Ionicons name={unlocked ? 'checkmark' : 'lock-closed-outline'} size={17} color={unlocked ? colors.background : colors.dim} /></View><Text style={styles.zoneName}>{zone.name}</Text><Text style={styles.zoneNote}>{unlocked ? `${zone.visitCount} visita${zone.visitCount === 1 ? '' : 's'}` : zone.note}</Text>{unlocked && <View style={styles.badge}><Text style={styles.badgeText}>LISTA</Text></View>}</View>;
         })}
       </View>
 

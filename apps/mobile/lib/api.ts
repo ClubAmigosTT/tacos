@@ -12,6 +12,8 @@ export type FeedItem = { id: string; visited_at: string; rating: number; note?: 
 export type BranchReview = { id: string; visitedAt: string; rating: number; note: string; photoUrl?: string | null; tacos: string; user: { id: string; displayName: string } };
 export type VisitComment = { id: string; body: string; createdAt: string; author: { id: string; displayName: string }; own: boolean };
 export type TasteProfile = { title: string; description: string; tags: string[]; profile: { intensity: number; spicy: number; traditional: number; texture: number; value: number } };
+export type PassportZone = { name: string; note: string; branchCount: number; visitCount: number; unlocked: boolean };
+export type PassportData = { zones: PassportZone[]; totalZones: number; visitedZones: number };
 export type AdminReport = { id: string; visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string; reporter: { id: string; displayName: string }; author: { id: string; displayName: string }; place: { id: string; name: string }; rating: number; visitedAt: string };
 export type AdminComment = { id: string; visitId: string; body: string; visibility: 'visible' | 'hidden'; createdAt: string; author: { id: string; displayName: string }; place: { id: string; name: string } };
 export type AdminAnalytics = { days: number; totalEvents: number; uniqueAudiences: number; byEvent: Array<{ eventName: string; count: number }> };
@@ -135,6 +137,10 @@ export async function recommendations(token?: string): Promise<Place[]> {
 
 export async function taste(token: string) {
   return request<{ taste: TasteProfile }>('/v1/me/taste', undefined, token);
+}
+
+export async function passport(token: string) {
+  return request<PassportData>('/v1/me/passport', undefined, token);
 }
 
 export async function getPlace(id: string, token?: string): Promise<Place> {

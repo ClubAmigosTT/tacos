@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListCollaborator, addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitComment, createVisitForUser, deleteVisitComment, deleteVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getAdminAnalytics, getAdminComments, getAdminReports, getBranchReviews, getDiary, getFeed, getHealth, getListDetails, getLists, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, getVisitComments, recordProductEvent, registerUser, removeListCollaborator, removeListItemForUser, reportVisitForUser, reviewAdminComment, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateUserProfileForUser, updateVisitForUser, type PublicUser } from './repository.js';
+import { addListCollaborator, addListItemForUser, authenticateUser, closeRepository, createListForUser, createVisitComment, createVisitForUser, deleteVisitComment, deleteVisitForUser, discoverPlaces, findPlace, findUserById, followUser, getAdminAnalytics, getAdminComments, getAdminReports, getBranchReviews, getDiary, getFeed, getHealth, getListDetails, getLists, getPassport, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, getVisitComments, recordProductEvent, registerUser, removeListCollaborator, removeListItemForUser, reportVisitForUser, reviewAdminComment, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateUserProfileForUser, updateVisitForUser, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
 import { uploadVisitImage } from './storage.js';
 
@@ -133,6 +133,12 @@ app.get('/v1/me/taste', async (request, reply) => {
   const user = await requireUser(request, reply);
   if (!user) return;
   return { taste: await getTasteProfile(user.id) };
+});
+
+app.get('/v1/me/passport', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  return getPassport(user.id);
 });
 
 app.get('/v1/branches/:id', async (request, reply) => {
