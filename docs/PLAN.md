@@ -274,31 +274,38 @@ El repositorio ya contiene el MVP funcional de las fases 1–7, más la base de 
 
 Para desarrollo local, `pnpm dev:local` levanta API y preview web en paralelo; la app queda disponible en `http://localhost:8081/` y el health check en `http://localhost:4000/health`.
 
-Para producción todavía faltan las credenciales y decisiones que sólo puede
-aportar el propietario: Resend/R2/Google Maps, el dominio HTTPS definitivo, un
-feed de sucursales con licencia y el certificado Apple de distribución. La demo
-gratuita ya está desplegada y permite validar el flujo sin depender de esta
-computadora; al completar esos datos se cambia al Blueprint de producción.
+La infraestructura de producción ya funciona fuera de esta computadora con
+Render Free, Neon PostgreSQL/PostGIS, Resend y EAS. Siguen siendo insumos del
+propietario el catálogo de sucursales y fotos con licencia, el almacenamiento
+R2 para cargas reales y el certificado Apple de distribución.
 
 ### 5.1 Estado de ejecución — 9 de septiembre de 2026
 
 - **Render demo gratuita:** Blueprint `tacos-free-demo` creado y servicio
   `tacos-api-free` en `https://tacos-api-free.onrender.com`. `/health` responde
   `200` con PostgreSQL y `/v1/discover` devuelve las tres sucursales semilla.
-- **Base de datos:** `tacos-postgres-free` está enlazada al API y las
-  migraciones se ejecutan idempotentemente al arrancar el servicio.
-- **EAS:** `EXPO_PUBLIC_API_URL` apunta al API HTTPS en los entornos `preview` y
-  `production`. La build de simulador iOS
+- **Producción gratuita:** Blueprint `tacos-production` creado. La API vive en
+  `https://tacos-api.onrender.com`, la web en
+  `https://tacos-web.onrender.com` y ambas responden correctamente por HTTPS.
+- **Base de datos persistente:** Neon `tacos-production` está enlazado al API,
+  PostGIS está habilitado y las migraciones se ejecutan idempotentemente al
+  arrancar el servicio.
+- **Correo:** `clubamigostt.com` está verificado en Resend mediante DKIM, SPF y
+  MX administrados en Cloudflare. Render conserva la clave de envío como
+  secreto y usa `Tacos <hola@clubamigostt.com>`.
+- **EAS:** `EXPO_PUBLIC_API_URL` de producción apunta a la API HTTPS y
+  `GOOGLE_MAPS_API_KEY` está guardada como secreto para Android. La build de
+  simulador iOS
   `f21afbed-d7ca-4e3e-8b3b-2122f9f6eee3` terminó correctamente y su artefacto
-  está disponible desde la página de EAS.
-- **Pendiente para producción:** configurar Resend/R2, importar un catálogo
-  real con licencia, definir `APP_WEB_URL`/`CORS_ORIGINS`, añadir
-  `GOOGLE_MAPS_API_KEY` para Android y configurar el certificado de distribución
-  Apple para TestFlight. La demo mantiene verificación de correo desactivada y
-  catálogo semilla sólo para QA.
-- **Riesgo de gratuidad:** el PostgreSQL Free de Render es temporal (30 días,
-  1 GB y sin backups); no se deben guardar datos de usuarios reales sin una
-  exportación y una migración a almacenamiento persistente.
+  está disponible desde la página de EAS. La build Android de producción
+  `8639e295-ade8-45db-8ee6-a58cf9401607` fue enviada a EAS.
+- **Pendiente de contenido y tiendas:** importar un catálogo real con fuente y
+  fotos licenciadas, crear R2 antes de habilitar cargas persistentes y validar
+  las credenciales Apple de distribución para generar la build de TestFlight.
+  Producción oculta deliberadamente las tres sucursales demo.
+- **Límite del plan gratuito:** Render puede dormir el API por inactividad y
+  provocar un primer request lento. Neon sustituye al PostgreSQL temporal de
+  Render, por lo que los datos de producción no expiran a los 30 días.
 
 ## 6. Evolución después del MVP
 
