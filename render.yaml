@@ -1,5 +1,23 @@
 services:
   - type: web
+    name: tacos-web
+    runtime: static
+    # Static sites are also available on Render's Free plan and provide the
+    # HTTPS origin used by account verification and password reset links.
+    plan: free
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @tacos/mobile exec expo export --platform web
+    staticPublishPath: apps/mobile/dist
+    envVars:
+      - key: EXPO_PUBLIC_API_URL
+        fromService:
+          name: tacos-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+  - type: web
     name: tacos-api
     runtime: node
     region: ohio
@@ -25,11 +43,20 @@ services:
       - key: ADMIN_EMAILS
         sync: false
       - key: PUBLIC_API_URL
-        value: https://tacos-api.onrender.com
+        fromService:
+          name: tacos-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
       - key: APP_WEB_URL
-        sync: false
+        fromService:
+          name: tacos-web
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
       - key: CORS_ORIGINS
-        sync: false
+        fromService:
+          name: tacos-web
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
       - key: REQUIRE_EMAIL_VERIFICATION
         value: "true"
       - key: RESEND_API_KEY

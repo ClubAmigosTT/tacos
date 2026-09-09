@@ -196,9 +196,9 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 ### Fase 8 — CI, Render y releases móviles (2–3 días de configuración)
 
 1. Subir el repositorio a GitHub y proteger `main`/`master` con `.github/workflows/ci.yml`.
-2. Crear el Blueprint gratuito de Render con `render.yaml`: únicamente API web
-   y PostgreSQL en plan Free. Worker, cron y Key Value quedan fuera del MVP para
-   no introducir cargos.
+2. Crear el Blueprint gratuito de Render con `render.yaml`: frontend estático,
+   API web y PostgreSQL en plan Free. Worker, cron y Key Value quedan fuera del
+   MVP para no introducir cargos.
 3. Configurar secretos en Render: `JWT_SECRET`, `DATABASE_URL`, `ADMIN_EMAILS` y credenciales S3.
 4. Verificar `/health`, ejecutar migraciones idempotentes al arrancar el API
    (el `preDeployCommand` requiere un servicio pagado) y revisar logs del primer
@@ -214,7 +214,11 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 13. Exponer reseñas públicas por sucursal a partir de visitas visibles, respetando `share_activity` y sin filtrar correo u otros campos privados.
 14. Aplicar `021_auth_security.sql`: sesiones de 7 días revocables, verificación y recuperación por token de un solo uso, exportación/eliminación y rate limiting persistido.
 15. Aplicar `022_catalog_sources.sql` e importar `catalog/branches.json` desde una fuente autorizada; rechazar fotos sin licencia/atribución y marcar duplicados para revisión.
-16. Configurar `PUBLIC_API_URL`, `APP_WEB_URL`, `CORS_ORIGINS`, Resend y R2 antes de activar tráfico de producción. Mientras tanto, el MVP mantiene fotos opcionales, pero no debe abrirse el registro público sin proveedor de correo.
+16. Configurar Resend y R2 antes de activar tráfico de producción. El Blueprint
+    enlaza automáticamente `PUBLIC_API_URL`, `APP_WEB_URL`, `CORS_ORIGINS` y
+    `EXPO_PUBLIC_API_URL` con las URLs HTTPS del frontend y la API. Mientras
+    tanto, el MVP mantiene fotos opcionales, pero no debe abrirse el registro
+    público sin proveedor de correo.
 
 17. Recordar que el PostgreSQL Free expira a los 30 días, está limitado a 1 GB
     y no tiene backups. Programar exportaciones y migrar a almacenamiento

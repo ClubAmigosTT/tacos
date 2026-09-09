@@ -221,22 +221,23 @@ Cada push y pull request a `main` o `master` ejecuta estos checks en GitHub Acti
 
 1. Sube este repositorio a GitHub.
 2. En Render elige **New → Blueprint**, selecciona el repositorio y confirma `render.yaml`.
-3. Render creará únicamente `tacos-api` y `tacos-postgres`, ambos en el plan
-   **Free**. No se requiere tarjeta mientras el Blueprint no incluya recursos
-   de pago.
+3. Render creará `tacos-web` (frontend estático), `tacos-api` y
+   `tacos-postgres`, todos en el plan **Free**. El frontend recibe la URL de la
+   API automáticamente y sirve las rutas de Expo para verificación y recuperación.
+   No se requiere tarjeta mientras el Blueprint no incluya recursos de pago.
 4. El `JWT_SECRET` se genera automáticamente. Las fotos son opcionales en el
    MVP (`STORAGE_REQUIRED=false`); configura `STORAGE_BUCKET_URL`, `S3_BUCKET`,
    `S3_ACCESS_KEY_ID` y `S3_SECRET_ACCESS_KEY` cuando conectes R2/S3.
    `S3_ENDPOINT` permite usar R2, MinIO u otro proveedor compatible.
 5. Comprueba `https://<tu-api>.onrender.com/health`.
 
-Para Cloudflare R2 usa `S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`,
+El Blueprint enlaza `PUBLIC_API_URL`, `APP_WEB_URL`, `CORS_ORIGINS` y
+`EXPO_PUBLIC_API_URL` mediante las URLs HTTPS de los servicios. Para Cloudflare R2 usa `S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`,
 `S3_REGION=auto`, `S3_FORCE_PATH_STYLE=false` y un dominio público HTTPS en
 `STORAGE_BUCKET_URL`. En Render configura también `RESEND_API_KEY`,
-`EMAIL_FROM`, `APP_WEB_URL` y conserva `REQUIRE_EMAIL_VERIFICATION=true`.
-Render entrega HTTPS automáticamente en `https://tacos-api.onrender.com`; si
-conectas un dominio propio, actualiza `PUBLIC_API_URL`, `APP_WEB_URL`,
-`CORS_ORIGINS` y `EXPO_PUBLIC_API_URL` con ese dominio.
+`EMAIL_FROM` y conserva `REQUIRE_EMAIL_VERIFICATION=true`. Render entrega
+HTTPS automáticamente en las URLs `onrender.com`; si conectas un dominio
+propio, actualiza las variables correspondientes.
 
 Las cuentas tienen sesiones revocables, verificación de correo, recuperación de
 contraseña, exportación JSON y eliminación. Las rutas de soporte son
