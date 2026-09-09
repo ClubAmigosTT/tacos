@@ -39,13 +39,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     void (async () => {
-      const saved = await readToken();
-      if (!saved) { if (active) setLoading(false); return; }
       try {
+        const saved = await readToken();
+        if (!saved) return;
         const result = await me(saved);
         if (active) { setToken(saved); setUser(result.user); }
-      } catch { await writeToken(null); }
-      if (active) setLoading(false);
+      } catch {
+        // A corrupt/expired local session must never block the app shell.
+        try { await writeToken(null); } catch { /* storage can be unavailable */ }
+        if (active) { setToken(undefined); setUser(undefined); }
+      } finally {
+        if (active) setLoading(false);
+      }
     })();
     return () => { active = false; };
   }, []);
