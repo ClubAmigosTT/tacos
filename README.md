@@ -136,6 +136,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 101. Listas resilientes: la pantalla de curaduría espera la sesión, diferencia una falla autenticada del estado vacío y permite reintentar sin mostrar fixtures como si fueran datos reales.
 102. Errores propagados: las consultas autenticadas de Listas y Personas ya no convierten una caída del API en un array vacío, por lo que el reintento visible se activa de verdad.
 103. Paridad de persistencia: CI levanta PostgreSQL con PostGIS, aplica todas las migraciones y ejecuta el smoke del API contra esa base antes de exportar Expo.
+104. Registro desde enlaces remotos: una sucursal válida de Render se carga antes de registrar la visita, sin sustituirla por el primer lugar del catálogo local; un enlace inválido ofrece reintento.
 
 ## Verificación
 

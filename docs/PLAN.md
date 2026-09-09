@@ -106,6 +106,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 13. Proponer la sucursal más cercana después de usar la cámara, manteniendo la selección explícita del usuario hasta confirmar.
 14. Mantener la sucursal elegida al entrar al registro desde una ficha, aunque la consulta de cercanía se actualice después.
 15. Diferenciar una falla temporal del API de un diario vacío en Diario, Reviews, Estadísticas, Passport y Wrapped, con reintento explícito.
+16. Resolver la sucursal explícita desde el API al abrir Registro cuando el enlace proviene de una sucursal que no está en el catálogo demo local.
 
 **Aceptación:** una visita aparece en diario, feed y estadísticas; una foto inválida no se persiste; una falla de media permite guardar sin foto; una edición propia persiste y una edición ajena responde 404.
 

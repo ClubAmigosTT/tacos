@@ -5,16 +5,24 @@ import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, Vi
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { createVisit, discover, trackEvent, uploadImage } from '@/lib/api';
+import { createVisit, discover, getPlace, trackEvent, uploadImage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { places } from '@/data/fixtures';
 import { colors, radii, spacing } from '@/theme';
+import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 export default function RegisterScreen() {
   const { token, loading } = useAuth();
   const queryClient = useQueryClient();
   const { placeId: initialPlaceId } = useLocalSearchParams<{ placeId?: string }>();
-  const initialPlace = places.find((item) => item.id === initialPlaceId) ?? places[0];
+  const fallbackPlace = places.find((item) => item.id === initialPlaceId) ?? places[0];
+  const remoteInitialPlace = Boolean(initialPlaceId && !places.some((item) => item.id === initialPlaceId));
+  const { data: fetchedInitialPlace, isLoading: initialPlaceLoading, isError: initialPlaceError, refetch: refetchInitialPlace } = useQuery({
+    queryKey: ['place', 'register', initialPlaceId],
+    queryFn: () => getPlace(initialPlaceId!),
+    enabled: remoteInitialPlace
+  });
+  const initialPlace = fetchedInitialPlace ?? fallbackPlace;
   const initialTacoId = initialPlace.tacos[0]?.id;
   const [placeId, setPlaceId] = useState(initialPlace.id);
   const [tacoIds, setTacoIds] = useState<string[]>(initialTacoId ? [initialTacoId] : []);
@@ -60,8 +68,18 @@ export default function RegisterScreen() {
     setTacoRatings(first.tacos[0] ? { [first.tacos[0].id]: rating } : {});
   }, [availablePlaces, placeId, rating]);
 
+  useEffect(() => {
+    if (!fetchedInitialPlace) return;
+    setPlaceId(fetchedInitialPlace.id);
+    const firstTaco = fetchedInitialPlace.tacos[0];
+    setTacoIds(firstTaco ? [firstTaco.id] : []);
+    setTacoRatings(firstTaco ? { [firstTaco.id]: rating } : {});
+  }, [fetchedInitialPlace?.id]);
+
   if (loading) return <View style={styles.authRequired}><Text style={styles.successText}>Cargando tu sesión…</Text></View>;
   if (!token) return <View style={styles.authRequired}><View style={styles.successIcon}><Ionicons name="person" size={26} color={colors.background} /></View><Text style={styles.successTitle}>Tu diario necesita una cuenta</Text><Text style={styles.successText}>Crea tu identidad para guardar esta visita y verla después en tu historial.</Text><Pressable style={styles.primary} onPress={() => router.push({ pathname: '/auth', params: { returnTo: '/register', placeId } })}><Text style={styles.primaryText}>Entrar o crear cuenta</Text><Ionicons name="arrow-forward" size={18} color={colors.background} /></Pressable><Pressable onPress={() => router.back()}><Text style={styles.cancelText}>Ahora no</Text></Pressable></View>;
+  if (remoteInitialPlace && initialPlaceLoading) return <View style={styles.authRequired}><Text style={styles.successText}>Buscando la sucursal…</Text></View>;
+  if (remoteInitialPlace && (initialPlaceError || !fetchedInitialPlace)) return <AsyncErrorState title="No encontramos esa sucursal" detail="El enlace puede haber caducado o la conexión no estar disponible. Inténtalo de nuevo o vuelve al mapa." onAction={() => void refetchInitialPlace()} />;
 
   function selectPlace(id: string) {
     setPlaceId(id);
