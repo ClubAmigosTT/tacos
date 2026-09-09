@@ -270,7 +270,30 @@ El repositorio ya contiene el MVP funcional de las fases 1–7, más la base de 
 
 Para desarrollo local, `pnpm dev:local` levanta API y preview web en paralelo; la app queda disponible en `http://localhost:8081/` y el health check en `http://localhost:4000/health`.
 
-Lo único que no puede completarse desde este entorno es la conexión de cuentas externas y la carga de datos reales: autorizar Render/EAS, pegar las claves R2/Resend/Maps, elegir el dominio HTTPS y proporcionar un feed de sucursales con licencia. Una vez configuradas esas credenciales, la secuencia de la Fase 8 deja la app operando sin depender de esta computadora.
+Para producción todavía faltan las credenciales y decisiones que sólo puede
+aportar el propietario: Resend/R2/Google Maps, el dominio HTTPS definitivo, un
+feed de sucursales con licencia y el certificado Apple de distribución. La demo
+gratuita ya está desplegada y permite validar el flujo sin depender de esta
+computadora; al completar esos datos se cambia al Blueprint de producción.
+
+### 5.1 Estado de ejecución — 9 de septiembre de 2026
+
+- **Render demo gratuita:** Blueprint `tacos-free-demo` creado y servicio
+  `tacos-api-free` en `https://tacos-api-free.onrender.com`. `/health` responde
+  `200` con PostgreSQL y `/v1/discover` devuelve las tres sucursales semilla.
+- **Base de datos:** `tacos-postgres-free` está enlazada al API y las
+  migraciones se ejecutan idempotentemente al arrancar el servicio.
+- **EAS:** `EXPO_PUBLIC_API_URL` apunta al API HTTPS en los entornos `preview` y
+  `production`. La build de simulador iOS
+  `f21afbed-d7ca-4e3e-8b3b-2122f9f6eee3` quedó encolada con el commit actual.
+- **Pendiente para producción:** configurar Resend/R2, importar un catálogo
+  real con licencia, definir `APP_WEB_URL`/`CORS_ORIGINS`, añadir
+  `GOOGLE_MAPS_API_KEY` para Android y configurar el certificado de distribución
+  Apple para TestFlight. La demo mantiene verificación de correo desactivada y
+  catálogo semilla sólo para QA.
+- **Riesgo de gratuidad:** el PostgreSQL Free de Render es temporal (30 días,
+  1 GB y sin backups); no se deben guardar datos de usuarios reales sin una
+  exportación y una migración a almacenamiento persistente.
 
 ## 6. Evolución después del MVP
 
