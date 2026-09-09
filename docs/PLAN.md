@@ -164,6 +164,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 8. Validar `render.yaml` con sintaxis local en cada CI y, cuando existan credenciales de workspace, ejecutar el Render CLI fijado para detectar referencias antes de sincronizar el Blueprint.
 9. Levantar PostgreSQL + PostGIS en CI, aplicar migraciones y correr el smoke autenticado contra la ruta de persistencia que usará Render.
 10. Mantener la CLI oficial de Render fijada a una versión vigente y verificar que el Blueprint también pase su validador local antes del primer deploy.
+11. Cubrir en CI por separado los dos fallos de configuración de una build production: URL de API no HTTPS y ausencia de la clave de Google Maps.
 
 **Aceptación:** la API responde desde `https://…onrender.com`, la app se conecta sin esta computadora encendida y el smoke test corre en CI.
 

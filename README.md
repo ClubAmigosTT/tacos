@@ -146,6 +146,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 111. Búsqueda universal contextual: una consulta de colonia o sucursal deja de heredar el filtro “Pastor” por defecto; sólo un taco detectado activa ratings y pins específicos de ese taco.
 112. Conversaciones recuperables: la pantalla de comentarios distingue un fallo temporal del estado sin comentarios y permite reintentar sin perder el redactor.
 113. Blueprint validado: la CLI oficial de Render 2.26.0 valida `render.yaml` localmente y el workflow puede repetir la comprobación contra un workspace cuando existan credenciales.
+114. Releases protegidos: el smoke de Expo comprueba por separado que production rechace tanto una API local como una build Android sin Google Maps.
 
 ## Verificación
 
