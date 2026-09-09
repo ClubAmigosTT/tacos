@@ -16,6 +16,7 @@ if (easProfile === 'production') {
 const config: ExpoConfig = {
   name: 'Tacos',
   slug: 'tacos',
+  owner: 'clubamigostt',
   version: '0.1.0',
   orientation: 'portrait',
   scheme: 'tacos',
@@ -70,7 +71,10 @@ const config: ExpoConfig = {
     ]
   ],
   extra: {
-    apiUrl
+    apiUrl,
+    eas: {
+      projectId: '155a5800-f93e-4680-9cc4-02450eb830b6'
+    }
   }
 };
 

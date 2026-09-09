@@ -30,6 +30,7 @@ const iosWithoutMaps = run({ EAS_BUILD_PROFILE: 'production', EAS_BUILD_PLATFORM
 if (iosWithoutMaps.status !== 0) throw new Error(`iOS production config unexpectedly requires Google Maps:\n${iosWithoutMaps.stderr || iosWithoutMaps.stdout}`);
 const iosConfig = JSON.parse(iosWithoutMaps.stdout.trim());
 if (iosConfig.ios?.bundleIdentifier !== 'com.tacos.app') throw new Error('iOS bundle identifier changed unexpectedly');
+if (iosConfig.owner !== 'clubamigostt' || iosConfig.extra?.eas?.projectId !== '155a5800-f93e-4680-9cc4-02450eb830b6') throw new Error('Expo project linkage changed unexpectedly');
 if (iosConfig.ios?.supportsTablet !== false) throw new Error('The iPhone-first release must not advertise untested iPad support');
 if (!iosConfig.ios?.infoPlist?.NSLocationWhenInUseUsageDescription) throw new Error('iOS location permission copy is missing');
 if (!iosConfig.ios?.infoPlist?.NSCameraUsageDescription || !iosConfig.ios?.infoPlist?.NSPhotoLibraryUsageDescription) throw new Error('iOS media permission copy is missing');
