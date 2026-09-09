@@ -143,6 +143,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 108. Cachés derivadas coherentes: guardar, editar o eliminar una visita invalida también Mapa, Ficha, Listas y Taste ID para que los ratings y progresos se actualicen inmediatamente.
 109. Enlaces profundos completos: una sesión anónima conserva el ID de la sucursal remota durante el acceso y vuelve al registro correcto después de autenticar.
 110. Sesión resistente: el perfil mínimo se conserva junto al token y sólo se borra ante `401/403`; una caída temporal del API no cierra la cuenta.
+111. Búsqueda universal contextual: una consulta de colonia o sucursal deja de heredar el filtro “Pastor” por defecto; sólo un taco detectado activa ratings y pins específicos de ese taco.
 
 ## Verificación
 
