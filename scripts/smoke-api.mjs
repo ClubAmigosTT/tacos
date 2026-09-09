@@ -55,6 +55,8 @@ const unsavedPlaces = await request('/v1/me/saved', { token: bob.token });
 if (unsavedPlaces.placeIds?.includes('vilsito')) throw new Error('Place was not removed from saved places');
 const taqueria = await request('/v1/taquerias/vilsito');
 if (taqueria.branches?.[0]?.taqueriaId !== 'vilsito') throw new Error('Taqueria parent relation missing');
+const vilsitoDetail = await request('/v1/branches/vilsito');
+if (!vilsitoDetail.tacos?.some((taco) => taco.id === 'vilsito-queso' && taco.name === 'Gringa')) throw new Error('Catalog seed is missing the Vilsito Gringa');
 
 await request(`/v1/users/${bob.user.id}/follow`, { method: 'POST', body: JSON.stringify({}), token: alice.token });
 const peopleSearch = await request(`/v1/users/search?q=${encodeURIComponent(suffix)}`, { token: alice.token });
