@@ -29,6 +29,8 @@ Para abrir la app en un dispositivo físico, sustituye `EXPO_PUBLIC_API_URL` por
 
 En el emulador Android usa `http://10.0.2.2:4000`; el emulador redirige esa dirección hacia el host local. El simulador iOS y el preview web pueden usar `http://localhost:4000`.
 
+Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejecuta `pnpm dev:expo`; después escanea el QR desde Expo Go. Con un simulador instalado puedes usar `pnpm dev:ios` o `pnpm dev:android`. `pnpm dev:local` está pensado para revisar la exportación web en `http://localhost:8081/`.
+
 ## Flujo implementado
 
 1. Inicio y mapa con filtros visuales (`Pastor`, `Abierto ahora`, `Barato`, `Para mí`).
@@ -108,7 +110,6 @@ En el emulador Android usa `http://10.0.2.2:4000`; el emulador redirige esa dire
 75. Paridad de búsqueda: PostgreSQL también encuentra sucursales por nombre de taco mediante `EXISTS` e índice trigram, igual que el fallback local.
 76. Decisión en la ficha: el detalle calcula precio promedio del menú y estado de apertura con la misma regla nocturna del mapa.
 77. Sesión sin parpadeos: Diario, Perfil y Registro esperan la restauración de SecureStore/localStorage antes de mostrar fixtures o estados de autenticación.
-78. Cierre del registro: guardar una visita invalida diario, feed, recomendaciones, mapa y ficha, y el CTA vuelve al mapa sin duplicar la pantalla de formulario.
 79. Contexto navegable: el hero de Inicio puntúa el taco destacado y cada lugar de Actividad abre su ficha, sin confundir rating global con rating de menú.
 80. Deep links sin estados falsos: las rutas personales esperan la restauración de sesión antes de consultar o mostrar el estado anónimo.
 81. Sesión consistente en rutas privadas: ajustes sincroniza el nombre cuando llega el usuario y edición/comentarios no consultan el API hasta tener token.
