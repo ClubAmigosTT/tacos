@@ -254,6 +254,13 @@ El servicio ejecuta las migraciones antes de cada deploy mediante `preDeployComm
 
 ### Builds iOS y Android
 
+La primera versión se configura como **iPhone-first**: Apple Maps nativo, áreas
+seguras para notch/Dynamic Island, gestos de cierre en modales y textos de
+permisos específicos para ubicación, cámara y fototeca. Android sigue usando
+Google Maps con la misma base React Native. El perfil `ios-simulator` permite
+generar una build de simulador sin credenciales de distribución; `production`
+genera la build firmada destinada a TestFlight.
+
 Desde `apps/mobile` inicia sesión en Expo y crea el proyecto EAS una sola vez. Los perfiles de `eas.json` fijan explícitamente los entornos `development`, `preview` y `production` para que la URL de Render no se mezcle entre builds:
 
 ```bash
@@ -262,6 +269,7 @@ npx eas-cli@latest init
 npx eas-cli@latest env:set --name EXPO_PUBLIC_API_URL --value https://<tu-api>.onrender.com --environment production --visibility plaintext
 npx eas-cli@latest env:set --name GOOGLE_MAPS_API_KEY --value <tu-clave> --environment production --visibility sensitive
 npx eas-cli@latest build --platform all --profile production
+npx eas-cli@latest build --platform ios --profile ios-simulator
 npx eas-cli@latest submit --platform ios --profile production
 npx eas-cli@latest submit --platform android --profile production
 ```

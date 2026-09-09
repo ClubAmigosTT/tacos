@@ -21,11 +21,20 @@ const config: ExpoConfig = {
   scheme: 'tacos',
   userInterfaceStyle: 'automatic',
   ios: {
-    supportsTablet: true,
+    // The first release is intentionally iPhone-first. Enabling iPad here
+    // would advertise a layout that has not yet completed tablet QA.
+    supportsTablet: false,
     bundleIdentifier: 'com.tacos.app',
+    config: {
+      usesNonExemptEncryption: false
+    },
     infoPlist: {
       NSLocationWhenInUseUsageDescription:
-        'Usamos tu ubicación para mostrar taquerías cercanas y personalizar el mapa.'
+        'Tu ubicación permite mostrar taquerías cercanas y calcular distancias. Solo se usa mientras tienes Tacos abierta.',
+      NSCameraUsageDescription:
+        'La cámara permite añadir una foto opcional a tu visita.',
+      NSPhotoLibraryUsageDescription:
+        'Tus fotos permiten añadir una imagen opcional a tu diario de tacos.'
     }
   },
   android: {
@@ -49,8 +58,8 @@ const config: ExpoConfig = {
     [
       'expo-image-picker',
       {
-        photosPermission: 'Usamos tus fotos para guardar recuerdos de tus visitas.',
-        cameraPermission: 'Usamos la cámara para fotografiar tus tacos.'
+        photosPermission: 'Tus fotos permiten añadir una imagen opcional a tu diario de tacos.',
+        cameraPermission: 'La cámara permite añadir una foto opcional a tu visita.'
       }
     ],
     [

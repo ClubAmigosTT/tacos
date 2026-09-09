@@ -28,6 +28,11 @@ if (missingMaps.error || missingMaps.status === 0 || !`${missingMaps.stdout ?? '
 
 const iosWithoutMaps = run({ EAS_BUILD_PROFILE: 'production', EAS_BUILD_PLATFORM: 'ios', EXPO_PUBLIC_API_URL: 'https://tacos-api.onrender.com', GOOGLE_MAPS_API_KEY: '' });
 if (iosWithoutMaps.status !== 0) throw new Error(`iOS production config unexpectedly requires Google Maps:\n${iosWithoutMaps.stderr || iosWithoutMaps.stdout}`);
+const iosConfig = JSON.parse(iosWithoutMaps.stdout.trim());
+if (iosConfig.ios?.bundleIdentifier !== 'com.tacos.app') throw new Error('iOS bundle identifier changed unexpectedly');
+if (iosConfig.ios?.supportsTablet !== false) throw new Error('The iPhone-first release must not advertise untested iPad support');
+if (!iosConfig.ios?.infoPlist?.NSLocationWhenInUseUsageDescription) throw new Error('iOS location permission copy is missing');
+if (!iosConfig.ios?.infoPlist?.NSCameraUsageDescription || !iosConfig.ios?.infoPlist?.NSPhotoLibraryUsageDescription) throw new Error('iOS media permission copy is missing');
 
 const valid = run({ EAS_BUILD_PROFILE: 'production', EAS_BUILD_PLATFORM: 'android', EXPO_PUBLIC_API_URL: 'https://tacos-api.onrender.com', GOOGLE_MAPS_API_KEY: 'smoke-key' });
 if (valid.status !== 0) throw new Error(`Production config rejected valid environment:\n${valid.stderr || valid.stdout}`);
