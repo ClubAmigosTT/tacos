@@ -191,6 +191,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 156. Búsqueda universal por intención: las consultas con varias palabras combinan taco, sucursal, zona y estilo en memoria y PostgreSQL, sin exigir que aparezcan contiguas.
 157. Consultas vacías honestas: una búsqueda compuesta sólo por puntuación devuelve cero resultados en vez de mostrar accidentalmente todo el catálogo.
 158. Sesión persistente ante outage: una falla transitoria del API conserva el JWT en memoria, muestra estados recuperables y sólo cierra la cuenta ante `401/403`.
+159. Pins semánticos: una búsqueda de colonia o sucursal muestra rating general en los pins aunque el filtro visual “Pastor” siga seleccionado.
 
 ## Verificación
 

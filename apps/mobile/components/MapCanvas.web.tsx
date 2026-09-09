@@ -55,7 +55,10 @@ export function MapCanvas({ places, active, tacoName, onSelect, userCoordinates,
       regionChangeRef.current?.({ latitude, longitude });
     }
   })).current;
-  const ratingTaco = tacoName ?? (active === 'Pastor' ? 'Pastor' : undefined);
+  // The screen decides whether the current query is actually taco-specific.
+  // Do not infer Pastor from the visual filter here: a neighborhood search
+  // may leave that filter selected while pins should show branch ratings.
+  const ratingTaco = tacoName;
   return <View accessibilityRole="adjustable" accessibilityLabel="Mapa de taquerías; arrastra para explorar" style={styles.webMap} {...panResponder.panHandlers}><View style={[styles.mapContent, { transform: [{ translateX: pan.x }, { translateY: pan.y }] }]}><View style={styles.roadOne} /><View style={styles.roadTwo} /><View style={styles.roadThree} /><Text style={[styles.label, { top: '25%', left: '19%' }]}>NARVARTE</Text><Text style={[styles.label, { top: '44%', left: '57%' }]}>ROMA SUR</Text><Text style={[styles.label, { top: '67%', left: '72%' }]}>CONDESA</Text>{places.map((place) => { const taco = ratingTaco ? place.tacos.find((item) => normalizeRadarText(item.name) === normalizeRadarText(ratingTaco)) : undefined; const pinLabel = active === '92% para mí' ? `${place.match}%` : taco ? `${taco.name} ${taco.rating.toFixed(1)}` : place.rating.toFixed(1); return <Pressable key={place.id} accessibilityRole="button" accessibilityLabel={`Abrir ${place.name}, ${pinLabel}`} onPress={() => onSelect(place.id)} style={[styles.pinPosition, pinPosition(place)]}><MapPin label={pinLabel} accent={active === '92% para mí'} /></Pressable>; })}</View></View>;
 }
 

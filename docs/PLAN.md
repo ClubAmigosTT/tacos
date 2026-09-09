@@ -185,6 +185,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 31. Tokenizar la búsqueda universal para resolver consultas como “gringa Narvarte” en el catálogo local y en PostGIS, con regresión en el smoke del API.
 32. Mantener vacía una búsqueda sin términos alfanuméricos, con regresión en el smoke para no confundir entrada inválida con “todos los lugares”.
 33. Conservar el token en memoria durante una falla transitoria al restaurar sesión, dejando que las rutas privadas ofrezcan reintento y reservando el cierre para `401/403`.
+34. Evitar que el filtro visual “Pastor” contamine búsquedas de colonia o sucursal; sólo el contexto de taco resuelto por el buscador debe cambiar el rating de los pins.
 
 **Aceptación:** un reporte aparece en `/v1/admin/reports`, un admin puede ocultarlo, el feed deja de mostrarlo, el perfil público no lo cuenta y `pnpm smoke:admin` confirma que no contamina recomendaciones.
 

@@ -11,6 +11,9 @@ export function MapCanvas({ places, active, tacoName, onSelect, userCoordinates,
   const mapRef = useRef<MapView>(null);
   const initialRegion = userCoordinates ? { ...userCoordinates, latitudeDelta: 0.04, longitudeDelta: 0.04 } : { latitude: 19.402, longitude: -99.163, latitudeDelta: 0.065, longitudeDelta: 0.065 };
   useEffect(() => { if (userCoordinates) mapRef.current?.animateToRegion({ ...userCoordinates, latitudeDelta: 0.04, longitudeDelta: 0.04 }, 450); }, [userCoordinates?.latitude, userCoordinates?.longitude]);
-  const ratingTaco = tacoName ?? (active === 'Pastor' ? 'Pastor' : undefined);
+  // The screen decides whether the current query is actually taco-specific.
+  // Do not infer Pastor from the visual filter here: a neighborhood search
+  // may leave that filter selected while pins should show branch ratings.
+  const ratingTaco = tacoName;
   return <MapView ref={mapRef} {...(Platform.OS === 'android' ? { provider: PROVIDER_GOOGLE } : {})} style={StyleSheet.absoluteFill} initialRegion={initialRegion} showsUserLocation={Boolean(userCoordinates)} showsMyLocationButton={Platform.OS === 'android'} customMapStyle={mapStyle} accessibilityLabel="Mapa de taquerías" onRegionChangeComplete={(region) => onRegionChangeComplete?.({ latitude: region.latitude, longitude: region.longitude })}>{places.map((place) => { const taco = ratingTaco ? place.tacos.find((item) => normalizeRadarText(item.name) === normalizeRadarText(ratingTaco)) : undefined; const pinLabel = active === '92% para mí' ? `${place.match}%` : taco ? `${taco.name} ${taco.rating.toFixed(1)}` : place.rating.toFixed(1); return <Marker key={place.id} coordinate={place.coordinates} accessibilityLabel={`Abrir ${place.name}, ${pinLabel}`} onPress={() => onSelect(place.id)}><MapPin label={pinLabel} accent={active === '92% para mí'} /></Marker>; })}</MapView>;
 }
