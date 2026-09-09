@@ -165,6 +165,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 9. Levantar PostgreSQL + PostGIS en CI, aplicar migraciones y correr el smoke autenticado contra la ruta de persistencia que usará Render.
 10. Mantener la CLI oficial de Render fijada a una versión vigente y verificar que el Blueprint también pase su validador local antes del primer deploy.
 11. Cubrir en CI por separado los dos fallos de configuración de una build production: URL de API no HTTPS y ausencia de la clave de Google Maps.
+12. Aplicar la exigencia de Google Maps sólo al perfil Android y verificar que la configuración iOS pueda compilar con Apple Maps sin esa clave.
 
 **Aceptación:** la API responde desde `https://…onrender.com`, la app se conecta sin esta computadora encendida y el smoke test corre en CI.
 

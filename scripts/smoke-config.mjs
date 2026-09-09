@@ -21,12 +21,15 @@ if (invalid.error || invalid.status === 0 || !`${invalid.stdout ?? ''}\n${invali
   throw new Error('Production config accepted a non-HTTPS API URL');
 }
 
-const missingMaps = run({ EAS_BUILD_PROFILE: 'production', EXPO_PUBLIC_API_URL: 'https://tacos-api.onrender.com', GOOGLE_MAPS_API_KEY: '' });
+const missingMaps = run({ EAS_BUILD_PROFILE: 'production', EAS_BUILD_PLATFORM: 'android', EXPO_PUBLIC_API_URL: 'https://tacos-api.onrender.com', GOOGLE_MAPS_API_KEY: '' });
 if (missingMaps.error || missingMaps.status === 0 || !`${missingMaps.stdout ?? ''}\n${missingMaps.stderr ?? ''}`.includes('GOOGLE_MAPS_API_KEY is required')) {
   throw new Error('Production config accepted a missing Google Maps key');
 }
 
-const valid = run({ EAS_BUILD_PROFILE: 'production', EXPO_PUBLIC_API_URL: 'https://tacos-api.onrender.com', GOOGLE_MAPS_API_KEY: 'smoke-key' });
+const iosWithoutMaps = run({ EAS_BUILD_PROFILE: 'production', EAS_BUILD_PLATFORM: 'ios', EXPO_PUBLIC_API_URL: 'https://tacos-api.onrender.com', GOOGLE_MAPS_API_KEY: '' });
+if (iosWithoutMaps.status !== 0) throw new Error(`iOS production config unexpectedly requires Google Maps:\n${iosWithoutMaps.stderr || iosWithoutMaps.stdout}`);
+
+const valid = run({ EAS_BUILD_PROFILE: 'production', EAS_BUILD_PLATFORM: 'android', EXPO_PUBLIC_API_URL: 'https://tacos-api.onrender.com', GOOGLE_MAPS_API_KEY: 'smoke-key' });
 if (valid.status !== 0) throw new Error(`Production config rejected valid environment:\n${valid.stderr || valid.stdout}`);
 const config = JSON.parse(valid.stdout.trim());
 if (config.extra?.apiUrl !== 'https://tacos-api.onrender.com') throw new Error('Production API URL was not forwarded to Expo config');
