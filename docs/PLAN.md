@@ -191,6 +191,9 @@ pnpm dev:android    # emulador Android
 pnpm dev:local
 pnpm typecheck
 pnpm build:api
+pnpm smoke:inputs
+pnpm smoke:config
+pnpm smoke:production
 pnpm smoke:api
 pnpm --filter @tacos/mobile exec expo export --platform web
 ```
