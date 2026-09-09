@@ -950,8 +950,14 @@ export async function getListDetails(listId: string, userId?: string): Promise<A
     `, [listId, userId ?? null]);
     if (!listResult.rows[0]) return undefined;
     const itemResult = await pool.query('SELECT branch_id, note, position FROM list_items WHERE list_id = $1 ORDER BY position, created_at', [listId]);
+    const normalized = normalizeList(listResult.rows[0]);
     const items = (await Promise.all(itemResult.rows.map(async (row) => ({ branchId: row.branch_id, note: row.note ?? '', position: Number(row.position), place: await findPlace(row.branch_id) })))).filter((item): item is { branchId: string; note: string; position: number; place: ApiPlace } => Boolean(item.place));
-    return { ...normalizeList(listResult.rows[0]), collaborators: await getListCollaborators(listId), items };
+    // A public list exposes its collaborator count, not the roster. The owner
+    // and an explicitly authorized collaborator may see names/roles to keep
+    // shared-list management functional.
+    const viewerRole = userId ? await getListRole(listId, userId) : undefined;
+    const collaborators = userId && (normalized.owner.id === userId || viewerRole) ? await getListCollaborators(listId) : [];
+    return { ...normalized, collaborators, items };
   }
   const local = localLists.get(listId);
   if (local && (local.visibility === 'public' || local.ownerId === userId || (userId ? localListCollaborators.has(`${local.id}:${userId}`) : false))) {
@@ -959,6 +965,7 @@ export async function getListDetails(listId: string, userId?: string): Promise<A
     const visitedCount = local.placeIds.filter((placeId) => [...localVisits.values()].some((visit) => visit.userId === userId && visit.placeId === placeId && visit.visibility === 'visible')).length;
     const collaborators = await getListCollaborators(local.id);
     const canEdit = local.ownerId === userId || collaborators.some((collaborator) => collaborator.id === userId && collaborator.role === 'editor');
+    const visibleCollaborators = userId && (local.ownerId === userId || collaborators.some((collaborator) => collaborator.id === userId)) ? collaborators : [];
     return {
       id: local.id,
       title: local.title,
@@ -970,7 +977,7 @@ export async function getListDetails(listId: string, userId?: string): Promise<A
       visibility: local.visibility,
       collaboratorCount: collaborators.length,
       canEdit,
-      collaborators,
+      collaborators: visibleCollaborators,
       items: local.placeIds.map((placeId, position) => { const place = places.find((item) => item.id === placeId); return place ? { branchId: placeId, note: '', position, place } : undefined; }).filter((item): item is { branchId: string; note: string; position: number; place: ApiPlace } => Boolean(item))
     };
   }
