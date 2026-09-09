@@ -161,6 +161,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 126. Analítica administrativa recuperable: si falla el resumen de eventos, Moderación conserva la cola de reportes y muestra un reintento independiente para la tarjeta de señales.
 127. Acceso inclusivo: autenticación, perfil, pestañas y navegación secundaria anuncian sus acciones y cambios de estado sin depender de iconos o color.
 128. Radar contextual completo: distancia, precio, antojo y nivel de hambre modifican filtros y orden; “Para mí” sólo recomienda dentro del conjunto resultante.
+129. Motor Radar modular: las reglas viven en `apps/mobile/lib/radar.ts`, de modo que mapa, listas y futuras superficies puedan compartir el mismo filtrado contextual.
 
 ## Verificación
 

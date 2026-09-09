@@ -10,22 +10,9 @@ import { colors, radii, spacing } from '@/theme';
 import { RatingBadge } from '@/components/RatingBadge';
 import { MapCanvas } from '@/components/MapCanvas';
 import { useAuth } from '@/lib/auth';
-import { isOpenNow } from '@/lib/hours';
+import { applyRadar, radarDistances, radarHunger, radarMoods, radarPrices, type RadarDistance, type RadarHunger, type RadarMood, type RadarPrice } from '@/lib/radar';
 const filters = ['Pastor', 'Abierto ahora', 'Barato', '92% para mí'];
-const radarDistances = ['Cerca', 'En la zona', 'Toda la ciudad'] as const;
-const radarPrices = ['Barato', 'Medio', 'Cualquier precio'] as const;
-const radarMoods = ['Clásico', 'Aventura', 'Alta calidad'] as const;
-const radarHunger = ['Ligero', 'Normal', 'Mucha hambre'] as const;
 const defaultMapCenter = { latitude: 19.402, longitude: -99.163 };
-
-function distanceKm(distance: string) {
-  const value = Number.parseFloat(distance.replace(',', '.'));
-  return Number.isFinite(value) ? value : Number.POSITIVE_INFINITY;
-}
-
-function lowestPrice(place: (typeof places)[number]) {
-  return Math.min(...place.tacos.map((taco) => taco.price), Number.POSITIVE_INFINITY);
-}
 
 export default function MapScreen() {
   const { token } = useAuth();
@@ -39,10 +26,10 @@ export default function MapScreen() {
   const [mapMoved, setMapMoved] = useState(false);
   const [locationDenied, setLocationDenied] = useState(false);
   const [radarOpen, setRadarOpen] = useState(false);
-  const [radarDistance, setRadarDistance] = useState<(typeof radarDistances)[number]>('En la zona');
-  const [radarPrice, setRadarPrice] = useState<(typeof radarPrices)[number]>('Cualquier precio');
-  const [radarMood, setRadarMood] = useState<(typeof radarMoods)[number]>('Alta calidad');
-  const [radarHungerLevel, setRadarHungerLevel] = useState<(typeof radarHunger)[number]>('Normal');
+  const [radarDistance, setRadarDistance] = useState<RadarDistance>('En la zona');
+  const [radarPrice, setRadarPrice] = useState<RadarPrice>('Cualquier precio');
+  const [radarMood, setRadarMood] = useState<RadarMood>('Alta calidad');
+  const [radarHungerLevel, setRadarHungerLevel] = useState<RadarHunger>('Normal');
   useEffect(() => { if (initialQuery != null) setSearch(initialQuery); }, [initialQuery]);
   useEffect(() => {
     const timer = setTimeout(() => setSearchQuery(search.trim()), 250);
@@ -81,54 +68,7 @@ export default function MapScreen() {
   // attribute, let the API result set speak for itself unless a taco name was
   // actually detected in the query.
   const contextualTaco = requestedTaco ?? (!hasFreeTextSearch && active === 'Pastor' ? 'Pastor' : undefined);
-  const sorted = useMemo(() => {
-    const tacoFiltered = contextualTaco
-      ? data.filter((place) => place.tacos.some((taco) => taco.name.toLowerCase() === contextualTaco.toLowerCase()))
-      : data;
-    // Keep the active taco as a truthful map context. An empty match should
-    // stay empty so a branch without that menu item is never mislabeled.
-    const source = [...tacoFiltered];
-    const distanceLimit = radarDistance === 'Cerca' ? 2 : radarDistance === 'En la zona' ? 5 : Number.POSITIVE_INFINITY;
-    // A permission prompt can leave the API with human-readable distances
-    // such as "cerca de ti". Price and hunger remain enforceable in that
-    // state; only the geographic constraint waits for numeric coordinates.
-    const hasDistanceData = source.some((place) => Number.isFinite(distanceKm(place.distance)));
-    const radarFiltered = source.filter((place) => {
-      if (hasDistanceData && distanceKm(place.distance) > distanceLimit) return false;
-      if (radarPrice === 'Barato' && lowestPrice(place) > 24) return false;
-      if (radarPrice === 'Medio' && (lowestPrice(place) < 24 || lowestPrice(place) > 32)) return false;
-      const highestPrice = Math.max(...place.tacos.map((taco) => taco.price), 0);
-      if (radarHungerLevel === 'Ligero' && highestPrice > 32) return false;
-      if (radarHungerLevel === 'Mucha hambre' && highestPrice < 24 && place.tacos.length < 3) return false;
-      return true;
-    });
-    // Once numeric distances exist, an incompatible Radar combination must
-    // remain empty instead of silently dropping one of the user's constraints.
-    const distanceAndPriceSource = radarFiltered;
-    const moodSource = radarMood === 'Clásico'
-      ? distanceAndPriceSource.filter((place) => place.flavorProfile.traditional >= 70)
-      : radarMood === 'Aventura'
-        ? distanceAndPriceSource.filter((place) => place.flavorProfile.traditional < 80 || place.flavorProfile.intensity >= 75)
-        : distanceAndPriceSource;
-    const hungerScore = (place: (typeof places)[number]) => Math.max(...place.tacos.map((taco) => taco.price), 0) + place.tacos.length * 4;
-    const moodScore = (place: (typeof places)[number]) => radarMood === 'Clásico'
-      ? place.flavorProfile.traditional
-      : radarMood === 'Aventura'
-        ? place.flavorProfile.intensity + (100 - place.flavorProfile.traditional)
-        : place.rating * 20;
-    const contextualSort = (a: (typeof places)[number], b: (typeof places)[number]) => {
-      if (radarHungerLevel !== 'Normal') {
-        const hungerDelta = hungerScore(b) - hungerScore(a);
-        if (hungerDelta) return radarHungerLevel === 'Mucha hambre' ? hungerDelta : -hungerDelta;
-      }
-      return moodScore(b) - moodScore(a);
-    };
-    if (active === 'Barato') return moodSource.sort((a, b) => (Math.min(...a.tacos.map((taco) => taco.price), Infinity) - Math.min(...b.tacos.map((taco) => taco.price), Infinity)) || contextualSort(a, b));
-    if (active === '92% para mí') return moodSource.sort((a, b) => (b.match - a.match) || contextualSort(a, b));
-    if (active === 'Pastor') return moodSource.sort((a, b) => ((b.tacos.find((taco) => taco.name.toLowerCase() === contextualTaco?.toLowerCase())?.rating ?? b.rating) - (a.tacos.find((taco) => taco.name.toLowerCase() === contextualTaco?.toLowerCase())?.rating ?? a.rating)) || contextualSort(a, b));
-    if (active === 'Abierto ahora') return moodSource.filter((place) => isOpenNow(place.openUntil)).sort(contextualSort);
-    return moodSource.sort(contextualSort);
-  }, [active, contextualTaco, data, radarDistance, radarHungerLevel, radarMood, radarPrice]);
+  const sorted = useMemo(() => applyRadar({ places: data, active, contextualTaco, distance: radarDistance, price: radarPrice, mood: radarMood, hunger: radarHungerLevel }), [active, contextualTaco, data, radarDistance, radarHungerLevel, radarMood, radarPrice]);
   // Never recommend a place outside the active search/Radar constraints.
   // An empty result set must remain empty instead of silently escaping the
   // user's distance, price or mood choices.

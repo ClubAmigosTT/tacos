@@ -160,6 +160,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 22. Aplicar `share_activity` también a agregados y Taste ID del perfil público, manteniendo el diario completo para su propietario y cubriendo ambos casos en el smoke.
 23. Mantener la analítica del panel admin desacoplada de la cola de moderación, con estado de error y reintento propio.
 24. Conectar las variables visuales del Radar (distancia, precio, antojo y hambre) al conjunto y al orden de recomendaciones.
+25. Mantener el motor de filtros y ranking del Radar fuera de las rutas visuales para reutilizarlo y probarlo de forma aislada.
 
 **Aceptación:** un reporte aparece en `/v1/admin/reports`, un admin puede ocultarlo, el feed deja de mostrarlo, el perfil público no lo cuenta y `pnpm smoke:admin` confirma que no contamina recomendaciones.
 
