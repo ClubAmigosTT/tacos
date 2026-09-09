@@ -35,18 +35,18 @@ export default function HomeScreen() {
           <Text style={styles.kicker}>{user ? `PARA ${user.displayName.toUpperCase()} · CDMX` : `CDMX · ${moment}`}</Text>
           <Text style={styles.logo}>tacos<Text style={styles.logoDot}>.</Text></Text>
         </View>
-        <Pressable style={styles.avatar} onPress={() => router.push('/(tabs)/profile')}><Text style={styles.avatarText}>{user?.displayName.slice(0, 1).toUpperCase() ?? 'M'}</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Abrir mi perfil" style={styles.avatar} onPress={() => router.push('/(tabs)/profile')}><Text style={styles.avatarText}>{user?.displayName.slice(0, 1).toUpperCase() ?? 'M'}</Text></Pressable>
       </View>
 
       <View style={styles.search}>
         <Ionicons name="search" size={20} color={colors.muted} />
-        <TextInput value={search} onChangeText={setSearch} onSubmitEditing={submitSearch} placeholder="¿Qué se te antoja?" placeholderTextColor={colors.muted} style={styles.searchInput} returnKeyType="search" />
-        <Pressable style={styles.searchShortcut} onPress={submitSearch}><Text style={styles.shortcutText}>↵</Text></Pressable>
+        <TextInput accessibilityLabel="Buscar tacos, taquerías o zonas" value={search} onChangeText={setSearch} onSubmitEditing={submitSearch} placeholder="¿Qué se te antoja?" placeholderTextColor={colors.muted} style={styles.searchInput} returnKeyType="search" />
+        <Pressable accessibilityRole="button" accessibilityLabel="Ejecutar búsqueda" style={styles.searchShortcut} onPress={submitSearch}><Text style={styles.shortcutText}>↵</Text></Pressable>
       </View>
 
       {featured ? (
         <Link href={`/place/${featured.id}`} asChild>
-          <Pressable style={styles.hero}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Abrir recomendación ${featured.name}, ${featuredTaco?.name ?? 'taco'} ${featuredTaco?.rating.toFixed(2) ?? featured.rating.toFixed(2)}`} style={styles.hero}>
             <Image source={{ uri: featured.image }} style={styles.heroImage} />
             <View style={styles.heroShade} />
             <View style={styles.heroContent}>

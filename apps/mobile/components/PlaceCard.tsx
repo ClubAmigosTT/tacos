@@ -6,7 +6,7 @@ import type { Place } from '@/data/fixtures';
 
 export function PlaceCard({ place, compact = false }: { place: Place; compact?: boolean }) {
   return (
-    <Pressable style={({ pressed }) => [styles.card, compact && styles.compact, pressed && styles.pressed]} onPress={() => router.push(`/place/${place.id}`)}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`Abrir ${place.name}, ${place.rating.toFixed(2)} de rating, ${place.match}% para ti`} style={({ pressed }) => [styles.card, compact && styles.compact, pressed && styles.pressed]} onPress={() => router.push(`/place/${place.id}`)}>
       <Image source={{ uri: place.image }} style={[styles.image, compact && styles.compactImage]} />
       <View style={styles.content}>
         <View style={styles.titleRow}>

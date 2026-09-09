@@ -26,7 +26,8 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 
 1. Mantener los tokens de color, tipografía, espaciado, radios y estados en `apps/mobile/theme.ts`.
 2. Construir componentes reutilizables: `PlaceCard`, `RatingBadge`, `MapPin`, `BottomSheet`, `TasteMatch` y tarjetas de actividad.
-3. Mantener rutas Expo pequeñas y orientadas a una sola tarea.
+3. Etiquetar acciones, estados y controles interactivos desde el primer render para VoiceOver, TalkBack y navegación por teclado web.
+4. Mantener rutas Expo pequeñas y orientadas a una sola tarea.
 
 **Aceptación:** `pnpm typecheck` pasa y `expo export --platform web` produce un bundle navegable.
 
