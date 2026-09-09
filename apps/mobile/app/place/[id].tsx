@@ -24,13 +24,14 @@ export default function PlaceScreen() {
   const { token } = useAuth();
   const queryClient = useQueryClient();
   useEffect(() => { if (id) void trackEvent('place_open', { place_id: id }, token); }, [id, token]);
-  const { data: place } = useQuery({ queryKey: ['place', id], queryFn: () => getPlace(id), enabled: Boolean(id) });
+  const { data: place, isLoading, isError } = useQuery({ queryKey: ['place', id], queryFn: () => getPlace(id), enabled: Boolean(id) });
   const { data: savedData } = useQuery({ queryKey: ['saved-places', token], queryFn: () => savedPlaces(token!), enabled: Boolean(token) });
   const savedMutation = useMutation({
     mutationFn: () => savedData?.placeIds.includes(place!.id) ? unsavePlace(place!.id, token!) : savePlace(place!.id, token!),
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['saved-places', token] }); }
   });
-  if (!place) return <View style={styles.loading}><Text style={styles.loadingText}>Cargando lugar…</Text></View>;
+  if (isLoading) return <View style={styles.loading}><Text style={styles.loadingText}>Cargando lugar…</Text></View>;
+  if (isError || !place) return <View style={styles.notFound}><Ionicons name="location-outline" size={28} color={colors.accent} /><Text style={styles.notFoundTitle}>Taquería no disponible</Text><Text style={styles.notFoundCopy}>El enlace puede haber cambiado o la sucursal ya no existe.</Text><Pressable style={styles.notFoundButton} onPress={() => router.replace('/(tabs)/map')}><Text style={styles.notFoundButtonText}>Volver al mapa</Text></Pressable></View>;
   const currentPlace = place;
   const averagePrice = place.tacos.length ? Math.round(place.tacos.reduce((sum, taco) => sum + taco.price, 0) / place.tacos.length) : undefined;
   const openNow = isOpenNow(place.openUntil);
@@ -50,6 +51,11 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 45 },
   loading: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
   loadingText: { color: colors.muted },
+  notFound: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  notFoundTitle: { color: colors.ink, fontSize: 25, fontWeight: '900', textAlign: 'center', marginTop: spacing.md },
+  notFoundCopy: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: 'center', maxWidth: 320, marginTop: 7 },
+  notFoundButton: { backgroundColor: colors.accent, borderRadius: radii.pill, paddingHorizontal: 18, paddingVertical: 11, marginTop: spacing.lg },
+  notFoundButtonText: { color: colors.background, fontSize: 12, fontWeight: '900' },
   cover: { height: 410, backgroundColor: colors.surfaceRaised },
   coverImage: { width: '100%', height: '100%' },
   coverShade: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(3,5,4,0.42)' },
