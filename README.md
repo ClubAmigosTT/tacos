@@ -181,6 +181,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 146. Taste ID consistente: la firma visual se comparte entre el perfil propio y los perfiles públicos mediante un componente reutilizable.
 147. Sesión sin carreras: Perfil y Listas esperan a restaurar la autenticación antes de consultar, evitando mezclar respuestas anónimas con datos privados.
 148. Pins consistentes: el rating contextual del mapa usa un `MapPin` compartido entre web, iOS y Android.
+149. Seguimiento recuperable: el perfil público anuncia errores de Seguir/Dejar de seguir y mantiene la acción lista para reintentar.
 
 ## Verificación
 
