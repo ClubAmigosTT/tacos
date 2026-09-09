@@ -8,15 +8,25 @@ import { diaryEntries } from '@/data/fixtures';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 
+type WrappedEntry = { id: string; rating: number; place_name: string; neighborhood: string; tacos: string; visited_at?: string };
+
 export default function WrappedScreen() {
   const { token, loading: authLoading } = useAuth();
   const { data, isLoading } = useQuery({ queryKey: ['diary', 'wrapped', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
-  const entries = data?.entries ?? (token ? [] : diaryEntries.map((entry) => ({ id: entry.id, rating: entry.rating, place_name: entry.place, neighborhood: 'CDMX', tacos: entry.taco })));
+  const wrappedYear = new Date().getFullYear();
+  const sourceEntries: WrappedEntry[] = data?.entries ?? (token ? [] : diaryEntries.map((entry) => ({ id: entry.id, rating: entry.rating, place_name: entry.place, neighborhood: 'CDMX', tacos: entry.taco })));
+  // Wrapped is an annual recap: use the visit's actual calendar year rather
+  // than showing the complete lifetime diary under a current-year heading.
+  const entries = data
+    ? sourceEntries.filter((entry) => {
+      const visitedAt = entry.visited_at ? Date.parse(entry.visited_at) : Number.NaN;
+      return Number.isFinite(visitedAt) && new Date(visitedAt).getFullYear() === wrappedYear;
+    })
+    : sourceEntries;
   const tacos = entries.flatMap((entry) => entry.tacos.split(',').map((taco) => taco.trim()).filter(Boolean));
   const average = entries.length ? (entries.reduce((sum, entry) => sum + Number(entry.rating), 0) / entries.length).toFixed(2) : '—';
-  const best = entries.reduce<typeof entries[number] | undefined>((winner, entry) => !winner || Number(entry.rating) > Number(winner.rating) ? entry : winner, undefined);
+  const best = entries.reduce<WrappedEntry | undefined>((winner, entry) => !winner || Number(entry.rating) > Number(winner.rating) ? entry : winner, undefined);
   const neighborhoods = new Set(entries.map((entry) => entry.neighborhood).filter(Boolean));
-  const wrappedYear = new Date().getFullYear();
 
   async function share() {
     try { await Share.share({ message: `Mi año en tacos: ${tacos.length} tacos, ${entries.length} visitas y promedio ${average}. Mi favorito: ${best?.place_name ?? 'todavía por descubrir'}.\n${Linking.createURL('/wrapped')}` }); } catch { /* Sharing is optional on platforms without a native share sheet. */ }
