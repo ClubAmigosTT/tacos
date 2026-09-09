@@ -115,6 +115,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 81. Sesión consistente en rutas privadas: ajustes sincroniza el nombre cuando llega el usuario y edición/comentarios no consultan el API hasta tener token.
 82. Catálogo consistente: la Gringa de El Vilsito existe tanto en el fallback móvil como en PostgreSQL mediante una migración idempotente.
 83. Permisos mínimos: Android bloquea `RECORD_AUDIO`, que no forma parte de la experiencia de Tacos.
+84. Deep links resilientes: una ruta inexistente muestra una salida de marca hacia Inicio o el mapa.
 78. Cierre del registro: guardar una visita invalida diario, feed, recomendaciones, mapa y ficha, y el CTA vuelve al mapa sin duplicar la pantalla de formulario.
 
 ## Verificación
