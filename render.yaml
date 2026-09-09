@@ -3,10 +3,12 @@ services:
     name: tacos-api
     runtime: node
     region: ohio
-    plan: 0.5c-512mb
+    # Free tier keeps the first release cost-free. It sleeps after inactivity.
+    plan: free
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter @tacos/api build
-    startCommand: pnpm --filter @tacos/api start
-    preDeployCommand: pnpm --filter @tacos/api migrate
+    # Free web services do not support Render's paid-only preDeployCommand.
+    # Run idempotent migrations before starting the API instead.
+    startCommand: pnpm --filter @tacos/api migrate && pnpm --filter @tacos/api start
     autoDeployTrigger: checksPass
     healthCheckPath: /health
     envVars:
@@ -34,11 +36,6 @@ services:
         sync: false
       - key: EMAIL_FROM
         sync: false
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: tacos-keyvalue
-          property: connectionString
       - key: STORAGE_BUCKET_URL
         sync: false
       - key: S3_ENDPOINT
@@ -53,8 +50,9 @@ services:
         sync: false
       - key: S3_FORCE_PATH_STYLE
         value: "false"
+      # Image uploads stay optional until an S3/R2 bucket is configured.
       - key: STORAGE_REQUIRED
-        value: "true"
+        value: "false"
       - key: CATALOG_FILE
         value: catalog/branches.json
       - key: CATALOG_FEED_URL
@@ -67,87 +65,9 @@ services:
         sync: false
       - key: ALLOW_DEMO_CATALOG
         value: "false"
-  - type: worker
-    name: tacos-worker
-    runtime: node
-    region: ohio
-    plan: 0.5c-512mb
-    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @tacos/api build
-    startCommand: pnpm --filter @tacos/api worker
-    autoDeployTrigger: checksPass
-    envVars:
-      - key: NODE_VERSION
-        value: "24"
-      - key: NODE_ENV
-        value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: tacos-postgres
-          property: connectionString
-      - key: JWT_SECRET
-        fromService:
-          type: web
-          name: tacos-api
-          envVarKey: JWT_SECRET
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: tacos-keyvalue
-          property: connectionString
-  - type: cron
-    name: tacos-nightly
-    runtime: node
-    region: ohio
-    plan: 0.5c-512mb
-    schedule: "0 8 * * *"
-    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @tacos/api build
-    startCommand: pnpm --filter @tacos/api nightly
-    autoDeployTrigger: checksPass
-    envVars:
-      - key: NODE_VERSION
-        value: "24"
-      - key: NODE_ENV
-        value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: tacos-postgres
-          property: connectionString
-  - type: cron
-    name: tacos-catalog-sync
-    runtime: node
-    region: ohio
-    plan: 0.5c-512mb
-    schedule: "30 8 * * *"
-    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @tacos/api build
-    startCommand: pnpm catalog:import
-    autoDeployTrigger: checksPass
-    envVars:
-      - key: NODE_VERSION
-        value: "24"
-      - key: NODE_ENV
-        value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: tacos-postgres
-          property: connectionString
-      - key: CATALOG_FEED_URL
-        sync: false
-      - key: CATALOG_SOURCE_NAME
-        sync: false
-      - key: CATALOG_SOURCE_URL
-        sync: false
-      - key: CATALOG_SOURCE_LICENSE
-        sync: false
-      - key: CATALOG_REPLACE_DEMO
-        value: "true"
-  - type: keyvalue
-    name: tacos-keyvalue
-    region: ohio
-    plan: 256mb
-    ipAllowList: []
 databases:
   - name: tacos-postgres
     region: ohio
-    plan: 0.5c-1g
+    # Free Postgres is temporary (30 days), 1 GB, and has no backups.
+    plan: free
     postgresMajorVersion: "18"
-    diskSizeGB: 15

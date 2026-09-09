@@ -65,6 +65,9 @@ jobs:
       - name: Expo production config smoke test
         run: pnpm smoke:config
 
+      - name: Render Free policy smoke test
+        run: pnpm smoke:render-free
+
       - name: Build API
         run: pnpm build:api
 

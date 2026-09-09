@@ -18,6 +18,7 @@
     "smoke:radar": "node scripts/smoke-radar.mjs",
     "smoke:inputs": "node scripts/smoke-inputs.mjs",
     "smoke:config": "node scripts/smoke-config.mjs",
+    "smoke:render-free": "node scripts/smoke-render-free.mjs",
     "smoke:production": "node scripts/smoke-production.mjs",
     "smoke:security": "node scripts/smoke-security.mjs"
   }

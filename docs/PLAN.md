@@ -8,7 +8,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 - **API:** Fastify + TypeScript. Módulos separados por dominio: auth, discovery, visits, lists, social, recommendations, moderation y media.
 - **Datos:** PostgreSQL con PostGIS en Render. La unidad de reputación es `taquería → sucursal → taco`; la experiencia se registra como `Usuario → Visita → Calificación → Contexto`.
 - **Media:** bucket S3-compatible. Render no debe guardar fotografías en disco local.
-- **Jobs:** worker y cron preparados en Render para recalcular señales, limpiar tareas y actualizar agregados.
+- **Jobs:** mantenimiento desacoplado del API; el MVP Free lo ejecuta manualmente o desde GitHub Actions. Worker y cron se incorporan sólo cuando el volumen justifique el costo.
 - **Entrega:** GitHub Actions valida cada push; EAS compila iOS/Android; Render mantiene la API y la base de datos sin depender de esta computadora.
 - **Configuración local:** los procesos Node leen el `.env` raíz mediante la opción nativa `--env-file-if-exists`; Render continúa usando sus variables inyectadas.
 
@@ -157,10 +157,13 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 3. Arrancar el primer admin con `ADMIN_EMAILS` o SQL controlado en Render.
 4. Añadir límites de tamaño, logs estructurados, manejo de errores sin filtrar secretos y fallo explícito si producción no tiene `JWT_SECRET`.
 5. Configurar health checks que validen PostgreSQL, el esquema migrado y PostGIS, además de cierre graceful para que Render pueda reemplazar instancias sin conexiones huérfanas.
-6. Ejecutar mantenimiento periódico desde worker/cron: analizar tablas operativas y aplicar retención explícita sólo a eventos de producto.
+6. Ejecutar mantenimiento periódico mediante GitHub Actions o una tarea manual:
+   analizar tablas operativas y aplicar retención explícita sólo a eventos de
+   producto. Añadir worker/cron de Render únicamente al superar el MVP Free.
 7. Mantener índices parciales para las agregaciones de reputación sobre visitas visibles y ratings de tacos.
 8. Ejecutar el migrador con un cliente dedicado y un lock advisory para que los reemplazos de Render no apliquen el mismo archivo en paralelo.
-9. Hacer que web, worker y cron sólo auto-desplieguen después de que pase el workflow de CI.
+9. Mantener el API con `autoDeployTrigger: checksPass`; cualquier job externo
+   de mantenimiento debe reutilizar el mismo build y pasar por CI.
 10. Mantener el fallback local alineado con PostgreSQL para poder validar el flujo de reputación sin depender de una base local.
 11. Compartir fichas, listas y Wrapped con deep links del esquema `tacos://`, manteniendo una ruta web equivalente en Expo Router.
 12. Derivar periodos y resúmenes del Diario desde las fechas reales para que el producto no dependa de un año fijo.
@@ -193,9 +196,13 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 ### Fase 8 — CI, Render y releases móviles (2–3 días de configuración)
 
 1. Subir el repositorio a GitHub y proteger `main`/`master` con `.github/workflows/ci.yml`.
-2. Crear el Blueprint de Render con `render.yaml`: API web, worker, cron, Key Value y PostgreSQL.
+2. Crear el Blueprint gratuito de Render con `render.yaml`: únicamente API web
+   y PostgreSQL en plan Free. Worker, cron y Key Value quedan fuera del MVP para
+   no introducir cargos.
 3. Configurar secretos en Render: `JWT_SECRET`, `DATABASE_URL`, `ADMIN_EMAILS` y credenciales S3.
-4. Verificar `/health`, aplicar migraciones con `preDeployCommand` y revisar logs del primer deploy.
+4. Verificar `/health`, ejecutar migraciones idempotentes al arrancar el API
+   (el `preDeployCommand` requiere un servicio pagado) y revisar logs del primer
+   deploy.
 5. En EAS: `eas init`, definir `EXPO_PUBLIC_API_URL` HTTPS y `GOOGLE_MAPS_API_KEY`, compilar el perfil production y enviar a TestFlight/Google Play.
 6. Fijar el entorno EAS en cada perfil y, para cambios JavaScript posteriores, usar `eas update --channel production --environment production`; para cambios nativos generar un nuevo build.
 7. Hacer que el perfil EAS `production` falle si la URL de API no es HTTPS o si Android no tiene `GOOGLE_MAPS_API_KEY`.
@@ -207,7 +214,11 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 13. Exponer reseñas públicas por sucursal a partir de visitas visibles, respetando `share_activity` y sin filtrar correo u otros campos privados.
 14. Aplicar `021_auth_security.sql`: sesiones de 7 días revocables, verificación y recuperación por token de un solo uso, exportación/eliminación y rate limiting persistido.
 15. Aplicar `022_catalog_sources.sql` e importar `catalog/branches.json` desde una fuente autorizada; rechazar fotos sin licencia/atribución y marcar duplicados para revisión.
-16. Configurar `PUBLIC_API_URL`, `APP_WEB_URL`, `CORS_ORIGINS`, Resend y R2 antes de activar tráfico de producción.
+16. Configurar `PUBLIC_API_URL`, `APP_WEB_URL`, `CORS_ORIGINS`, Resend y R2 antes de activar tráfico de producción. Mientras tanto, el MVP mantiene fotos opcionales, pero no debe abrirse el registro público sin proveedor de correo.
+
+17. Recordar que el PostgreSQL Free expira a los 30 días, está limitado a 1 GB
+    y no tiene backups. Programar exportaciones y migrar a almacenamiento
+    persistente antes de usarlo como producción.
 
 **Aceptación:** la API responde desde `https://…onrender.com`, la app se conecta sin esta computadora encendida y el smoke test corre en CI.
 
@@ -240,7 +251,7 @@ pnpm --filter @tacos/mobile exec expo export --platform web
 | `EXPO_PUBLIC_API_URL` | `http://localhost:4000` | URL HTTPS de `tacos-api` |
 | `GOOGLE_MAPS_API_KEY` | opcional | secreto de EAS para Android |
 | `S3_*` / `STORAGE_BUCKET_URL` | opcional | credenciales del bucket |
-| `STORAGE_REQUIRED` / `ALLOW_DEMO_CATALOG` | `false` / `true` | `true` / `false` en producción |
+| `STORAGE_REQUIRED` / `ALLOW_DEMO_CATALOG` | `false` / `true` | `false` / `false` en el MVP Free; cambiar `STORAGE_REQUIRED` a `true` al configurar R2/S3 |
 | `ADMIN_EMAILS` | opcional | lista controlada de bootstrap |
 | `PUBLIC_API_URL` / `APP_WEB_URL` | `http://localhost:4000` / `http://localhost:8081` | URLs HTTPS de Render y del cliente web |
 | `CORS_ORIGINS` | `http://localhost:8081` | dominios web permitidos, separados por coma |

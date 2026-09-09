@@ -9,7 +9,9 @@ El repositorio ya contiene un MVP ejecutable para iOS, Android y web: mapa conte
 - `apps/mobile`: Expo Router + React Native (iOS/Android/web), con un sistema visual compartido.
 - `services/api`: Fastify + TypeScript, autenticación JWT, búsqueda y visitas.
 - `database/migrations`: PostgreSQL + PostGIS, con datos iniciales y usuarios.
-- `render.yaml`: Blueprint de API web, worker, cron, Redis y PostgreSQL.
+- `render.yaml`: Blueprint gratuito de API web y PostgreSQL para el MVP. Los
+  trabajos de mantenimiento se ejecutan manualmente o desde GitHub Actions;
+  no se crean workers, cron ni Redis en Render.
 
 ## Arranque local
 
@@ -85,7 +87,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 50. Búsqueda universal: la barra de inicio acepta el antojo y abre el mapa con la consulta ya aplicada, mientras que el módulo social del inicio lee actividad real del feed autenticado.
 51. Migración segura de catálogo: los padres de taquería se crean antes de la llave foránea, incluso para sucursales importadas fuera del catálogo de ejemplo.
 52. Audiencia anónima: la app conserva un identificador aleatorio local para medir recurrencia sin enviar correo, ubicación ni texto de búsqueda.
-53. Operación activa: el worker y el cron de Render ejecutan mantenimiento acotado, `ANALYZE` del catálogo/visitas y retención de eventos analíticos de 180 días sin borrar contenido de usuarios.
+53. Operación Free: el mantenimiento acotado (`ANALYZE` y retención de eventos analíticos de 180 días) puede ejecutarse con `pnpm --filter @tacos/api nightly` desde una tarea manual o GitHub Actions, sin mantener un worker pagado activo.
 54. Integridad de listas: sucursales inexistentes se rechazan con 404 y las visitas ocultas no inflan el progreso visitado.
 55. Privacidad del directorio: buscar personas requiere sesión y los eventos autenticados no mezclan un identificador anónimo con el usuario.
 56. Persistencia transaccional: visitas y moderaciones usan una conexión dedicada del pool para garantizar `BEGIN/COMMIT/ROLLBACK` atómicos en Render.
@@ -216,8 +218,13 @@ Cada push y pull request a `main` o `master` ejecuta estos checks en GitHub Acti
 
 1. Sube este repositorio a GitHub.
 2. En Render elige **New → Blueprint**, selecciona el repositorio y confirma `render.yaml`.
-3. Render creará `tacos-api`, `tacos-worker`, `tacos-nightly`, `tacos-catalog-sync`, `tacos-keyvalue` y `tacos-postgres`.
-4. El `JWT_SECRET` se genera automáticamente; configura `STORAGE_BUCKET_URL`, `S3_BUCKET`, `S3_ACCESS_KEY_ID` y `S3_SECRET_ACCESS_KEY` para activar las fotos. `S3_ENDPOINT` permite usar R2, MinIO u otro proveedor compatible.
+3. Render creará únicamente `tacos-api` y `tacos-postgres`, ambos en el plan
+   **Free**. No se requiere tarjeta mientras el Blueprint no incluya recursos
+   de pago.
+4. El `JWT_SECRET` se genera automáticamente. Las fotos son opcionales en el
+   MVP (`STORAGE_REQUIRED=false`); configura `STORAGE_BUCKET_URL`, `S3_BUCKET`,
+   `S3_ACCESS_KEY_ID` y `S3_SECRET_ACCESS_KEY` cuando conectes R2/S3.
+   `S3_ENDPOINT` permite usar R2, MinIO u otro proveedor compatible.
 5. Comprueba `https://<tu-api>.onrender.com/health`.
 
 Para Cloudflare R2 usa `S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`,
@@ -250,7 +257,13 @@ Para que CI ejecute además la validación remota del Blueprint, añade los secr
 
 Después de aplicar la migración `009_admin_roles.sql`, puedes promover una cuenta existente desde la consola SQL de Render con `UPDATE users SET role = 'admin' WHERE email_lower = 'tu-correo@example.com';`. Para el primer registro también puedes definir `ADMIN_EMAILS` antes de crear la cuenta.
 
-El servicio ejecuta las migraciones antes de cada deploy mediante `preDeployCommand`; no hay que conectarse a esta computadora para mantenerlo activo.
+El servicio gratuito no admite el `preDeployCommand` de Render. Por eso el
+`startCommand` ejecuta migraciones idempotentes y después inicia la API. Esto
+permite desplegar sin un worker pagado y sin depender de esta computadora.
+
+El PostgreSQL Free de Render es temporal: tiene 1 GB, no incluye backups y
+expira a los 30 días. Antes de usar datos reales de usuarios, programa una
+exportación y migra la base a un proveedor persistente o a un plan pagado.
 
 ### Builds iOS y Android
 
