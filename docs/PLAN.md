@@ -86,6 +86,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 30. Diferenciar carga y error en fichas compartidas, con una salida útil si la sucursal ya no existe.
 31. Reintentar únicamente fallos transitorios de API y resolver rápido los estados 4xx.
 32. No consultar el directorio social sin sesión y explicar el requisito directamente en la interfaz.
+33. Ejecutar en CI un smoke del guard production de Expo antes de cualquier build móvil.
 **Aceptación:** “Pastor”, “Abierto ahora”, “Barato” y “Para mí” producen resultados ordenados; negar ubicación no rompe el catálogo.
 
 ### Fase 5 — Visitas, diario y media (3–5 días)

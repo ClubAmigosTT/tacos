@@ -39,6 +39,9 @@ jobs:
       - name: Hours filter smoke test
         run: pnpm smoke:hours
 
+      - name: Expo production config smoke test
+        run: pnpm smoke:config
+
       - name: Build API
         run: pnpm build:api
 
