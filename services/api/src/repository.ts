@@ -2,8 +2,13 @@ import { Pool } from 'pg';
 import bcrypt from 'bcryptjs';
 import { lists as fixtureLists, places, type ApiList, type ApiListDetail, type ApiPlace, type ApiTaqueria, type FlavorProfile, type TasteProfile } from './data.js';
 
-const pool = process.env.DATABASE_URL
-  ? new Pool({ connectionString: process.env.DATABASE_URL, max: 10, connectionTimeoutMillis: 5_000, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined })
+const configuredDatabaseUrl = process.env.DATABASE_URL?.trim();
+if (process.env.NODE_ENV === 'production' && !configuredDatabaseUrl) {
+  throw new Error('DATABASE_URL is required in production');
+}
+
+const pool = configuredDatabaseUrl
+  ? new Pool({ connectionString: configuredDatabaseUrl, max: 10, connectionTimeoutMillis: 5_000, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined })
   : null;
 
 type DiscoverQuery = { q?: string; lat?: number; lng?: number; limit: number };

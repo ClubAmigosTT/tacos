@@ -153,6 +153,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 118. Entrada numérica segura: el precio de una visita acepta coma decimal, redondea a dos posiciones y bloquea valores no numéricos o fuera de rango antes de persistirlos.
 119. Reintentos de moderación y privacidad: las colas administrativas y preferencias de cuenta muestran una acción clara para recuperar una falla temporal sin confundirla con un estado vacío.
 120. Radar sin escapes: “Para mí” queda deshabilitado cuando los filtros no encuentran lugares y nunca abre una sucursal fuera de la combinación elegida.
+121. Producción sin memoria accidental: la API se niega a arrancar en `NODE_ENV=production` si falta `DATABASE_URL`, evitando desplegar un Render efímero que pierda visitas al reiniciarse.
 
 ## Verificación
 

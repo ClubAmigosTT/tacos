@@ -15,6 +15,7 @@
     "smoke:admin": "node scripts/smoke-admin.mjs",
     "smoke:hours": "node scripts/smoke-hours.mjs",
     "smoke:inputs": "node scripts/smoke-inputs.mjs",
-    "smoke:config": "node scripts/smoke-config.mjs"
+    "smoke:config": "node scripts/smoke-config.mjs",
+    "smoke:production": "node scripts/smoke-production.mjs"
   }
 }

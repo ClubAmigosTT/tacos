@@ -153,6 +153,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 16. Ofrecer reintento visible al cargar comentarios de una visita para no confundir una caída temporal con una conversación vacía.
 17. Mantener reintento visible también en Privacidad, Moderación y Comentarios administrativos cuando el API no esté disponible.
 18. Mantener la recomendación contextual dentro del conjunto filtrado del Radar, incluyendo un estado sin resultados sin fallback silencioso.
+19. Fallar explícitamente si la API se inicia en producción sin `DATABASE_URL`, conservando el repositorio en memoria sólo para desarrollo y smoke local.
 
 **Aceptación:** un reporte aparece en `/v1/admin/reports`, un admin puede ocultarlo, el feed deja de mostrarlo, el perfil público no lo cuenta y `pnpm smoke:admin` confirma que no contamina recomendaciones.
 

@@ -65,6 +65,9 @@ jobs:
       - name: Build API
         run: pnpm build:api
 
+      - name: Production environment guard smoke test
+        run: pnpm smoke:production
+
       - name: Apply PostgreSQL migrations
         run: pnpm --filter @tacos/api migrate
 
