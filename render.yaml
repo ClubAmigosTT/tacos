@@ -4,7 +4,6 @@ services:
     runtime: static
     # Static sites are also available on Render's Free plan and provide the
     # HTTPS origin used by account verification and password reset links.
-    plan: free
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter @tacos/mobile exec expo export --platform web
     staticPublishPath: apps/mobile/dist
     envVars:

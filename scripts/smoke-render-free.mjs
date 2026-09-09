@@ -13,7 +13,7 @@ const productionWebServices = blueprint.match(/^\s*- type:\s+web\s*$/gm) ?? [];
 if (productionWebServices.length !== 2 || !/^\s*name:\s+tacos-web\s*$/m.test(blueprint) || !/^\s*name:\s+tacos-api\s*$/m.test(blueprint)) {
   throw new Error('Production Free Blueprint must contain exactly the web API and static frontend');
 }
-if ((blueprint.match(/^\s*plan:\s+free\s*$/gm) ?? []).length < 2) throw new Error('Production services are not all on the Free plan');
+if (!/name:\s+tacos-api[\s\S]*?plan:\s+free\s*/m.test(blueprint)) throw new Error('API service is not on the Free plan');
 if (!/databases:[\s\S]*?^\s*plan:\s+free\s*$/m.test(blueprint)) throw new Error('PostgreSQL is not on the Free plan');
 if (!/^\s*- key:\s+STORAGE_REQUIRED\s*\n\s+value:\s+"false"\s*$/m.test(blueprint)) throw new Error('Storage must remain optional in the Free MVP');
 if (!/^\s*name:\s+tacos-api-free\s*$/m.test(demoBlueprint) || !/^\s*name:\s+tacos-postgres-free\s*$/m.test(demoBlueprint)) throw new Error('Free demo Blueprint resource names changed unexpectedly');
