@@ -227,7 +227,7 @@ export async function updatePrivacy(input: { shareActivity: boolean }, token: st
 }
 
 export async function diary(token: string) {
-  return request<{ entries: Array<{ id: string; visited_at: string; rating: number; price?: number | null; note?: string; photo_url?: string | null; place_name: string; neighborhood: string; tacos: string; taco_ratings?: Record<string, number | null>; image_url: string }> }>('/v1/diary', undefined, token);
+  return request<{ entries: Array<{ id: string; visited_at: string; rating: number; price?: number | null; note?: string; photo_url?: string | null; place_name: string; neighborhood: string; tacos: string; taco_ratings?: Record<string, number | null>; latitude?: number | null; longitude?: number | null; image_url: string }> }>('/v1/diary', undefined, token);
 }
 
 export async function lists(token?: string) {

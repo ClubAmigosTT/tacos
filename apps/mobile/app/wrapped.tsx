@@ -9,7 +9,7 @@ import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 import { AsyncErrorState } from '@/components/AsyncErrorState';
 
-type WrappedEntry = { id: string; rating: number; place_name: string; neighborhood: string; tacos: string; visited_at?: string };
+type WrappedEntry = { id: string; rating: number; price?: number | null; place_name: string; neighborhood: string; tacos: string; visited_at?: string; latitude?: number | null; longitude?: number | null };
 
 export default function WrappedScreen() {
   const { token, loading: authLoading } = useAuth();
@@ -28,9 +28,19 @@ export default function WrappedScreen() {
   const average = entries.length ? (entries.reduce((sum, entry) => sum + Number(entry.rating), 0) / entries.length).toFixed(2) : '—';
   const best = entries.reduce<WrappedEntry | undefined>((winner, entry) => !winner || Number(entry.rating) > Number(winner.rating) ? entry : winner, undefined);
   const neighborhoods = new Set(entries.map((entry) => entry.neighborhood).filter(Boolean));
+  const spent = entries.reduce((sum, entry) => sum + (entry.price == null || !Number.isFinite(Number(entry.price)) ? 0 : Number(entry.price)), 0);
+  const pricedVisits = entries.filter((entry) => entry.price != null && Number.isFinite(Number(entry.price))).length;
+  const favoriteNeighborhood = [...entries.reduce((counts, entry) => counts.set(entry.neighborhood, (counts.get(entry.neighborhood) ?? 0) + 1), new Map<string, number>()).entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0];
+  const favoriteHour = [...entries.reduce((counts, entry) => {
+    const date = entry.visited_at ? new Date(entry.visited_at) : undefined;
+    if (date && Number.isFinite(date.getTime())) counts.set(date.getHours(), (counts.get(date.getHours()) ?? 0) + 1);
+    return counts;
+  }, new Map<number, number>()).entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0];
+  const routePoints = entries.map((entry) => ({ latitude: Number(entry.latitude), longitude: Number(entry.longitude), at: entry.visited_at ? Date.parse(entry.visited_at) : Number.NaN })).filter((point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude) && Number.isFinite(point.at)).sort((a, b) => a.at - b.at);
+  const kilometers = routePoints.slice(1).reduce((total, point, index) => total + distanceKm(routePoints[index], point), 0);
 
   async function share() {
-    try { await Share.share({ message: `Mi año en tacos: ${tacos.length} tacos, ${entries.length} visitas y promedio ${average}. Mi favorito: ${best?.place_name ?? 'todavía por descubrir'}.\n${Linking.createURL('/wrapped')}` }); } catch { /* Sharing is optional on platforms without a native share sheet. */ }
+    try { await Share.share({ message: `Mi año en tacos: ${tacos.length} tacos, ${entries.length} visitas, ${kilometers.toFixed(1)} km y promedio ${average}. Mi favorito: ${best?.place_name ?? 'todavía por descubrir'}.\n${Linking.createURL('/wrapped')}` }); } catch { /* Sharing is optional on platforms without a native share sheet. */ }
   }
 
   if (authLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando tu resumen…</Text></View>;
@@ -41,10 +51,22 @@ export default function WrappedScreen() {
       <View style={styles.hero}><Text style={styles.heroKicker}>TACOS WRAPPED · {wrappedYear}</Text><Text style={styles.heroTitle}>{isLoading ? 'Cargando…' : entries.length ? 'Una ciudad entera en tu memoria.' : 'Tu historia está por empezar.'}</Text><Text style={styles.heroCopy}>{entries.length ? 'Un resumen de los lugares, tacos y decisiones que definieron tu año.' : 'Registra tu primera visita y vuelve aquí para ver cómo evoluciona tu gusto.'}</Text><View style={styles.heroMark}><Ionicons name="flame" size={26} color={colors.background} /></View></View>
       <View style={styles.grid}><Metric label="TACOS" value={String(tacos.length)} icon="restaurant-outline" /><Metric label="VISITAS" value={String(entries.length)} icon="location-outline" /><Metric label="PROMEDIO" value={average} icon="star-outline" /><Metric label="ZONAS" value={String(neighborhoods.size)} icon="map-outline" /></View>
       <View style={styles.feature}><Text style={styles.featureEyebrow}>TU MOMENTO CUMBRE</Text><Text style={styles.featureTitle}>{best?.place_name ?? 'Todavía no hay un favorito'}</Text><Text style={styles.featureCopy}>{best ? `${best.tacos} · ${Number(best.rating).toFixed(2)} de rating` : 'Tu mejor taco aparecerá aquí después de registrarlo.'}</Text></View>
+      <View style={styles.signalGrid}><View style={styles.signal}><Text style={styles.signalLabel}>ZONA DE CULTO</Text><Text style={styles.signalValue}>{favoriteNeighborhood ?? '—'}</Text><Text style={styles.signalCopy}>{favoriteNeighborhood ? 'Tu colonia más visitada' : 'Aún por descubrir'}</Text></View><View style={styles.signal}><Text style={styles.signalLabel}>HORA FIRMA</Text><Text style={styles.signalValue}>{favoriteHour == null ? '—' : `${String(favoriteHour).padStart(2, '0')}:00`}</Text><Text style={styles.signalCopy}>{favoriteHour == null ? 'Registra más visitas' : 'Tu hora más frecuente'}</Text></View></View>
+      <View style={styles.routeCard}><View style={styles.routeTop}><View><Text style={styles.featureEyebrow}>RUTA ACUMULADA</Text><Text style={styles.routeTitle}>{kilometers.toFixed(1)} km</Text></View><Ionicons name="navigate-outline" size={24} color={colors.accent} /></View><Text style={styles.routeCopy}>{pricedVisits ? `También registraste $${spent.toFixed(0)} MXN en ${pricedVisits} visita${pricedVisits === 1 ? '' : 's'}.` : 'Añade precios al registrar para estimar tu gasto.'}</Text></View>
       <Pressable style={styles.share} onPress={() => void share()}><Ionicons name="share-outline" size={18} color={colors.background} /><Text style={styles.shareText}>Compartir mi resumen</Text></Pressable>
       {!entries.length && <Pressable style={styles.secondary} onPress={() => router.push('/register')}><Text style={styles.secondaryText}>Registrar mi primer taco</Text><Ionicons name="arrow-forward" size={17} color={colors.accent} /></Pressable>}
     </ScrollView>
   );
+}
+
+function distanceKm(from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }) {
+  const radius = 6371;
+  const latitudeDelta = (to.latitude - from.latitude) * Math.PI / 180;
+  const longitudeDelta = (to.longitude - from.longitude) * Math.PI / 180;
+  const latitudeA = from.latitude * Math.PI / 180;
+  const latitudeB = to.latitude * Math.PI / 180;
+  const a = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(latitudeA) * Math.cos(latitudeB) * Math.sin(longitudeDelta / 2) ** 2;
+  return radius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function Metric({ label, value, icon }: { label: string; value: string; icon: keyof typeof Ionicons.glyphMap }) {
@@ -73,6 +95,15 @@ const styles = StyleSheet.create({
   featureEyebrow: { color: colors.accent, fontSize: 9, fontWeight: '900', letterSpacing: 1.4 },
   featureTitle: { color: colors.ink, fontSize: 22, fontWeight: '900', marginTop: 14 },
   featureCopy: { color: colors.muted, fontSize: 12, marginTop: 5 },
+  signalGrid: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  signal: { flex: 1, minHeight: 112, backgroundColor: colors.surfaceRaised, borderRadius: radii.md, padding: spacing.md },
+  signalLabel: { color: colors.accent, fontSize: 8, fontWeight: '900', letterSpacing: 1.1 },
+  signalValue: { color: colors.ink, fontSize: 20, fontWeight: '900', marginTop: 18 },
+  signalCopy: { color: colors.muted, fontSize: 10, marginTop: 4 },
+  routeCard: { backgroundColor: colors.surface, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginBottom: spacing.lg },
+  routeTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  routeTitle: { color: colors.ink, fontSize: 27, fontWeight: '900', marginTop: 8 },
+  routeCopy: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 13 },
   share: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.accent, borderRadius: radii.md, minHeight: 53 },
   shareText: { color: colors.background, fontSize: 14, fontWeight: '900' },
   secondary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: spacing.md, minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md },

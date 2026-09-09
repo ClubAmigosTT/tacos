@@ -776,11 +776,13 @@ export async function getDiary(userId: string, includeHidden = true) {
       SELECT v.id, v.visited_at, v.rating, v.price, v.note, v.photo_url, b.name AS place_name, b.neighborhood,
         COALESCE(string_agg(m.name, ', ' ORDER BY m.name), '') AS tacos,
       COALESCE(json_object_agg(m.id, vi.rating) FILTER (WHERE m.id IS NOT NULL), '{}'::json) AS taco_ratings,
-        COALESCE(v.photo_url, b.image_url) AS image_url
+        COALESCE(v.photo_url, b.image_url) AS image_url,
+        ST_Y(COALESCE(v.visit_location, b.location)::geometry) AS latitude,
+        ST_X(COALESCE(v.visit_location, b.location)::geometry) AS longitude
       FROM visits v JOIN branches b ON b.id = v.branch_id
       LEFT JOIN visit_items vi ON vi.visit_id = v.id
       LEFT JOIN menu_items m ON m.id = vi.menu_item_id
-      WHERE v.user_id = $1${visibilityFilter} GROUP BY v.id, v.price, v.note, v.photo_url, b.name, b.neighborhood, b.image_url
+      WHERE v.user_id = $1${visibilityFilter} GROUP BY v.id, v.price, v.note, v.photo_url, b.name, b.neighborhood, b.image_url, b.location
       ORDER BY v.visited_at DESC LIMIT 100
     `, [userId]);
     return result.rows;
@@ -788,7 +790,7 @@ export async function getDiary(userId: string, includeHidden = true) {
   return [...localVisits.entries()].filter(([, visit]) => visit.userId === userId && (includeHidden || visit.visibility === 'visible')).sort(([, a], [, b]) => b.createdAt.localeCompare(a.createdAt)).map(([id, visit]) => {
     const place = places.find((item) => item.id === visit.placeId);
     const tacoNames = visit.tacoIds.map((tacoId) => place?.tacos.find((taco) => taco.id === tacoId)?.name ?? tacoId).join(', ');
-    return { id, visited_at: visit.createdAt, rating: visit.rating, price: visit.price ?? null, note: visit.note ?? '', photo_url: visit.photoUrl ?? null, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', tacos: tacoNames, taco_ratings: visit.tacoRatings ?? {}, image_url: visit.photoUrl ?? place?.image ?? '' };
+    return { id, visited_at: visit.createdAt, rating: visit.rating, price: visit.price ?? null, note: visit.note ?? '', photo_url: visit.photoUrl ?? null, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', tacos: tacoNames, taco_ratings: visit.tacoRatings ?? {}, latitude: visit.latitude ?? place?.coordinates.latitude ?? null, longitude: visit.longitude ?? place?.coordinates.longitude ?? null, image_url: visit.photoUrl ?? place?.image ?? '' };
   });
 }
 
