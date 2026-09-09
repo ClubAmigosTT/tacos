@@ -88,7 +88,12 @@ export default function MapScreen() {
       if (radarPrice === 'Medio' && (lowestPrice(place) < 24 || lowestPrice(place) > 32)) return false;
       return true;
     });
-    const radarSource = radarFiltered.length > 0 ? radarFiltered : source;
+    // If the API cannot provide numeric distances yet (for example before a
+    // location permission), keep the catalog visible. Once distances exist,
+    // an incompatible Radar combination must remain empty instead of silently
+    // dropping one of the user's constraints.
+    const hasDistanceData = source.some((place) => Number.isFinite(distanceKm(place.distance)));
+    const radarSource = radarFiltered.length > 0 || hasDistanceData ? radarFiltered : source;
     if (active === 'Barato') return radarSource.sort((a, b) => (Math.min(...a.tacos.map((taco) => taco.price), Infinity) - Math.min(...b.tacos.map((taco) => taco.price), Infinity)));
     if (active === '92% para mí') return radarSource.sort((a, b) => b.match - a.match);
     if (active === 'Pastor') return radarSource.sort((a, b) => (b.tacos.find((taco) => taco.name.toLowerCase() === displayedTaco?.toLowerCase())?.rating ?? b.rating) - (a.tacos.find((taco) => taco.name.toLowerCase() === displayedTaco?.toLowerCase())?.rating ?? a.rating));

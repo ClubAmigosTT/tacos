@@ -81,6 +81,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 25. Mostrar una salida de navegación útil para enlaces compartidos que ya no existan.
 26. Hacer explícito en cada pin qué taco determina el rating contextual del mapa.
 27. Excluir del filtro de un taco las sucursales que no ofrecen ese taco.
+28. No ignorar silenciosamente combinaciones imposibles del Radar; conservar fallback sólo cuando no existe distancia numérica.
 **Aceptación:** “Pastor”, “Abierto ahora”, “Barato” y “Para mí” producen resultados ordenados; negar ubicación no rompe el catálogo.
 
 ### Fase 5 — Visitas, diario y media (3–5 días)
