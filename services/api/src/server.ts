@@ -137,7 +137,8 @@ app.get('/v1/me/taste', async (request, reply) => {
 
 app.get('/v1/branches/:id', async (request, reply) => {
   const params = z.object({ id: z.string() }).parse(request.params);
-  const place = await findPlace(params.id);
+  const user = await resolveUser(request);
+  const place = await findPlace(params.id, user?.id);
   if (!place) return reply.code(404).send({ error: 'BRANCH_NOT_FOUND' });
   return place;
 });

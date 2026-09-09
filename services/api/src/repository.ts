@@ -447,10 +447,13 @@ export async function getTasteProfile(userId: string): Promise<TasteProfile> {
   return { title, description, tags, profile };
 }
 
-export async function findPlace(id: string): Promise<ApiPlace | undefined> {
+export async function findPlace(id: string, userId?: string): Promise<ApiPlace | undefined> {
   const fallback = places.find((place) => place.id === id);
-  if (!pool) return fallback ? localReputation(fallback) : fallback;
-  const result = await pool.query(`
+  let found: ApiPlace | undefined;
+  if (!pool) {
+    found = fallback ? localReputation(fallback) : fallback;
+  } else {
+    const result = await pool.query(`
     SELECT b.id, b.taqueria_id, t.name AS taqueria_name, b.name, b.neighborhood, b.open_until,
       ${reputationSelect}
       b.match_score, b.style,
@@ -464,8 +467,13 @@ export async function findPlace(id: string): Promise<ApiPlace | undefined> {
       ${reputationJoin}
       LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
     WHERE b.id = $1 AND b.is_active = true GROUP BY b.id, t.name, reviews.review_count, reviews.score
-  `, [id]);
-  return result.rows[0] ? normalizePlace(result.rows[0]) : undefined;
+    `, [id]);
+    found = result.rows[0] ? normalizePlace(result.rows[0]) : undefined;
+  }
+  if (!found || !userId) return found;
+  const personalized = await getRecommendations(userId);
+  const match = personalized.find((place) => place.id === id);
+  return match ? { ...found, match: match.match, tasteMatch: match.tasteMatch, socialMatch: match.socialMatch, friendCount: match.friendCount } : found;
 }
 
 export type ApiBranchReview = {

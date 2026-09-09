@@ -81,6 +81,8 @@ const visit = await request('/v1/visits', {
 }, 201);
 const personalizedDiscover = await request('/v1/discover?limit=3', { token: bob.token });
 if (personalizedDiscover.context?.personalized !== true || !personalizedDiscover.places?.some((place) => typeof place.tasteMatch === 'number')) throw new Error('Authenticated discovery did not expose the user affinity score');
+const personalizedDetail = await request('/v1/branches/vilsito', { token: bob.token });
+if (typeof personalizedDetail.tasteMatch !== 'number') throw new Error('Authenticated branch detail did not expose taste affinity');
 const branchReviews = await request('/v1/branches/vilsito/reviews');
 if (!branchReviews.reviews?.some((review) => review.id === visit.id && review.note === 'Smoke test' && review.user?.id === bob.user.id)) throw new Error('Public branch reviews did not include the visible visit');
 await request('/v1/branches/branch-does-not-exist/reviews', {}, 404);

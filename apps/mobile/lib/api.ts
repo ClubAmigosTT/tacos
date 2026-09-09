@@ -137,9 +137,9 @@ export async function taste(token: string) {
   return request<{ taste: TasteProfile }>('/v1/me/taste', undefined, token);
 }
 
-export async function getPlace(id: string): Promise<Place> {
+export async function getPlace(id: string, token?: string): Promise<Place> {
   try {
-    return await request<Place>(`/v1/branches/${id}`);
+    return await request<Place>(`/v1/branches/${id}`, undefined, token);
   } catch (cause) {
     // A real 4xx means the branch is gone or the link is invalid. Do not
     // resurrect a stale local fixture in its place; the route can then show

@@ -19,8 +19,8 @@ export default function RegisterScreen() {
   const fallbackPlace = places.find((item) => item.id === initialPlaceId) ?? places[0];
   const remoteInitialPlace = Boolean(initialPlaceId && !places.some((item) => item.id === initialPlaceId));
   const { data: fetchedInitialPlace, isLoading: initialPlaceLoading, isError: initialPlaceError, refetch: refetchInitialPlace } = useQuery({
-    queryKey: ['place', 'register', initialPlaceId],
-    queryFn: () => getPlace(initialPlaceId!),
+    queryKey: ['place', 'register', initialPlaceId, token],
+    queryFn: () => getPlace(initialPlaceId!, token),
     enabled: remoteInitialPlace
   });
   const initialPlace = fetchedInitialPlace ?? fallbackPlace;

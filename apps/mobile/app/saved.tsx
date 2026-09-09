@@ -12,7 +12,7 @@ export default function SavedScreen() {
   const { token, loading: authLoading } = useAuth();
   const { data: savedData, isLoading: loadingIds, isError: idsError, refetch: refetchIds } = useQuery({ queryKey: ['saved-places', token], queryFn: () => savedPlaces(token!), enabled: Boolean(token) });
   const ids = savedData?.placeIds ?? [];
-  const { data: places = [], isLoading: loadingPlaces, isError: placesError, refetch: refetchPlaces } = useQuery({ queryKey: ['saved-place-details', ids], queryFn: () => Promise.all(ids.map((id) => getPlace(id))), enabled: savedData !== undefined });
+  const { data: places = [], isLoading: loadingPlaces, isError: placesError, refetch: refetchPlaces } = useQuery({ queryKey: ['saved-place-details', ids, token], queryFn: () => Promise.all(ids.map((id) => getPlace(id, token))), enabled: savedData !== undefined });
   if (authLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando tu radar…</Text></View>;
   if (!token) return <View style={styles.center}><View style={styles.icon}><Ionicons name="bookmark-outline" size={24} color={colors.background} /></View><Text style={styles.title}>Tu radar necesita una cuenta</Text><Text style={styles.muted}>Entra para guardar lugares y volver a ellos cuando llegue el antojo.</Text><Pressable style={styles.primary} onPress={() => router.push('/auth')}><Text style={styles.primaryText}>Entrar o crear cuenta</Text></Pressable></View>;
   if (idsError || placesError) return <AsyncErrorState title="No pudimos cargar tu radar" detail="Tus lugares guardados siguen intactos. Revisa la conexión e inténtalo de nuevo." onAction={() => { void refetchIds(); if (savedData !== undefined) void refetchPlaces(); }} />;
