@@ -140,7 +140,12 @@ export async function taste(token: string) {
 export async function getPlace(id: string): Promise<Place> {
   try {
     return await request<Place>(`/v1/branches/${id}`);
-  } catch {
+  } catch (cause) {
+    // A real 4xx means the branch is gone or the link is invalid. Do not
+    // resurrect a stale local fixture in its place; the route can then show
+    // the proper unavailable state. Network/5xx failures may still use the
+    // catalog fallback while the API recovers.
+    if (cause instanceof ApiError && cause.status < 500) throw cause;
     const fallback = places.find((place) => place.id === id);
     if (!fallback) throw new Error('Taquería no encontrada');
     return fallback;
@@ -166,7 +171,8 @@ export async function unsavePlace(placeId: string, token: string) {
 export async function getTaqueria(id: string) {
   try {
     return await request<ApiTaqueria>(`/v1/taquerias/${id}`);
-  } catch {
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.status < 500) throw cause;
     const branches = places.filter((place) => (place.taqueriaId ?? place.id) === id);
     if (!branches.length) throw new Error('Taquería no encontrada');
     const first = branches[0];
