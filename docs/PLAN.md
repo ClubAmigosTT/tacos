@@ -88,6 +88,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 32. No consultar el directorio social sin sesión y explicar el requisito directamente en la interfaz.
 33. Ejecutar en CI un smoke del guard production de Expo antes de cualquier build móvil.
 34. Dar prioridad a la búsqueda universal sobre el filtro visual por defecto: una colonia o sucursal muestra todas sus coincidencias y sólo un taco detectado cambia la reputación contextual.
+35. Hacer que el mapa web de revisión también se pueda arrastrar y emita un centro geográfico al soltar para probar “Buscar en esta zona” sin un dispositivo nativo.
 **Aceptación:** “Pastor”, “Abierto ahora”, “Barato” y “Para mí” producen resultados ordenados; negar ubicación no rompe el catálogo.
 
 ### Fase 5 — Visitas, diario y media (3–5 días)
