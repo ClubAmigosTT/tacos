@@ -167,6 +167,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 132. Passport vivo: `/v1/me/passport` deriva colonias, sucursales y progreso desde el catálogo y las visitas visibles del usuario, sin depender de una lista fija.
 133. Wrapped con memoria: el resumen anual calcula desde las visitas del usuario la colonia más frecuente, hora característica, kilómetros recorridos y gasto con precio registrado.
 134. Recomendaciones honestas: una sesión autenticada ya no cae silenciosamente al catálogo demo si falla `/v1/recommendations`; Inicio muestra el error y permite reintentar, mientras el modo anónimo conserva el fallback local.
+135. Descubrimiento honesto: Mapa y Registro no muestran sucursales demo cuando falla `/v1/discover` con sesión; ofrecen reintento y sólo mantienen un deep link de sucursal explícito para no perder la intención del usuario.
 
 ## Verificación
 

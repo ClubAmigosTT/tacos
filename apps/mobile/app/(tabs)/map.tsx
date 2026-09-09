@@ -9,6 +9,7 @@ import { discover, trackEvent } from '@/lib/api';
 import { colors, radii, spacing } from '@/theme';
 import { RatingBadge } from '@/components/RatingBadge';
 import { MapCanvas } from '@/components/MapCanvas';
+import { AsyncErrorState } from '@/components/AsyncErrorState';
 import { useAuth } from '@/lib/auth';
 import { applyRadar, radarDistances, radarHunger, radarMoods, radarPrices, type RadarDistance, type RadarHunger, type RadarMood, type RadarPrice } from '@/lib/radar';
 const filters = ['Pastor', 'Abierto ahora', 'Barato', '92% para mí'];
@@ -54,25 +55,28 @@ export default function MapScreen() {
     if (moved) { setPendingMapCenter(next); setMapMoved(true); }
     else { setPendingMapCenter(undefined); setMapMoved(false); }
   };
-  const { data = places } = useQuery({ queryKey: ['discover', 'map', searchQuery, searchCoordinates?.latitude, searchCoordinates?.longitude, token], queryFn: () => discover({ q: searchQuery, lat: searchCoordinates?.latitude, lng: searchCoordinates?.longitude }, token), placeholderData: places });
+  const { data = places, isError: discoverError, refetch: refetchDiscover } = useQuery({ queryKey: ['discover', 'map', searchQuery, searchCoordinates?.latitude, searchCoordinates?.longitude, token], queryFn: () => discover({ q: searchQuery, lat: searchCoordinates?.latitude, lng: searchCoordinates?.longitude }, token), placeholderData: places });
+  const discoveryPlaces = token && discoverError ? [] : data;
   const requestedTaco = useMemo(() => {
     const normalized = searchQuery.trim().toLowerCase();
     if (normalized.length < 3) return undefined;
-    const tacoNames = [...new Set(data.flatMap((place) => place.tacos.map((taco) => taco.name)))];
+    const tacoNames = [...new Set(discoveryPlaces.flatMap((place) => place.tacos.map((taco) => taco.name)))];
     return tacoNames.find((name) => normalized.includes(name.toLowerCase()))
       ?? tacoNames.find((name) => name.toLowerCase().includes(normalized));
-  }, [data, searchQuery]);
+  }, [discoveryPlaces, searchQuery]);
   const hasFreeTextSearch = searchQuery.trim().length > 0;
   // "Pastor" is the visual default for an empty map, not a hidden query
   // constraint. Once the user searches for a neighborhood or another branch
   // attribute, let the API result set speak for itself unless a taco name was
   // actually detected in the query.
   const contextualTaco = requestedTaco ?? (!hasFreeTextSearch && active === 'Pastor' ? 'Pastor' : undefined);
-  const sorted = useMemo(() => applyRadar({ places: data, active, contextualTaco, distance: radarDistance, price: radarPrice, mood: radarMood, hunger: radarHungerLevel }), [active, contextualTaco, data, radarDistance, radarHungerLevel, radarMood, radarPrice]);
+  const sorted = useMemo(() => applyRadar({ places: discoveryPlaces, active, contextualTaco, distance: radarDistance, price: radarPrice, mood: radarMood, hunger: radarHungerLevel }), [active, contextualTaco, discoveryPlaces, radarDistance, radarHungerLevel, radarMood, radarPrice]);
   // Never recommend a place outside the active search/Radar constraints.
   // An empty result set must remain empty instead of silently escaping the
   // user's distance, price or mood choices.
   const suggestion = sorted[0];
+
+  if (token && discoverError) return <View style={styles.errorScreen}><AsyncErrorState title="No pudimos actualizar tu mapa" detail="No mostramos sucursales demo mientras tu sesión está activa. Revisa la conexión para recuperar resultados reales." onAction={() => void refetchDiscover()} /></View>;
 
   function clearDiscovery() {
     setActive('Pastor');
@@ -103,6 +107,7 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  errorScreen: { flex: 1, backgroundColor: colors.background },
   topOverlay: { position: 'absolute', top: 62, left: spacing.lg, right: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backButton: { width: 42, height: 42, borderRadius: 22, backgroundColor: 'rgba(11,13,12,0.86)', alignItems: 'center', justifyContent: 'center' },
   mapTitle: { alignItems: 'center' },

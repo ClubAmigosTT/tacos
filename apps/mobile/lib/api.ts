@@ -114,7 +114,11 @@ export async function discover(options: { q?: string; lat?: number; lng?: number
     const query = params.toString();
     const result = await request<{ places: Place[] }>(`/v1/discover${query ? `?${query}` : ''}`, undefined, token);
     return result.places;
-  } catch {
+  } catch (cause) {
+    // Anonymous discovery can keep using the local catalog for design/offline
+    // review. Once a session exists, never present demo branches as if they
+    // were the current server-backed result set.
+    if (token) throw cause;
     const normalized = options.q?.trim() ? normalizeSearchText(options.q.trim()) : undefined;
     const filtered = normalized
       ? places.filter((place) => normalizeSearchText(`${place.name} ${place.neighborhood} ${place.style} ${place.tags.join(' ')} ${place.tacos.map((taco) => taco.name).join(' ')}`).includes(normalized))

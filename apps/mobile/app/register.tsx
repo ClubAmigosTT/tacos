@@ -37,14 +37,15 @@ export default function RegisterScreen() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const { data: nearbyPlaces = places } = useQuery({ queryKey: ['discover', 'register', coordinates?.latitude, coordinates?.longitude, token], queryFn: () => discover({ lat: coordinates?.latitude, lng: coordinates?.longitude, limit: 3 }, token), placeholderData: places });
+  const { data: nearbyPlaces = places, isError: nearbyPlacesError, refetch: refetchNearbyPlaces } = useQuery({ queryKey: ['discover', 'register', coordinates?.latitude, coordinates?.longitude, token], queryFn: () => discover({ lat: coordinates?.latitude, lng: coordinates?.longitude, limit: 3 }, token), placeholderData: places });
+  const visibleNearbyPlaces = token && nearbyPlacesError ? [] : nearbyPlaces;
   // A deep link from a place detail is an explicit user choice. Keep that
   // branch in the selector even when the nearest-three query does not include
   // it, so location ranking never changes the visit behind the user's back.
   const hasExplicitPlace = Boolean(initialPlaceId && initialPlace.id === initialPlaceId);
-  const availablePlaces = hasExplicitPlace && !nearbyPlaces.some((item) => item.id === initialPlace.id)
-    ? [initialPlace, ...nearbyPlaces]
-    : nearbyPlaces;
+  const availablePlaces = hasExplicitPlace && !visibleNearbyPlaces.some((item) => item.id === initialPlace.id)
+    ? [initialPlace, ...visibleNearbyPlaces]
+    : visibleNearbyPlaces;
   const place = availablePlaces.find((item) => item.id === placeId) ?? availablePlaces[0] ?? places[0];
 
   useEffect(() => {
@@ -81,6 +82,7 @@ export default function RegisterScreen() {
   if (!token) return <View style={styles.authRequired}><View style={styles.successIcon}><Ionicons name="person" size={26} color={colors.background} /></View><Text style={styles.successTitle}>Tu diario necesita una cuenta</Text><Text style={styles.successText}>Crea tu identidad para guardar esta visita y verla después en tu historial.</Text><Pressable accessibilityRole="button" accessibilityLabel="Entrar o crear cuenta" style={styles.primary} onPress={() => router.push({ pathname: '/auth', params: { returnTo: '/register', placeId: initialPlaceId ?? placeId } })}><Text style={styles.primaryText}>Entrar o crear cuenta</Text><Ionicons name="arrow-forward" size={18} color={colors.background} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Cancelar registro" onPress={() => router.back()}><Text style={styles.cancelText}>Ahora no</Text></Pressable></View>;
   if (remoteInitialPlace && initialPlaceLoading) return <View style={styles.authRequired}><Text style={styles.successText}>Buscando la sucursal…</Text></View>;
   if (remoteInitialPlace && (initialPlaceError || !fetchedInitialPlace)) return <AsyncErrorState title="No encontramos esa sucursal" detail="El enlace puede haber caducado o la conexión no estar disponible. Inténtalo de nuevo o vuelve al mapa." onAction={() => void refetchInitialPlace()} />;
+  if (token && nearbyPlacesError && !hasExplicitPlace) return <View style={styles.authRequired}><AsyncErrorState title="No pudimos encontrar lugares cercanos" detail="No mostramos sucursales demo mientras tu sesión está activa. Revisa la conexión para registrar una visita real." onAction={() => void refetchNearbyPlaces()} /></View>;
 
   function selectPlace(id: string) {
     setPlaceId(id);
@@ -117,7 +119,7 @@ export default function RegisterScreen() {
       // Keep the explicit branch selected by a deep link, but base the camera
       // hint on the actual nearest-place query rather than on the selector's
       // first item (which may be the preserved explicit branch).
-      setPhotoSuggestion(source === 'camera' && coordinates ? nearbyPlaces[0] ?? availablePlaces[0] : undefined);
+      setPhotoSuggestion(source === 'camera' && coordinates ? visibleNearbyPlaces[0] ?? availablePlaces[0] : undefined);
       setError('');
     } catch { setError('No pudimos abrir la cámara o galería.'); }
   }
