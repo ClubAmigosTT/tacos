@@ -132,6 +132,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 97. Errores honestos: las pantallas privadas diferencian una falla temporal de API de un diario vacío y ofrecen reintento explícito.
 98. Red social resiliente: Actividad, Personas y Quiero ir muestran reintento cuando falla su consulta, sin confundirlo con ausencia de contenido.
 99. Búsqueda tolerante a acentos: el fallback local y PostgreSQL normalizan nombres y consultas en español de forma consistente.
+100. Prior de reputación estable: una primera reseña ya no degrada artificialmente la puntuación seed de una sucursal o taco; el smoke test lo protege.
 
 ## Verificación
 

@@ -121,6 +121,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 8. Ofrecer navegación rápida entre Diario, Reviews, Listas, Mapa y Estadísticas desde el Perfil.
 9. Mantener estados de error y reintento en Actividad, Personas y Quiero ir para no presentar fallas de API como listas vacías.
 10. Normalizar acentos en la búsqueda de sucursales y tacos para mantener el mismo resultado en fallback local y PostgreSQL.
+11. Usar la reputación de catálogo como media del prior bayesiano para que la primera visita no desplace artificialmente un lugar establecido.
 
 **Aceptación:** el smoke test confirma follow, unfollow, feed con nota, perfil público, exclusión de listas privadas y edición autorizada de listas.
 

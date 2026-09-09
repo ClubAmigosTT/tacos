@@ -71,6 +71,10 @@ const visit = await request('/v1/visits', {
   body: JSON.stringify({ placeId: 'vilsito', tacoIds: ['vilsito-pastor'], tacoRatings: { 'vilsito-pastor': 5 }, rating: 5, price: 44, note: 'Smoke test' }),
   token: bob.token
 }, 201);
+const reputationAfterFirstReview = await request('/v1/discover?limit=3');
+const vilsitoAfterFirstReview = reputationAfterFirstReview.places?.find((place) => place.id === 'vilsito');
+const pastorAfterFirstReview = vilsitoAfterFirstReview?.tacos?.find((taco) => taco.id === 'vilsito-pastor');
+if (Number(vilsitoAfterFirstReview?.rating) < 4.6 || Number(pastorAfterFirstReview?.rating) < 4.7) throw new Error('A single review artificially displaced the seeded reputation prior');
 
 const feed = await request('/v1/feed', { token: alice.token });
 if (feed.items?.length !== 1 || feed.items?.[0]?.note !== 'Smoke test') throw new Error(`Expected one feed item with its note, got ${feed.items?.length ?? 0}`);

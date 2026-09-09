@@ -192,7 +192,7 @@ const reputationJoin = `
         SELECT stats.review_count,
           CASE WHEN stats.review_count = 0 THEN b.rating
             ELSE LEAST(5::numeric, GREATEST(1::numeric,
-              (((stats.effective_count * ((stats.average_rating * 0.65) + (stats.recent_rating * 0.35))) + (10 * 4.2)) / (stats.effective_count + 10))
+              (((stats.effective_count * ((stats.average_rating * 0.65) + (stats.recent_rating * 0.35))) + (10 * COALESCE(b.rating, 4.2))) / (stats.effective_count + 10))
               - LEAST(0.25::numeric, stats.dispersion * 0.08)
               + LEAST(0.08::numeric, GREATEST(0::numeric, stats.recent_rating - stats.average_rating) * 0.12)
             ))
@@ -224,7 +224,7 @@ const reputationSelect = `
 const tacoReputationSelect = `(
         SELECT CASE WHEN stats.review_count = 0 THEN m.rating
           ELSE LEAST(5::numeric, GREATEST(1::numeric,
-            (((stats.effective_count * ((stats.average_rating * 0.65) + (stats.recent_rating * 0.35))) + (5 * 4.2)) / (stats.effective_count + 5))
+            (((stats.effective_count * ((stats.average_rating * 0.65) + (stats.recent_rating * 0.35))) + (5 * COALESCE(m.rating, 4.2))) / (stats.effective_count + 5))
             - LEAST(0.25::numeric, stats.dispersion * 0.08)
             + LEAST(0.08::numeric, GREATEST(0::numeric, stats.recent_rating - stats.average_rating) * 0.12)
           ))
@@ -261,8 +261,9 @@ function localRobustScore(reviews: LocalReview[], priorStrength: number, fallbac
   const weightTotal = weights.reduce((sum, weight) => sum + weight, 0);
   const recent = reviews.reduce((sum, review, index) => sum + review.rating * weights[index], 0) / weightTotal;
   const effectiveCount = Math.max(1, Math.min(reviews.length, Math.max(1, new Set(reviews.map((review) => review.userId)).size * 3)));
+  const priorMean = Math.max(1, Math.min(5, fallback));
   return Math.max(1, Math.min(5,
-    ((effectiveCount * (average * 0.65 + recent * 0.35)) + (priorStrength * 4.2)) / (effectiveCount + priorStrength)
+    ((effectiveCount * (average * 0.65 + recent * 0.35)) + (priorStrength * priorMean)) / (effectiveCount + priorStrength)
       - Math.min(0.25, dispersion * 0.08)
       + Math.min(0.08, Math.max(0, recent - average) * 0.12)
   ));
