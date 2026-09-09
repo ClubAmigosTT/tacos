@@ -210,6 +210,23 @@ const collaborator = await request(`/v1/lists/${list.id}/collaborators`, {
 if (collaborator.status !== 'added') throw new Error('List collaborator was not added');
 const collaboratorDetail = await request(`/v1/lists/${list.id}`, { token: alice.token });
 if (collaboratorDetail.collaborators?.[0]?.id !== alice.user.id || collaboratorDetail.canEdit !== true) throw new Error('Collaborator could not access the private list');
+// A public list may reveal how many collaborators it has, but never their
+// names/roles to an anonymous visitor. The authorized collaborator above must
+// still receive the roster so shared-list management remains functional.
+await request(`/v1/lists/${list.id}`, {
+  method: 'PATCH',
+  body: JSON.stringify({ visibility: 'public' }),
+  token: bob.token
+});
+const publicCollaboratorDetail = await request(`/v1/lists/${list.id}`);
+if (publicCollaboratorDetail.collaboratorCount !== 1 || !Array.isArray(publicCollaboratorDetail.collaborators) || publicCollaboratorDetail.collaborators.length !== 0) {
+  throw new Error('Public list detail leaked the collaborator roster');
+}
+await request(`/v1/lists/${list.id}`, {
+  method: 'PATCH',
+  body: JSON.stringify({ visibility: 'private' }),
+  token: bob.token
+});
 await request(`/v1/lists/${list.id}/items`, {
   method: 'POST',
   body: JSON.stringify({ branchId: 'oriente', note: 'Sugerencia de Alice' }),
