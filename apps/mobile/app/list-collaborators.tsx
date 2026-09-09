@@ -9,11 +9,11 @@ import { colors, radii, spacing } from '@/theme';
 
 export default function ListCollaboratorsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { token, user } = useAuth();
+  const { token, user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
   const [role, setRole] = useState<'editor' | 'viewer'>('editor');
-  const { data: list, isLoading, isError } = useQuery({ queryKey: ['list', id, token], queryFn: () => listDetails(id, token), enabled: Boolean(id) });
+  const { data: list, isLoading, isError } = useQuery({ queryKey: ['list', id, token], queryFn: () => listDetails(id, token), enabled: Boolean(id && token) });
   const { data: searchData } = useQuery({ queryKey: ['list-collaborator-search', query, token], queryFn: () => searchUsers(query, token), enabled: Boolean(token && query.trim().length >= 2) });
   const addMutation = useMutation({ mutationFn: (userId: string) => addListCollaborator(id, { userId, role }, token!), onSuccess: () => { void trackEvent('list_collaborator_changed', { list_id: id, role }, token); setQuery(''); void queryClient.invalidateQueries({ queryKey: ['list', id] }); } });
   const roleMutation = useMutation({ mutationFn: (input: { userId: string; role: 'editor' | 'viewer' }) => addListCollaborator(id, input, token!), onSuccess: (_result, input) => { void trackEvent('list_collaborator_changed', { list_id: id, role: input.role }, token); void queryClient.invalidateQueries({ queryKey: ['list', id] }); } });
@@ -21,6 +21,7 @@ export default function ListCollaboratorsScreen() {
   const existingIds = useMemo(() => new Set((list?.collaborators ?? []).map((collaborator) => collaborator.id)), [list?.collaborators]);
   const results = (searchData?.users ?? []).filter((candidate) => !existingIds.has(candidate.id) && candidate.id !== list?.owner.id);
 
+  if (authLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando colaboradores…</Text></View>;
   if (!token) return <View style={styles.center}><Text style={styles.title}>Entra para gestionar colaboradores</Text><Pressable style={styles.primary} onPress={() => router.push('/auth')}><Text style={styles.primaryText}>Entrar</Text></Pressable></View>;
   if (isLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando colaboradores…</Text></View>;
   if (isError || !list || list.owner.id !== user?.id) return <View style={styles.center}><Text style={styles.title}>No puedes gestionar esta lista</Text><Text style={styles.muted}>Sólo el propietario puede invitar o quitar colaboradores.</Text><Pressable style={styles.secondary} onPress={() => router.back()}><Text style={styles.secondaryText}>Volver</Text></Pressable></View>;
