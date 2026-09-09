@@ -160,6 +160,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 125. Accesibilidad operativa: mapa, pins, Radar, búsqueda, selector de sucursal, tacos, ratings y cámara exponen nombres, roles y estados nativos para VoiceOver, TalkBack y teclado web.
 126. Analítica administrativa recuperable: si falla el resumen de eventos, Moderación conserva la cola de reportes y muestra un reintento independiente para la tarjeta de señales.
 127. Acceso inclusivo: autenticación, perfil, pestañas y navegación secundaria anuncian sus acciones y cambios de estado sin depender de iconos o color.
+128. Radar contextual completo: distancia, precio, antojo y nivel de hambre modifican filtros y orden; “Para mí” sólo recomienda dentro del conjunto resultante.
 
 ## Verificación
 

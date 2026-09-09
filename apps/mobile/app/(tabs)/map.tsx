@@ -15,6 +15,7 @@ const filters = ['Pastor', 'Abierto ahora', 'Barato', '92% para mí'];
 const radarDistances = ['Cerca', 'En la zona', 'Toda la ciudad'] as const;
 const radarPrices = ['Barato', 'Medio', 'Cualquier precio'] as const;
 const radarMoods = ['Clásico', 'Aventura', 'Alta calidad'] as const;
+const radarHunger = ['Ligero', 'Normal', 'Mucha hambre'] as const;
 const defaultMapCenter = { latitude: 19.402, longitude: -99.163 };
 
 function distanceKm(distance: string) {
@@ -41,6 +42,7 @@ export default function MapScreen() {
   const [radarDistance, setRadarDistance] = useState<(typeof radarDistances)[number]>('En la zona');
   const [radarPrice, setRadarPrice] = useState<(typeof radarPrices)[number]>('Cualquier precio');
   const [radarMood, setRadarMood] = useState<(typeof radarMoods)[number]>('Alta calidad');
+  const [radarHungerLevel, setRadarHungerLevel] = useState<(typeof radarHunger)[number]>('Normal');
   useEffect(() => { if (initialQuery != null) setSearch(initialQuery); }, [initialQuery]);
   useEffect(() => {
     const timer = setTimeout(() => setSearchQuery(search.trim()), 250);
@@ -87,26 +89,46 @@ export default function MapScreen() {
     // stay empty so a branch without that menu item is never mislabeled.
     const source = [...tacoFiltered];
     const distanceLimit = radarDistance === 'Cerca' ? 2 : radarDistance === 'En la zona' ? 5 : Number.POSITIVE_INFINITY;
+    // A permission prompt can leave the API with human-readable distances
+    // such as "cerca de ti". Price and hunger remain enforceable in that
+    // state; only the geographic constraint waits for numeric coordinates.
+    const hasDistanceData = source.some((place) => Number.isFinite(distanceKm(place.distance)));
     const radarFiltered = source.filter((place) => {
-      if (distanceKm(place.distance) > distanceLimit) return false;
+      if (hasDistanceData && distanceKm(place.distance) > distanceLimit) return false;
       if (radarPrice === 'Barato' && lowestPrice(place) > 24) return false;
       if (radarPrice === 'Medio' && (lowestPrice(place) < 24 || lowestPrice(place) > 32)) return false;
+      const highestPrice = Math.max(...place.tacos.map((taco) => taco.price), 0);
+      if (radarHungerLevel === 'Ligero' && highestPrice > 32) return false;
+      if (radarHungerLevel === 'Mucha hambre' && highestPrice < 24 && place.tacos.length < 3) return false;
       return true;
     });
-    // If the API cannot provide numeric distances yet (for example before a
-    // location permission), keep the catalog visible. Once distances exist,
-    // an incompatible Radar combination must remain empty instead of silently
-    // dropping one of the user's constraints.
-    const hasDistanceData = source.some((place) => Number.isFinite(distanceKm(place.distance)));
-    const radarSource = radarFiltered.length > 0 || hasDistanceData ? radarFiltered : source;
-    if (active === 'Barato') return radarSource.sort((a, b) => (Math.min(...a.tacos.map((taco) => taco.price), Infinity) - Math.min(...b.tacos.map((taco) => taco.price), Infinity)));
-    if (active === '92% para mí') return radarSource.sort((a, b) => b.match - a.match);
-    if (active === 'Pastor') return radarSource.sort((a, b) => (b.tacos.find((taco) => taco.name.toLowerCase() === contextualTaco?.toLowerCase())?.rating ?? b.rating) - (a.tacos.find((taco) => taco.name.toLowerCase() === contextualTaco?.toLowerCase())?.rating ?? a.rating));
-    if (active === 'Abierto ahora') return radarSource.filter((place) => isOpenNow(place.openUntil));
-    if (radarMood === 'Clásico') return radarSource.sort((a, b) => b.flavorProfile.traditional - a.flavorProfile.traditional);
-    if (radarMood === 'Aventura') return radarSource.sort((a, b) => (b.flavorProfile.intensity + (100 - b.flavorProfile.traditional)) - (a.flavorProfile.intensity + (100 - a.flavorProfile.traditional)));
-    return radarSource.sort((a, b) => b.rating - a.rating);
-  }, [active, contextualTaco, data, radarDistance, radarMood, radarPrice]);
+    // Once numeric distances exist, an incompatible Radar combination must
+    // remain empty instead of silently dropping one of the user's constraints.
+    const distanceAndPriceSource = radarFiltered;
+    const moodSource = radarMood === 'Clásico'
+      ? distanceAndPriceSource.filter((place) => place.flavorProfile.traditional >= 70)
+      : radarMood === 'Aventura'
+        ? distanceAndPriceSource.filter((place) => place.flavorProfile.traditional < 80 || place.flavorProfile.intensity >= 75)
+        : distanceAndPriceSource;
+    const hungerScore = (place: (typeof places)[number]) => Math.max(...place.tacos.map((taco) => taco.price), 0) + place.tacos.length * 4;
+    const moodScore = (place: (typeof places)[number]) => radarMood === 'Clásico'
+      ? place.flavorProfile.traditional
+      : radarMood === 'Aventura'
+        ? place.flavorProfile.intensity + (100 - place.flavorProfile.traditional)
+        : place.rating * 20;
+    const contextualSort = (a: (typeof places)[number], b: (typeof places)[number]) => {
+      if (radarHungerLevel !== 'Normal') {
+        const hungerDelta = hungerScore(b) - hungerScore(a);
+        if (hungerDelta) return radarHungerLevel === 'Mucha hambre' ? hungerDelta : -hungerDelta;
+      }
+      return moodScore(b) - moodScore(a);
+    };
+    if (active === 'Barato') return moodSource.sort((a, b) => (Math.min(...a.tacos.map((taco) => taco.price), Infinity) - Math.min(...b.tacos.map((taco) => taco.price), Infinity)) || contextualSort(a, b));
+    if (active === '92% para mí') return moodSource.sort((a, b) => (b.match - a.match) || contextualSort(a, b));
+    if (active === 'Pastor') return moodSource.sort((a, b) => ((b.tacos.find((taco) => taco.name.toLowerCase() === contextualTaco?.toLowerCase())?.rating ?? b.rating) - (a.tacos.find((taco) => taco.name.toLowerCase() === contextualTaco?.toLowerCase())?.rating ?? a.rating)) || contextualSort(a, b));
+    if (active === 'Abierto ahora') return moodSource.filter((place) => isOpenNow(place.openUntil)).sort(contextualSort);
+    return moodSource.sort(contextualSort);
+  }, [active, contextualTaco, data, radarDistance, radarHungerLevel, radarMood, radarPrice]);
   // Never recommend a place outside the active search/Radar constraints.
   // An empty result set must remain empty instead of silently escaping the
   // user's distance, price or mood choices.
@@ -117,6 +139,7 @@ export default function MapScreen() {
     setRadarDistance('En la zona');
     setRadarPrice('Cualquier precio');
     setRadarMood('Alta calidad');
+    setRadarHungerLevel('Normal');
     setSearch('');
     setSearchQuery('');
     setSearchCenter(undefined);
@@ -130,7 +153,7 @@ export default function MapScreen() {
       <View style={styles.topOverlay}><Pressable accessibilityRole="button" accessibilityLabel="Volver" style={styles.backButton} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable><View style={styles.mapTitle}><Text style={styles.mapKicker}>EXPLORAR</Text><Text style={styles.mapHeading}>Tu mapa</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Usar mi ubicación" style={[styles.locate, coordinates && styles.locateActive]} onPress={() => void loadLocation()}><Ionicons name="navigate" size={18} color={coordinates ? colors.background : colors.ink} /></Pressable></View>
       <View style={styles.searchBar}><Ionicons name="search" size={17} color={colors.muted} /><TextInput accessibilityLabel="Buscar taquerías, tacos o zonas" value={search} onChangeText={setSearch} onSubmitEditing={() => { setSearchQuery(search.trim()); void trackEvent('map_search', { query_length: search.trim().length }, token); }} placeholder="Pastor, suadero, Roma…" placeholderTextColor={colors.muted} style={styles.searchInput} returnKeyType="search" /></View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters} contentContainerStyle={styles.filterContent}>{filters.map((filter) => { const selected = filter === active && !(filter === 'Pastor' && hasFreeTextSearch && !requestedTaco); return <Pressable key={filter} accessibilityRole="button" accessibilityLabel={`Filtrar por ${filter}`} accessibilityState={{ selected }} onPress={() => { setActive(filter); void trackEvent('map_filter', { filter }, token); }} style={[styles.filter, selected && styles.filterActive]}><Text style={[styles.filterText, selected && styles.filterTextActive]}>{filter}</Text></Pressable>; })}<Pressable accessibilityRole="button" accessibilityLabel="Abrir Radar de tacos" accessibilityState={{ expanded: radarOpen }} onPress={() => { setRadarOpen((value) => !value); void trackEvent('radar_filter', { filter: 'open' }, token); }} style={[styles.filter, radarOpen && styles.filterActive]}><Ionicons name="options-outline" size={13} color={radarOpen ? colors.background : colors.ink} /><Text style={[styles.filterText, radarOpen && styles.filterTextActive]}>Radar</Text></Pressable></ScrollView>
-      {radarOpen ? <View style={styles.radarPanel}><View style={styles.radarHeader}><View><Text style={styles.radarEyebrow}>RADAR DE TACOS</Text><Text style={styles.radarTitle}>Encuentra algo para ti</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Cerrar Radar" onPress={() => setRadarOpen(false)}><Ionicons name="close" size={19} color={colors.muted} /></Pressable></View><Text style={styles.radarLabel}>DISTANCIA</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radarOptions}>{radarDistances.map((option) => <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Distancia: ${option}`} accessibilityState={{ selected: radarDistance === option }} onPress={() => { setRadarDistance(option); void trackEvent('radar_filter', { filter: `distance:${option}` }, token); }} style={[styles.radarOption, radarDistance === option && styles.radarOptionActive]}><Text style={[styles.radarOptionText, radarDistance === option && styles.radarOptionTextActive]}>{option}</Text></Pressable>)}</ScrollView><Text style={styles.radarLabel}>PRECIO</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radarOptions}>{radarPrices.map((option) => <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Precio: ${option}`} accessibilityState={{ selected: radarPrice === option }} onPress={() => { setRadarPrice(option); void trackEvent('radar_filter', { filter: `price:${option}` }, token); }} style={[styles.radarOption, radarPrice === option && styles.radarOptionActive]}><Text style={[styles.radarOptionText, radarPrice === option && styles.radarOptionTextActive]}>{option}</Text></Pressable>)}</ScrollView><Text style={styles.radarLabel}>ANTOJO</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radarOptions}>{radarMoods.map((option) => <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Antojo: ${option}`} accessibilityState={{ selected: radarMood === option }} onPress={() => { setRadarMood(option); void trackEvent('radar_filter', { filter: `mood:${option}` }, token); }} style={[styles.radarOption, radarMood === option && styles.radarOptionActive]}><Text style={[styles.radarOptionText, radarMood === option && styles.radarOptionTextActive]}>{option}</Text></Pressable>)}</ScrollView></View> : null}
+      {radarOpen ? <View style={styles.radarPanel}><View style={styles.radarHeader}><View><Text style={styles.radarEyebrow}>RADAR DE TACOS</Text><Text style={styles.radarTitle}>Encuentra algo para ti</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Cerrar Radar" onPress={() => setRadarOpen(false)}><Ionicons name="close" size={19} color={colors.muted} /></Pressable></View><Text style={styles.radarLabel}>DISTANCIA</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radarOptions}>{radarDistances.map((option) => <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Distancia: ${option}`} accessibilityState={{ selected: radarDistance === option }} onPress={() => { setRadarDistance(option); void trackEvent('radar_filter', { filter: `distance:${option}` }, token); }} style={[styles.radarOption, radarDistance === option && styles.radarOptionActive]}><Text style={[styles.radarOptionText, radarDistance === option && styles.radarOptionTextActive]}>{option}</Text></Pressable>)}</ScrollView><Text style={styles.radarLabel}>PRECIO</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radarOptions}>{radarPrices.map((option) => <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Precio: ${option}`} accessibilityState={{ selected: radarPrice === option }} onPress={() => { setRadarPrice(option); void trackEvent('radar_filter', { filter: `price:${option}` }, token); }} style={[styles.radarOption, radarPrice === option && styles.radarOptionActive]}><Text style={[styles.radarOptionText, radarPrice === option && styles.radarOptionTextActive]}>{option}</Text></Pressable>)}</ScrollView><Text style={styles.radarLabel}>ANTOJO</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radarOptions}>{radarMoods.map((option) => <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Antojo: ${option}`} accessibilityState={{ selected: radarMood === option }} onPress={() => { setRadarMood(option); void trackEvent('radar_filter', { filter: `mood:${option}` }, token); }} style={[styles.radarOption, radarMood === option && styles.radarOptionActive]}><Text style={[styles.radarOptionText, radarMood === option && styles.radarOptionTextActive]}>{option}</Text></Pressable>)}</ScrollView><Text style={styles.radarLabel}>HAMBRE</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radarOptions}>{radarHunger.map((option) => <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Hambre: ${option}`} accessibilityState={{ selected: radarHungerLevel === option }} onPress={() => { setRadarHungerLevel(option); void trackEvent('radar_filter', { filter: `hunger:${option}` }, token); }} style={[styles.radarOption, radarHungerLevel === option && styles.radarOptionActive]}><Text style={[styles.radarOptionText, radarHungerLevel === option && styles.radarOptionTextActive]}>{option}</Text></Pressable>)}</ScrollView></View> : null}
       {mapMoved && pendingMapCenter ? <Pressable accessibilityRole="button" accessibilityLabel="Buscar en esta zona" style={styles.searchAreaButton} onPress={() => { setSearchCenter(pendingMapCenter); setPendingMapCenter(undefined); setMapMoved(false); void trackEvent('map_filter', { filter: 'search_area' }, token); }}><Ionicons name="search" size={14} color={colors.background} /><Text style={styles.searchAreaText}>Buscar en esta zona</Text></Pressable> : null}
       <View style={styles.sheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><View><Text style={styles.sheetEyebrow}>{sorted.length} LUGARES EN ESTA ZONA</Text><Text style={styles.sheetTitle}>{requestedTaco ? `${requestedTaco} que vale la pena` : hasFreeTextSearch ? `Resultados para "${searchQuery.trim()}"` : active === 'Pastor' ? 'Pastor que vale la pena' : active}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={suggestion ? `Abrir recomendación para ${suggestion.name}` : 'Sin recomendaciones disponibles'} style={[styles.magicButton, !suggestion && styles.magicButtonDisabled]} disabled={!suggestion} onPress={() => suggestion && router.push(`/place/${suggestion.id}`)}><Ionicons name="sparkles-outline" size={14} color={colors.background} /><Text style={styles.magicText}>Para mí</Text></Pressable></View>{sorted.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false}>{sorted.map((place) => <Pressable key={place.id} accessibilityRole="button" accessibilityLabel={`${place.name}, ${place.rating.toFixed(1)} de rating, ${place.distance}`} style={styles.resultCard} onPress={() => router.push(`/place/${place.id}`)}><View style={styles.resultTop}><Text style={styles.resultName} numberOfLines={1}>{place.name}</Text><RatingBadge rating={contextualTaco ? place.tacos.find((taco) => taco.name.toLowerCase() === contextualTaco.toLowerCase())?.rating ?? place.rating : place.rating} /></View><Text style={styles.resultMeta}>{place.neighborhood} · {place.distance}</Text><Text style={styles.resultStyle}>{place.style}</Text></Pressable>)}</ScrollView> : <View style={styles.emptyResults}><Ionicons name="moon-outline" size={21} color={colors.warm} /><View style={styles.emptyResultsCopy}><Text style={styles.emptyResultsTitle}>No hay lugares con esta combinación</Text><Text style={styles.emptyResultsText}>Prueba otra hora, zona o criterio para seguir explorando.</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Limpiar filtros y búsqueda" style={styles.clearButton} onPress={clearDiscovery}><Text style={styles.clearButtonText}>Limpiar</Text></Pressable></View>}</View>
       {locationDenied ? <Pressable accessibilityRole="button" accessibilityLabel="Activar ubicación para calcular distancias reales" style={styles.locationHint} onPress={() => void loadLocation()}><Ionicons name="location-outline" size={14} color={colors.warm} /><Text style={styles.locationHintText}>Activa ubicación para calcular distancias reales</Text></Pressable> : null}
