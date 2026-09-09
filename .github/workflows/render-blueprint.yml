@@ -20,6 +20,11 @@ jobs:
     timeout-minutes: 5
     env:
       RENDER_CLI_VERSION: v2.26.0
+      # GitHub Actions does not expose the `secrets` context directly inside
+      # step-level `if` expressions. Project the optional secrets into the
+      # environment first, then gate the authenticated validator on `env`.
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      RENDER_WORKSPACE_ID: ${{ secrets.RENDER_WORKSPACE_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,8 +47,5 @@ jobs:
       # The remote validator also checks conflicts against a Render workspace.
       # Keep it opt-in so public forks and first-time local CI stay green.
       - name: Validate Blueprint with Render
-        if: ${{ secrets.RENDER_API_KEY != '' && secrets.RENDER_WORKSPACE_ID != '' }}
-        env:
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          RENDER_WORKSPACE_ID: ${{ secrets.RENDER_WORKSPACE_ID }}
+        if: ${{ env.RENDER_API_KEY != '' && env.RENDER_WORKSPACE_ID != '' }}
         run: render blueprints validate render.yaml --workspace "$RENDER_WORKSPACE_ID"
