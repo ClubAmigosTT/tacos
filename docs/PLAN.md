@@ -152,6 +152,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 15. Ofrecer reintento visible en la búsqueda de colaboradores cuando la consulta social no está disponible.
 16. Ofrecer reintento visible al cargar comentarios de una visita para no confundir una caída temporal con una conversación vacía.
 17. Mantener reintento visible también en Privacidad, Moderación y Comentarios administrativos cuando el API no esté disponible.
+18. Mantener la recomendación contextual dentro del conjunto filtrado del Radar, incluyendo un estado sin resultados sin fallback silencioso.
 
 **Aceptación:** un reporte aparece en `/v1/admin/reports`, un admin puede ocultarlo, el feed deja de mostrarlo, el perfil público no lo cuenta y `pnpm smoke:admin` confirma que no contamina recomendaciones.
 

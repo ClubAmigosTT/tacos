@@ -152,6 +152,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 117. Mapa web interactivo: el preview local permite arrastrar el mapa, conserva la posición de los pines y ofrece “Buscar en esta zona” al soltar, igual que la experiencia nativa.
 118. Entrada numérica segura: el precio de una visita acepta coma decimal, redondea a dos posiciones y bloquea valores no numéricos o fuera de rango antes de persistirlos.
 119. Reintentos de moderación y privacidad: las colas administrativas y preferencias de cuenta muestran una acción clara para recuperar una falla temporal sin confundirla con un estado vacío.
+120. Radar sin escapes: “Para mí” queda deshabilitado cuando los filtros no encuentran lugares y nunca abre una sucursal fuera de la combinación elegida.
 
 ## Verificación
 
