@@ -180,6 +180,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 26. Propagar la sesión a Descubrimiento para que “Para mí” use afinidad real y conserve contexto geográfico, con regresión en el smoke autenticado.
 27. Etiquetar las acciones iconográficas de compartir y gestión de listas para que las rutas sociales sean operables sin depender del aspecto visual.
 28. Comunicar fallos de mutaciones sociales y de guardado con feedback accesible o nativo, evitando acciones que fallen en silencio y conservando el contexto para reintentar.
+29. Hacer recuperables las mutaciones del panel de moderación (reportes y comentarios), manteniendo la cola y el filtro actuales tras un error.
 
 **Aceptación:** un reporte aparece en `/v1/admin/reports`, un admin puede ocultarlo, el feed deja de mostrarlo, el perfil público no lo cuenta y `pnpm smoke:admin` confirma que no contamina recomendaciones.
 

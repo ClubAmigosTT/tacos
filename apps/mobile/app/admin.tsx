@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { adminAnalytics, adminReports, reviewReport } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -18,7 +18,7 @@ export default function AdminScreen() {
   const [status, setStatus] = useState<(typeof statuses)[number]>('open');
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['admin-reports', status, token], queryFn: () => adminReports(token!, status), enabled: Boolean(token && user?.role === 'admin') });
   const { data: analyticsData, isError: analyticsError, refetch: refetchAnalytics } = useQuery({ queryKey: ['admin-analytics', token], queryFn: () => adminAnalytics(token!), enabled: Boolean(token && user?.role === 'admin'), staleTime: 60_000 });
-  const mutation = useMutation({ mutationFn: ({ id, action }: { id: string; action: 'hide' | 'dismiss' }) => reviewReport(id, action, token!), onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['admin-reports'] }) });
+  const mutation = useMutation({ mutationFn: ({ id, action }: { id: string; action: 'hide' | 'dismiss' }) => reviewReport(id, action, token!), onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['admin-reports'] }), onError: () => Alert.alert('No pudimos actualizar el reporte', 'Revisa la conexión e inténtalo de nuevo.') });
 
   if (!user) return <Gate title="Acceso restringido" detail="Entra a tu cuenta para continuar." action="Entrar" onAction={() => router.push('/auth')} />;
   if (user.role !== 'admin') return <Gate title="No tienes acceso" detail="Esta sección está reservada para el equipo de revisión." action="Volver" onAction={() => router.back()} />;

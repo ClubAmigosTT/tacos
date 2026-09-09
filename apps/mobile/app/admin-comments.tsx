@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { adminComments, reviewComment } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -16,7 +16,7 @@ export default function AdminCommentsScreen() {
   const queryClient = useQueryClient();
   const [visibility, setVisibility] = useState<(typeof filters)[number]>('visible');
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['admin-comments', visibility, token], queryFn: () => adminComments(token!, visibility), enabled: Boolean(token && user?.role === 'admin') });
-  const mutation = useMutation({ mutationFn: ({ id, action }: { id: string; action: 'hide' | 'restore' }) => reviewComment(id, action, token!), onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['admin-comments'] }) });
+  const mutation = useMutation({ mutationFn: ({ id, action }: { id: string; action: 'hide' | 'restore' }) => reviewComment(id, action, token!), onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['admin-comments'] }), onError: () => Alert.alert('No pudimos actualizar el comentario', 'Revisa la conexión e inténtalo de nuevo.') });
 
   if (!user) return <Gate title="Acceso restringido" detail="Entra a tu cuenta para continuar." action="Entrar" onAction={() => router.push('/auth')} />;
   if (user.role !== 'admin') return <Gate title="No tienes acceso" detail="Esta sección está reservada para el equipo de revisión." action="Volver" onAction={() => router.back()} />;
