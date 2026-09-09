@@ -188,6 +188,10 @@ function normalizeSearchText(value: string) {
   return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
+function searchTerms(value: string) {
+  return normalizeSearchText(value).split(/[^a-z0-9]+/).filter((term) => term.length >= 2);
+}
+
 // Reputation is deliberately conservative: recent reviews matter, noisy
 // ratings are discounted, and one prolific reviewer cannot dominate a branch.
 // The Bayesian prior keeps low-volume places from jumping to the top of the
@@ -290,8 +294,13 @@ function localReputation(place: ApiPlace): ApiPlace {
 export async function discoverPlaces(query: DiscoverQuery, userId?: string): Promise<ApiPlace[]> {
   let discovered: ApiPlace[];
   if (!pool) {
-    const normalized = query.q?.trim() ? normalizeSearchText(query.q.trim()) : undefined;
-    const filtered = normalized ? places.filter((place) => normalizeSearchText(`${place.name} ${place.neighborhood} ${place.style} ${place.tags.join(' ')} ${place.tacos.map((taco) => taco.name).join(' ')}`).includes(normalized)) : places;
+    const terms = query.q?.trim() ? searchTerms(query.q.trim()) : [];
+    const filtered = query.q?.trim()
+      ? places.filter((place) => {
+        const haystack = normalizeSearchText(`${place.name} ${place.neighborhood} ${place.style} ${place.tags.join(' ')} ${place.tacos.map((taco) => taco.name).join(' ')}`);
+        return terms.length > 0 && terms.every((term) => haystack.includes(term));
+      })
+      : places;
     const scored = filtered.map(localReputation);
     discovered = query.lat == null || query.lng == null ? scored.slice(0, query.limit) : scored
       .map((place) => ({ ...place, distance: `${haversineKm({ latitude: query.lat!, longitude: query.lng! }, place.coordinates).toFixed(1)} km` }))
@@ -300,9 +309,13 @@ export async function discoverPlaces(query: DiscoverQuery, userId?: string): Pro
   } else {
     const values: unknown[] = [];
     const predicates: string[] = ['b.is_active = true'];
-    if (query.q) {
-      values.push(`%${query.q.trim()}%`);
-      predicates.push(`(unaccent(b.name) ILIKE unaccent($${values.length}) OR unaccent(b.neighborhood) ILIKE unaccent($${values.length}) OR unaccent(b.search_text) ILIKE unaccent($${values.length}) OR EXISTS (SELECT 1 FROM menu_items search_menu WHERE search_menu.branch_id = b.id AND search_menu.is_active = true AND unaccent(search_menu.name) ILIKE unaccent($${values.length})))`);
+    if (query.q?.trim()) {
+      const terms = searchTerms(query.q.trim());
+      if (!terms.length) predicates.push('false');
+      for (const term of terms) {
+        values.push(`%${term}%`);
+        predicates.push(`(unaccent(b.name) ILIKE unaccent($${values.length}) OR unaccent(b.neighborhood) ILIKE unaccent($${values.length}) OR unaccent(b.search_text) ILIKE unaccent($${values.length}) OR EXISTS (SELECT 1 FROM menu_items search_menu WHERE search_menu.branch_id = b.id AND search_menu.is_active = true AND unaccent(search_menu.name) ILIKE unaccent($${values.length})))`);
+      }
     }
     const distanceSelect = query.lat != null && query.lng != null
       ? `ST_Distance(b.location, ST_SetSRID(ST_MakePoint($${values.length + 1}, $${values.length + 2}), 4326)::geography) / 1000 AS distance_km`

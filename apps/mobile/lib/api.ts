@@ -68,6 +68,10 @@ function normalizeSearchText(value: string) {
   return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
+function searchTerms(value: string) {
+  return normalizeSearchText(value).split(/[^a-z0-9]+/).filter((term) => term.length >= 2);
+}
+
 async function request<T>(path: string, options?: RequestInit, token?: string): Promise<T> {
   if (!API_URL) throw new Error('API URL no configurada');
   const controller = new AbortController();
@@ -119,9 +123,12 @@ export async function discover(options: { q?: string; lat?: number; lng?: number
     // review. Once a session exists, never present demo branches as if they
     // were the current server-backed result set.
     if (token) throw cause;
-    const normalized = options.q?.trim() ? normalizeSearchText(options.q.trim()) : undefined;
-    const filtered = normalized
-      ? places.filter((place) => normalizeSearchText(`${place.name} ${place.neighborhood} ${place.style} ${place.tags.join(' ')} ${place.tacos.map((taco) => taco.name).join(' ')}`).includes(normalized))
+    const terms = options.q?.trim() ? searchTerms(options.q.trim()) : [];
+    const filtered = options.q?.trim()
+      ? places.filter((place) => {
+        const haystack = normalizeSearchText(`${place.name} ${place.neighborhood} ${place.style} ${place.tags.join(' ')} ${place.tacos.map((taco) => taco.name).join(' ')}`);
+        return terms.length > 0 && terms.every((term) => haystack.includes(term));
+      })
       : places;
     const withDistance = options.lat == null || options.lng == null
       ? filtered
