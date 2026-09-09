@@ -14,8 +14,8 @@ export default function ListCollaboratorsScreen() {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
   const [role, setRole] = useState<'editor' | 'viewer'>('editor');
-  const { data: list, isLoading, isError, error, refetch } = useQuery({ queryKey: ['list', id, token], queryFn: () => listDetails(id, token), enabled: Boolean(id && token) });
-  const { data: searchData, isError: searchError, refetch: refetchSearch } = useQuery({ queryKey: ['list-collaborator-search', query, token], queryFn: () => searchUsers(query, token), enabled: Boolean(token && query.trim().length >= 2) });
+  const { data: list, isLoading, isError, error, refetch } = useQuery({ queryKey: ['list', id, token], queryFn: () => listDetails(id, token), enabled: Boolean(id && token && !authLoading) });
+  const { data: searchData, isError: searchError, refetch: refetchSearch } = useQuery({ queryKey: ['list-collaborator-search', query, token], queryFn: () => searchUsers(query, token), enabled: Boolean(token && !authLoading && query.trim().length >= 2) });
   const addMutation = useMutation({ mutationFn: (userId: string) => addListCollaborator(id, { userId, role }, token!), onSuccess: () => { void trackEvent('list_collaborator_changed', { list_id: id, role }, token); setQuery(''); void queryClient.invalidateQueries({ queryKey: ['list', id] }); } });
   const roleMutation = useMutation({ mutationFn: (input: { userId: string; role: 'editor' | 'viewer' }) => addListCollaborator(id, input, token!), onSuccess: (_result, input) => { void trackEvent('list_collaborator_changed', { list_id: id, role: input.role }, token); void queryClient.invalidateQueries({ queryKey: ['list', id] }); } });
   const removeMutation = useMutation({ mutationFn: (userId: string) => removeListCollaborator(id, userId, token!), onSuccess: () => { void trackEvent('list_collaborator_changed', { list_id: id, role: 'removed' }, token); void queryClient.invalidateQueries({ queryKey: ['list', id] }); } });

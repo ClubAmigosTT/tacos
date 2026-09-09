@@ -13,7 +13,7 @@ export default function VisitEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { token, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
-  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['diary', token], queryFn: () => diary(token!), enabled: Boolean(token && id) });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['diary', token], queryFn: () => diary(token!), enabled: Boolean(token && id && !authLoading) });
   const entry = data?.entries.find((item) => item.id === id);
   const [rating, setRating] = useState(5);
   const [price, setPrice] = useState('');

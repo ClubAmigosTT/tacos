@@ -13,7 +13,7 @@ import { AsyncErrorState } from '@/components/AsyncErrorState';
 export default function FeedScreen() {
   const { token, user, loading: authLoading } = useAuth();
   useEffect(() => { void trackEvent('feed_open', {}, token); }, [token]);
-  const { data, isError, refetch } = useQuery({ queryKey: ['feed', token], queryFn: () => feedRequest(token!), enabled: Boolean(token) });
+  const { data, isError, refetch } = useQuery({ queryKey: ['feed', token], queryFn: () => feedRequest(token!), enabled: Boolean(token && !authLoading) });
   const items = data?.items ?? [];
   const reportMutation = useMutation({ mutationFn: (visitId: string) => reportVisit({ visitId, reason: 'other' }, token!), onSuccess: () => Alert.alert('Gracias', 'Revisaremos este registro.'), onError: () => Alert.alert('No se pudo reportar', 'Inténtalo de nuevo más tarde.') });
   function openReport(visitId: string) {

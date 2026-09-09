@@ -11,7 +11,7 @@ import { colors, radii, spacing } from '@/theme';
 export default function PrivacyScreen() {
   const { token, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
-  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['privacy', token], queryFn: () => privacyRequest(token!), enabled: Boolean(token) });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['privacy', token], queryFn: () => privacyRequest(token!), enabled: Boolean(token && !authLoading) });
   const [shareActivity, setShareActivity] = useState(true);
   const mutation = useMutation({
     mutationFn: (value: boolean) => updatePrivacy({ shareActivity: value }, token!),

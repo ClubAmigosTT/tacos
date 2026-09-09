@@ -13,7 +13,7 @@ type ReviewEntry = { id: string; visited_at?: string; rating: number; note?: str
 
 export default function ReviewsScreen() {
   const { token, loading: authLoading } = useAuth();
-  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['diary', 'reviews', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['diary', 'reviews', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token && !authLoading) });
   const entries: ReviewEntry[] = data?.entries ?? (token ? [] : diaryEntries.map((entry) => ({ id: entry.id, rating: entry.rating, note: entry.rating >= 4.8 ? 'Volvería por otro; gran textura y salsa.' : 'Buena información para mi futuro yo.', place_name: entry.place, neighborhood: 'CDMX', tacos: entry.taco, image_url: entry.image })));
   const average = entries.length ? (entries.reduce((sum, entry) => sum + Number(entry.rating), 0) / entries.length).toFixed(2) : '—';
 

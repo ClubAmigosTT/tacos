@@ -13,7 +13,7 @@ type WrappedEntry = { id: string; rating: number; price?: number | null; place_n
 
 export default function WrappedScreen() {
   const { token, loading: authLoading } = useAuth();
-  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['diary', 'wrapped', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['diary', 'wrapped', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token && !authLoading) });
   const wrappedYear = new Date().getFullYear();
   const sourceEntries: WrappedEntry[] = data?.entries ?? (token ? [] : diaryEntries.map((entry) => ({ id: entry.id, rating: entry.rating, place_name: entry.place, neighborhood: 'CDMX', tacos: entry.taco })));
   // Wrapped is an annual recap: use the visit's actual calendar year rather

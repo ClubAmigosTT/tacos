@@ -12,7 +12,7 @@ export default function ListEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { token, user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
-  const { data: list, isLoading, isError, error, refetch } = useQuery({ queryKey: ['list', id, token], queryFn: () => listDetails(id, token), enabled: Boolean(id && token) });
+  const { data: list, isLoading, isError, error, refetch } = useQuery({ queryKey: ['list', id, token], queryFn: () => listDetails(id, token), enabled: Boolean(id && token && !authLoading) });
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');

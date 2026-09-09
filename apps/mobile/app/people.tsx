@@ -13,7 +13,7 @@ export default function PeopleScreen() {
   const [query, setQuery] = useState('');
   const [following, setFollowing] = useState<string[]>([]);
   const queryClient = useQueryClient();
-  const { data, isFetching, isError, refetch } = useQuery({ queryKey: ['people', query, token], queryFn: () => searchUsers(query, token), enabled: Boolean(token && query.trim().length >= 2) });
+  const { data, isFetching, isError, refetch } = useQuery({ queryKey: ['people', query, token], queryFn: () => searchUsers(query, token), enabled: Boolean(token && !authLoading && query.trim().length >= 2) });
   useEffect(() => { if (data?.users) setFollowing(data.users.filter((person) => person.following).map((person) => person.id)); }, [data]);
   const followMutation = useMutation({ mutationFn: (userId: string) => followUser(userId, token!), onSuccess: (_, userId) => { setFollowing((current) => current.includes(userId) ? current : [...current, userId]); void queryClient.invalidateQueries({ queryKey: ['feed'] }); void queryClient.invalidateQueries({ queryKey: ['recommendations'] }); void queryClient.invalidateQueries({ queryKey: ['user-profile', userId] }); } });
   const unfollowMutation = useMutation({ mutationFn: (userId: string) => unfollowUser(userId, token!), onSuccess: (_, userId) => { setFollowing((current) => current.filter((id) => id !== userId)); void queryClient.invalidateQueries({ queryKey: ['feed'] }); void queryClient.invalidateQueries({ queryKey: ['recommendations'] }); void queryClient.invalidateQueries({ queryKey: ['user-profile', userId] }); } });

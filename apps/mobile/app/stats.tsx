@@ -14,7 +14,7 @@ const monthFormatter = new Intl.DateTimeFormat('es-MX', { month: 'short' });
 
 export default function StatsScreen() {
   const { token, loading: authLoading } = useAuth();
-  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['diary', 'stats', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['diary', 'stats', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token && !authLoading) });
   const sourceEntries: StatsEntry[] = data?.entries ?? (token ? [] : diaryEntries.map((entry) => ({ rating: entry.rating, place_name: entry.place, neighborhood: 'CDMX', tacos: entry.taco, price: null })));
   const entries = sourceEntries;
   const tacoNames = entries.flatMap((entry) => entry.tacos.split(',').map((taco) => taco.trim()).filter(Boolean));

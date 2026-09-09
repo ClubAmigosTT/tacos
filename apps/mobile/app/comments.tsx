@@ -13,7 +13,7 @@ export default function CommentsScreen() {
   const { token, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const [body, setBody] = useState('');
-  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['comments', visitId, token], queryFn: () => visitComments(visitId!, token!), enabled: Boolean(token && visitId) });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['comments', visitId, token], queryFn: () => visitComments(visitId!, token!), enabled: Boolean(token && visitId && !authLoading) });
   const createMutation = useMutation({
     mutationFn: () => createComment(visitId!, body.trim(), token!),
     onSuccess: () => { setBody(''); void queryClient.invalidateQueries({ queryKey: ['comments', visitId] }); void queryClient.invalidateQueries({ queryKey: ['feed'] }); }

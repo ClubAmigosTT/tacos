@@ -182,6 +182,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 147. Sesión sin carreras: Perfil y Listas esperan a restaurar la autenticación antes de consultar, evitando mezclar respuestas anónimas con datos privados.
 148. Pins consistentes: el rating contextual del mapa usa un `MapPin` compartido entre web, iOS y Android.
 149. Seguimiento recuperable: el perfil público anuncia errores de Seguir/Dejar de seguir y mantiene la acción lista para reintentar.
+150. Consultas privadas sincronizadas: Diario, Reviews, Estadísticas, Passport, Wrapped, Radar, Comentarios, Personas, Privacidad y edición de listas esperan a que termine la restauración de sesión, incluidos los detalles del radar.
 
 ## Verificación
 

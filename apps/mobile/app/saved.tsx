@@ -10,7 +10,7 @@ import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 export default function SavedScreen() {
   const { token, loading: authLoading } = useAuth();
-  const { data: savedData, isLoading: loadingIds, isError: idsError, refetch: refetchIds } = useQuery({ queryKey: ['saved-places', token], queryFn: () => savedPlaces(token!), enabled: Boolean(token) });
+  const { data: savedData, isLoading: loadingIds, isError: idsError, refetch: refetchIds } = useQuery({ queryKey: ['saved-places', token], queryFn: () => savedPlaces(token!), enabled: Boolean(token && !authLoading) });
   const ids = savedData?.placeIds ?? [];
   const { data: savedDetails = { places: [], unavailableIds: [] as string[] }, isLoading: loadingPlaces, isError: placesError, refetch: refetchPlaces } = useQuery({
     queryKey: ['saved-place-details', ids, token],
@@ -30,7 +30,7 @@ export default function SavedScreen() {
         unavailableIds: results.flatMap((result) => result.unavailableId ? [result.unavailableId] : [])
       };
     },
-    enabled: savedData !== undefined
+    enabled: Boolean(token && !authLoading && savedData !== undefined)
   });
   const places = savedDetails.places;
   const unavailableCount = savedDetails.unavailableIds.length;

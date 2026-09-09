@@ -144,6 +144,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 20. Esperar la restauración de sesión antes de consultar Perfil y Listas, diferenciando el catálogo público del estado privado autenticado.
 21. Compartir el componente visual de `MapPin` entre las implementaciones nativa y web para mantener consistente el rating contextual.
 22. Comunicar fallos de seguimiento en el perfil público con estado accesible y reintento directo.
+23. Bloquear consultas privadas hasta completar la restauración de sesión en las rutas de Diario, Social, Passport, Wrapped, Radar, Privacidad, Comentarios y edición.
 
 **Aceptación:** el smoke test confirma follow, unfollow, feed con nota, perfil público, exclusión de listas privadas y edición autorizada de listas.
 

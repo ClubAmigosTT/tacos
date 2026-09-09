@@ -24,7 +24,7 @@ export default function PassportScreen() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['passport', token],
     queryFn: () => passportRequest(token!),
-    enabled: Boolean(token),
+    enabled: Boolean(token && !authLoading),
   });
   const displayZones = data?.zones ?? anonymousZones;
   const visitedCount = data?.visitedZones ?? displayZones.filter((zone) => zone.unlocked).length;
