@@ -75,7 +75,13 @@ export default function MapScreen() {
   }, [data, searchQuery]);
   const displayedTaco = requestedTaco ?? (active === 'Pastor' ? 'Pastor' : undefined);
   const sorted = useMemo(() => {
-    const source = [...data];
+    const tacoFiltered = displayedTaco
+      ? data.filter((place) => place.tacos.some((taco) => taco.name.toLowerCase() === displayedTaco.toLowerCase()))
+      : data;
+    // Keep the active taco as a truthful map context. If an API/catalog
+    // response has no matching menu items, fall back to the full result set
+    // instead of showing an empty map for a transient data mismatch.
+    const source = [...(tacoFiltered.length ? tacoFiltered : data)];
     const distanceLimit = radarDistance === 'Cerca' ? 2 : radarDistance === 'En la zona' ? 5 : Number.POSITIVE_INFINITY;
     const radarFiltered = source.filter((place) => {
       if (distanceKm(place.distance) > distanceLimit) return false;
