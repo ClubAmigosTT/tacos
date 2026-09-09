@@ -126,6 +126,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 92. Guard de releases: CI prueba que EAS production rechace `localhost`/Maps ausentes y conserve la política de permisos mínimos.
 78. Cierre del registro: guardar una visita invalida diario, feed, recomendaciones, mapa y ficha, y el CTA vuelve al mapa sin duplicar la pantalla de formulario.
 93. Estadísticas de gusto: el Perfil abre un resumen real de tacos, zonas, gasto, promedio y ritmo de visitas mensual.
+94. Reviews personales: el Perfil separa ratings y notas del timeline del Diario, con edición directa de cada visita.
 
 ## Verificación
 
