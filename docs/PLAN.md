@@ -123,6 +123,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 9. Mantener estados de error y reintento en Actividad, Personas y Quiero ir para no presentar fallas de API como listas vacías.
 10. Normalizar acentos en la búsqueda de sucursales y tacos para mantener el mismo resultado en fallback local y PostgreSQL.
 11. Usar la reputación de catálogo como media del prior bayesiano para que la primera visita no desplace artificialmente un lugar establecido.
+12. Mantener el Perfil autenticado consistente cuando fallan en conjunto sus consultas de Diario, Listas o Taste ID, con un reintento coordinado.
 
 **Aceptación:** el smoke test confirma follow, unfollow, feed con nota, perfil público, exclusión de listas privadas y edición autorizada de listas.
 

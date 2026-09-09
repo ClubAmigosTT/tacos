@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { diary as diaryRequest, lists as listsRequest, taste as tasteRequest, trackEvent } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
+import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 const profileTabs = [
   { label: 'Diario', path: '/(tabs)/diary' },
@@ -18,9 +19,9 @@ const profileTabs = [
 export default function ProfileScreen() {
   const { user, token, loading, signOut } = useAuth();
   useEffect(() => { void trackEvent('profile_open', {}, token); }, [token]);
-  const { data } = useQuery({ queryKey: ['diary', 'profile', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
-  const { data: listData } = useQuery({ queryKey: ['lists', 'profile', token], queryFn: () => listsRequest(token), enabled: true });
-  const { data: tasteData } = useQuery({ queryKey: ['taste', token], queryFn: () => tasteRequest(token!), enabled: Boolean(token) });
+  const { data, isError: diaryError, refetch: refetchDiary } = useQuery({ queryKey: ['diary', 'profile', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
+  const { data: listData, isError: listsError, refetch: refetchLists } = useQuery({ queryKey: ['lists', 'profile', token], queryFn: () => listsRequest(token), enabled: true });
+  const { data: tasteData, isError: tasteError, refetch: refetchTaste } = useQuery({ queryKey: ['taste', token], queryFn: () => tasteRequest(token!), enabled: Boolean(token) });
   const entries = data?.entries ?? [];
   const visits = user ? entries.length : 17;
   const average = user ? (entries.length ? (entries.reduce((sum, entry) => sum + Number(entry.rating), 0) / entries.length).toFixed(2) : '—') : '4.21';
@@ -28,6 +29,7 @@ export default function ProfileScreen() {
   const exploredZones = user ? new Set(entries.map((entry) => entry.neighborhood).filter(Boolean)).size : 3;
   const tasteId = tasteData?.taste;
   if (loading) return <View style={styles.loading}><Text style={styles.loadingText}>Cargando tu perfil…</Text></View>;
+  if (user && (diaryError || listsError || tasteError)) return <AsyncErrorState title="No pudimos cargar tu perfil" detail="Tu diario y tus listas siguen guardados. Comprueba la conexión e inténtalo de nuevo." onAction={() => { void refetchDiary(); void refetchLists(); void refetchTaste(); }} />;
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.top}><View style={styles.avatar}><Text style={styles.avatarText}>{(user?.displayName ?? 'M').slice(0, 1).toUpperCase()}</Text></View><View style={styles.topCopy}><Text style={styles.name}>{user?.displayName ?? 'Marcelo'}</Text><Text style={styles.location}>{user?.email ?? 'Ciudad de México · 2026'}</Text></View>{user ? <Pressable accessibilityLabel="Abrir ajustes" onPress={() => router.push('/settings')}><Ionicons name="settings-outline" size={21} color={colors.muted} /></Pressable> : <Ionicons name="settings-outline" size={21} color={colors.muted} />}</View>
