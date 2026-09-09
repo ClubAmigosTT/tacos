@@ -165,6 +165,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 130. Mapa personalizado: `/v1/discover` acepta la sesión y devuelve `match`, `tasteMatch` y señales sociales del mismo motor de recomendaciones sin cambiar el conjunto geográfico ni filtrar datos privados.
 131. Media tolerante: si S3/R2 no está disponible, registrar una foto no bloquea la visita; la app guarda ratings y contexto sin imagen y avisa al usuario.
 132. Passport vivo: `/v1/me/passport` deriva colonias, sucursales y progreso desde el catálogo y las visitas visibles del usuario, sin depender de una lista fija.
+133. Wrapped con memoria: el resumen anual calcula desde las visitas del usuario la colonia más frecuente, hora característica, kilómetros recorridos y gasto con precio registrado.
 
 ## Verificación
 
