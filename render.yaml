@@ -37,7 +37,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        # Use the persistent Supabase PostgreSQL/PostGIS connection string.
+        # Use the persistent Neon PostgreSQL/PostGIS connection string.
         # Keeping the database outside Render avoids the 30-day lifetime of
         # Render's free PostgreSQL instances.
         sync: false

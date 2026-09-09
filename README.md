@@ -10,7 +10,7 @@ El repositorio ya contiene un MVP ejecutable para iOS, Android y web: mapa conte
 - `services/api`: Fastify + TypeScript, autenticación JWT, búsqueda y visitas.
 - `database/migrations`: PostgreSQL + PostGIS, con datos iniciales y usuarios.
 - `render.yaml`: Blueprint gratuito de frontend estático y API web en Render,
-  conectado a PostgreSQL/PostGIS persistente de Supabase. Los
+  conectado a PostgreSQL/PostGIS persistente de Neon. Los
   trabajos de mantenimiento se ejecutan manualmente o desde GitHub Actions;
   no se crean workers, cron ni Redis en Render.
 - `render.free-demo.yaml`: Blueprint aislado para una demo gratuita sin
@@ -222,7 +222,7 @@ Los checks de GitHub Actions quedan disponibles bajo `workflow_dispatch`, sin ej
 
 1. Sube este repositorio a GitHub.
 2. En Render elige **New → Blueprint**, selecciona el repositorio y confirma `render.yaml`.
-3. Crea antes un proyecto gratuito en Supabase, habilita PostGIS y copia su
+3. Crea antes un proyecto gratuito en Neon, habilita PostGIS y copia su
    cadena PostgreSQL en `DATABASE_URL`. Render creará `tacos-web` (frontend
    estático) y `tacos-api`, ambos en el plan **Free**. El frontend recibe la URL de la
    API automáticamente y sirve las rutas de Expo para verificación y recuperación.
@@ -267,7 +267,7 @@ El servicio gratuito no admite el `preDeployCommand` de Render. Por eso el
 `startCommand` ejecuta migraciones idempotentes y después inicia la API. Esto
 permite desplegar sin un worker pagado y sin depender de esta computadora.
 
-La producción usa Supabase PostgreSQL/PostGIS porque el PostgreSQL Free de
+La producción usa Neon PostgreSQL/PostGIS porque el PostgreSQL Free de
 Render es temporal y expira. Conserva la cadena de conexión únicamente en las
 variables secretas de Render y ejecuta las migraciones antes de importar el
 catálogo real.
