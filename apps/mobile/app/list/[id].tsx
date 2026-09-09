@@ -14,15 +14,15 @@ import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 export default function ListDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { token, user } = useAuth();
+  const { token, user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   useEffect(() => { if (id) void trackEvent('list_open', { list_id: id }, token); }, [id, token]);
-  const { data: list, isLoading, isError, error, refetch } = useQuery({ queryKey: ['list', id, token], queryFn: () => listDetails(id, token), enabled: Boolean(id) });
+  const { data: list, isLoading, isError, error, refetch } = useQuery({ queryKey: ['list', id, token], queryFn: () => listDetails(id, token), enabled: Boolean(id && !authLoading) });
   const removeMutation = useMutation({
     mutationFn: (branchId: string) => removeListItem(id, branchId, token!),
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['list', id] }); void queryClient.invalidateQueries({ queryKey: ['lists'] }); }
   });
-  if (isLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando lista…</Text></View>;
+  if (authLoading || isLoading) return <View style={styles.center}><Text style={styles.muted}>{authLoading ? 'Preparando la lista…' : 'Cargando lista…'}</Text></View>;
   if (isError && !(error instanceof ApiError && error.status === 404)) return <AsyncErrorState title="No pudimos cargar la lista" detail="La curaduría no se modificó. Revisa la conexión e inténtalo de nuevo." onAction={() => void refetch()} />;
   if (!list) return <View style={styles.center}><Text style={styles.title}>Lista no disponible</Text><Text style={styles.muted}>Puede que sea privada o haya sido eliminada.</Text><Pressable style={styles.backButton} onPress={() => router.back()}><Text style={styles.backText}>Volver</Text></Pressable></View>;
   const currentList = list;

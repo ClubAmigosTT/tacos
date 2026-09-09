@@ -13,11 +13,11 @@ import { RatingBadge } from '@/components/RatingBadge';
 import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 export default function HomeScreen() {
-  const { token, user } = useAuth();
+  const { token, user, loading: authLoading } = useAuth();
   const [search, setSearch] = useState('');
-  const { data = [], isError: recommendationsError, refetch: refetchRecommendations } = useQuery({ queryKey: ['recommendations', token], queryFn: () => recommendations(token) });
-  const { data: feedData, isError: feedError, refetch: refetchFeed } = useQuery({ queryKey: ['feed', 'home', token], queryFn: () => feedRequest(token!), enabled: Boolean(token), staleTime: 60_000 });
-  const { data: listData, isError: listsError, refetch: refetchLists } = useQuery({ queryKey: ['lists', 'home', token], queryFn: () => listsRequest(token), enabled: true, staleTime: 60_000 });
+  const { data = [], isError: recommendationsError, refetch: refetchRecommendations } = useQuery({ queryKey: ['recommendations', token], queryFn: () => recommendations(token), enabled: !authLoading });
+  const { data: feedData, isError: feedError, refetch: refetchFeed } = useQuery({ queryKey: ['feed', 'home', token], queryFn: () => feedRequest(token!), enabled: !authLoading && Boolean(token), staleTime: 60_000 });
+  const { data: listData, isError: listsError, refetch: refetchLists } = useQuery({ queryKey: ['lists', 'home', token], queryFn: () => listsRequest(token), enabled: !authLoading, staleTime: 60_000 });
   const featured = data[0];
   const featuredTaco = featured?.tacos.reduce((best, taco) => taco.rating > (best?.rating ?? 0) ? taco : best, featured.tacos[0]);
   const hour = new Date().getHours();
@@ -32,6 +32,8 @@ export default function HomeScreen() {
     if (query) router.push({ pathname: '/(tabs)/map', params: { q: query } });
     else router.push('/(tabs)/map');
   }
+
+  if (authLoading) return <View style={styles.loading}><Text style={styles.loadingText}>Preparando tu mapa de sabor…</Text></View>;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -75,6 +77,8 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  loading: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  loadingText: { color: colors.muted, fontSize: 13 },
   content: { paddingHorizontal: spacing.lg, paddingTop: 66, paddingBottom: 38 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
   kicker: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, marginBottom: 4 },

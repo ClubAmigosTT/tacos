@@ -16,7 +16,7 @@ const filters = ['Pastor', 'Abierto ahora', 'Barato', '92% para mí'];
 const defaultMapCenter = { latitude: 19.402, longitude: -99.163 };
 
 export default function MapScreen() {
-  const { token } = useAuth();
+  const { token, loading: authLoading } = useAuth();
   const { q: initialQuery } = useLocalSearchParams<{ q?: string }>();
   const [active, setActive] = useState('Pastor');
   const [search, setSearch] = useState(initialQuery ?? '');
@@ -55,7 +55,7 @@ export default function MapScreen() {
     if (moved) { setPendingMapCenter(next); setMapMoved(true); }
     else { setPendingMapCenter(undefined); setMapMoved(false); }
   };
-  const { data, isLoading: discoverLoading, isError: discoverError, refetch: refetchDiscover } = useQuery({ queryKey: ['discover', 'map', searchQuery, searchCoordinates?.latitude, searchCoordinates?.longitude, token], queryFn: () => discover({ q: searchQuery, lat: searchCoordinates?.latitude, lng: searchCoordinates?.longitude }, token) });
+  const { data, isLoading: discoverLoading, isError: discoverError, refetch: refetchDiscover } = useQuery({ queryKey: ['discover', 'map', searchQuery, searchCoordinates?.latitude, searchCoordinates?.longitude, token], queryFn: () => discover({ q: searchQuery, lat: searchCoordinates?.latitude, lng: searchCoordinates?.longitude }, token), enabled: !authLoading });
   // Fixtures are useful for anonymous design/offline review, but must never
   // appear while an authenticated catalog query is still in flight.
   const discoveryPlaces = token ? (data ?? []) : (data ?? places);
@@ -77,6 +77,8 @@ export default function MapScreen() {
   // An empty result set must remain empty instead of silently escaping the
   // user's distance, price or mood choices.
   const suggestion = sorted[0];
+
+  if (authLoading) return <View style={styles.authLoading}><Text style={styles.authLoadingText}>Preparando tu mapa…</Text></View>;
 
   if (token && discoverError) return <View style={styles.errorScreen}><AsyncErrorState title="No pudimos actualizar tu mapa" detail="No mostramos sucursales demo mientras tu sesión está activa. Revisa la conexión para recuperar resultados reales." onAction={() => void refetchDiscover()} /></View>;
 
@@ -109,6 +111,8 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  authLoading: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  authLoadingText: { color: colors.muted, fontSize: 13 },
   errorScreen: { flex: 1, backgroundColor: colors.background },
   topOverlay: { position: 'absolute', top: 62, left: spacing.lg, right: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backButton: { width: 42, height: 42, borderRadius: 22, backgroundColor: 'rgba(11,13,12,0.86)', alignItems: 'center', justifyContent: 'center' },

@@ -21,17 +21,17 @@ const flavorLabels = [
 
 export default function PlaceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { token } = useAuth();
+  const { token, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   useEffect(() => { if (id) void trackEvent('place_open', { place_id: id }, token); }, [id, token]);
-  const { data: place, isLoading, isError } = useQuery({ queryKey: ['place', id, token], queryFn: () => getPlace(id, token), enabled: Boolean(id) });
+  const { data: place, isLoading, isError } = useQuery({ queryKey: ['place', id, token], queryFn: () => getPlace(id, token), enabled: Boolean(id && !authLoading) });
   const { data: reviewData, isLoading: reviewsLoading, isError: reviewsError, refetch: refetchReviews } = useQuery({ queryKey: ['branch-reviews', id], queryFn: () => branchReviews(id), enabled: Boolean(id) });
-  const { data: savedData } = useQuery({ queryKey: ['saved-places', token], queryFn: () => savedPlaces(token!), enabled: Boolean(token) });
+  const { data: savedData } = useQuery({ queryKey: ['saved-places', token], queryFn: () => savedPlaces(token!), enabled: Boolean(token && !authLoading) });
   const savedMutation = useMutation({
     mutationFn: () => savedData?.placeIds.includes(place!.id) ? unsavePlace(place!.id, token!) : savePlace(place!.id, token!),
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['saved-places', token] }); }
   });
-  if (isLoading) return <View style={styles.loading}><Text style={styles.loadingText}>Cargando lugar…</Text></View>;
+  if (authLoading || isLoading) return <View style={styles.loading}><Text style={styles.loadingText}>{authLoading ? 'Preparando la ficha…' : 'Cargando lugar…'}</Text></View>;
   if (isError || !place) return <View style={styles.notFound}><Ionicons name="location-outline" size={28} color={colors.accent} /><Text style={styles.notFoundTitle}>Taquería no disponible</Text><Text style={styles.notFoundCopy}>El enlace puede haber cambiado o la sucursal ya no existe.</Text><Pressable style={styles.notFoundButton} onPress={() => router.replace('/(tabs)/map')}><Text style={styles.notFoundButtonText}>Volver al mapa</Text></Pressable></View>;
   const currentPlace = place;
   const averagePrice = place.tacos.length ? Math.round(place.tacos.reduce((sum, taco) => sum + taco.price, 0) / place.tacos.length) : undefined;
