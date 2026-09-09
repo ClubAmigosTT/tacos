@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 
 export default function AuthScreen() {
-  const { returnTo, placeId } = useLocalSearchParams<{ returnTo?: string; placeId?: string }>();
+  const { returnTo, placeId, visitId, placeName } = useLocalSearchParams<{ returnTo?: string; placeId?: string; visitId?: string; placeName?: string }>();
   const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [displayName, setDisplayName] = useState('');
@@ -24,7 +24,9 @@ export default function AuthScreen() {
       else await signIn({ email, password });
       if (returnTo === '/register') router.replace({ pathname: '/register', params: placeId ? { placeId } : undefined });
       else if (returnTo === '/lists') router.replace({ pathname: '/lists', params: placeId ? { placeId } : undefined });
+      else if (returnTo === '/comments') router.replace({ pathname: '/comments', params: { visitId, placeName } });
       else if (returnTo?.startsWith('/place/')) router.replace(returnTo as never);
+      else if (returnTo?.startsWith('/user/')) router.replace(returnTo as never);
       else router.replace('/(tabs)/profile');
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : '';

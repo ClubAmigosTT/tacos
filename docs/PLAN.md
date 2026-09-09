@@ -75,7 +75,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 18. Evitar que la restauración de sesión muestre datos demo o un bloqueo de cuenta transitorio en Diario, Perfil y Registro.
 19. Cerrar el registro con una ruta explícita al mapa e invalidar las consultas derivadas para que la visita recién guardada sea visible al regresar.
 20. Mantener el contexto de taco en el hero de Inicio y hacer navegables las sucursales mostradas en Actividad.
-21. Proteger deep links personales (Radar, Passport, Wrapped, Privacidad, edición y comentarios) durante la restauración de sesión.
+21. Proteger deep links personales (Radar, Passport, Wrapped, Privacidad, edición y comentarios) durante la restauración de sesión, conservando el destino cuando una acción social exige autenticarse.
 22. Sincronizar el estado de Ajustes tras restaurar el usuario y bloquear consultas privadas hasta contar con un token válido.
 23. Mantener el catálogo seed alineado con el fallback móvil mediante migraciones idempotentes.
 24. Mantener permisos nativos mínimos y no solicitar audio para una app que sólo usa ubicación, cámara y galería.
