@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,11 +6,13 @@ import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 
 export default function SettingsScreen() {
-  const { user, updateProfile } = useAuth();
+  const { user, loading: authLoading, updateProfile } = useAuth();
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  useEffect(() => { if (user) setDisplayName(user.displayName); }, [user]);
 
+  if (authLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando tu cuenta…</Text></View>;
   if (!user) return <View style={styles.center}><Ionicons name="person-circle-outline" size={42} color={colors.accent} /><Text style={styles.title}>Entra para editar tu perfil</Text><Pressable style={styles.primary} onPress={() => router.push('/auth')}><Text style={styles.primaryText}>Entrar</Text></Pressable></View>;
 
   async function save() {
@@ -52,4 +54,5 @@ const styles = StyleSheet.create({
   linkTitle: { color: colors.ink, fontSize: 13, fontWeight: '900' },
   linkDetail: { color: colors.muted, fontSize: 11, marginTop: 3 },
   title: { color: colors.ink, fontSize: 24, fontWeight: '900', marginTop: spacing.md },
+  muted: { color: colors.muted, fontSize: 13 },
 });

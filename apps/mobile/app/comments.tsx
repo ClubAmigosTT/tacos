@@ -9,7 +9,7 @@ import { colors, radii, spacing } from '@/theme';
 
 export default function CommentsScreen() {
   const { visitId, placeName } = useLocalSearchParams<{ visitId?: string; placeName?: string }>();
-  const { token } = useAuth();
+  const { token, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const [body, setBody] = useState('');
   const { data, isLoading, isError } = useQuery({ queryKey: ['comments', visitId, token], queryFn: () => visitComments(visitId!, token!), enabled: Boolean(token && visitId) });
@@ -22,6 +22,7 @@ export default function CommentsScreen() {
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['comments', visitId] }); void queryClient.invalidateQueries({ queryKey: ['feed'] }); }
   });
 
+  if (authLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando conversación…</Text></View>;
   if (!token) return <View style={styles.center}><View style={styles.icon}><Ionicons name="chatbubble-ellipses-outline" size={24} color={colors.background} /></View><Text style={styles.title}>Entra para comentar</Text><Text style={styles.muted}>Sigue la conversación alrededor de cada descubrimiento.</Text><Pressable style={styles.primary} onPress={() => router.push('/auth')}><Text style={styles.primaryText}>Entrar o crear cuenta</Text></Pressable></View>;
   if (!visitId) return <View style={styles.center}><Text style={styles.title}>Conversación no disponible</Text><Pressable style={styles.secondary} onPress={() => router.back()}><Text style={styles.secondaryText}>Volver</Text></Pressable></View>;
   const comments = data?.comments ?? [];

@@ -9,7 +9,7 @@ import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 
 export default function WrappedScreen() {
-  const { token } = useAuth();
+  const { token, loading: authLoading } = useAuth();
   const { data, isLoading } = useQuery({ queryKey: ['diary', 'wrapped', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
   const entries = data?.entries ?? (token ? [] : diaryEntries.map((entry) => ({ id: entry.id, rating: entry.rating, place_name: entry.place, neighborhood: 'CDMX', tacos: entry.taco })));
   const tacos = entries.flatMap((entry) => entry.tacos.split(',').map((taco) => taco.trim()).filter(Boolean));
@@ -22,6 +22,7 @@ export default function WrappedScreen() {
     try { await Share.share({ message: `Mi año en tacos: ${tacos.length} tacos, ${entries.length} visitas y promedio ${average}. Mi favorito: ${best?.place_name ?? 'todavía por descubrir'}.\n${Linking.createURL('/wrapped')}` }); } catch { /* Sharing is optional on platforms without a native share sheet. */ }
   }
 
+  if (authLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando tu resumen…</Text></View>;
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="arrow-back" size={20} color={colors.ink} /></Pressable><View><Text style={styles.eyebrow}>MEMORIA GASTRONÓMICA</Text><Text style={styles.title}>Tu año en tacos</Text></View></View>
@@ -40,6 +41,8 @@ function Metric({ label, value, icon }: { label: string; value: string; icon: ke
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  muted: { color: colors.muted, fontSize: 13 },
   content: { padding: spacing.lg, paddingTop: 58, paddingBottom: 110 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 13, marginBottom: spacing.xl },
   back: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },

@@ -18,7 +18,7 @@ const zones = [
 ];
 
 export default function PassportScreen() {
-  const { token } = useAuth();
+  const { token, loading: authLoading } = useAuth();
   const { data, isLoading } = useQuery({
     queryKey: ['diary', 'passport', token],
     queryFn: () => diaryRequest(token!),
@@ -28,6 +28,7 @@ export default function PassportScreen() {
   const visitedCount = zones.filter((zone) => visited.has(zone.name.toLowerCase())).length;
   const progress = Math.round((visitedCount / zones.length) * 100);
 
+  if (authLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando tu pasaporte…</Text></View>;
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.header}>
@@ -58,6 +59,8 @@ export default function PassportScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  muted: { color: colors.muted, fontSize: 13 },
   content: { padding: spacing.lg, paddingTop: 58, paddingBottom: 110 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 13, marginBottom: spacing.xl },
   back: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
