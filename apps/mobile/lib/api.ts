@@ -61,6 +61,10 @@ function haversineKm(from: { latitude: number; longitude: number }, to: { latitu
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function normalizeSearchText(value: string) {
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 async function request<T>(path: string, options?: RequestInit, token?: string): Promise<T> {
   if (!API_URL) throw new Error('API URL no configurada');
   const controller = new AbortController();
@@ -108,9 +112,9 @@ export async function discover(options: { q?: string; lat?: number; lng?: number
     const result = await request<{ places: Place[] }>(`/v1/discover${query ? `?${query}` : ''}`);
     return result.places;
   } catch {
-    const normalized = options.q?.trim().toLowerCase();
+    const normalized = options.q?.trim() ? normalizeSearchText(options.q.trim()) : undefined;
     const filtered = normalized
-      ? places.filter((place) => `${place.name} ${place.neighborhood} ${place.style} ${place.tags.join(' ')} ${place.tacos.map((taco) => taco.name).join(' ')}`.toLowerCase().includes(normalized))
+      ? places.filter((place) => normalizeSearchText(`${place.name} ${place.neighborhood} ${place.style} ${place.tags.join(' ')} ${place.tacos.map((taco) => taco.name).join(' ')}`).includes(normalized))
       : places;
     const withDistance = options.lat == null || options.lng == null
       ? filtered

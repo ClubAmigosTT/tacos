@@ -179,6 +179,10 @@ function haversineKm(from: { latitude: number; longitude: number }, to: { latitu
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function normalizeSearchText(value: string) {
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 // Reputation is deliberately conservative: recent reviews matter, noisy
 // ratings are discounted, and one prolific reviewer cannot dominate a branch.
 // The Bayesian prior keeps low-volume places from jumping to the top of the
@@ -279,8 +283,8 @@ function localReputation(place: ApiPlace): ApiPlace {
 
 export async function discoverPlaces(query: DiscoverQuery): Promise<ApiPlace[]> {
   if (!pool) {
-    const normalized = query.q?.trim().toLowerCase();
-    const filtered = normalized ? places.filter((place) => `${place.name} ${place.neighborhood} ${place.style} ${place.tags.join(' ')} ${place.tacos.map((taco) => taco.name).join(' ')}`.toLowerCase().includes(normalized)) : places;
+    const normalized = query.q?.trim() ? normalizeSearchText(query.q.trim()) : undefined;
+    const filtered = normalized ? places.filter((place) => normalizeSearchText(`${place.name} ${place.neighborhood} ${place.style} ${place.tags.join(' ')} ${place.tacos.map((taco) => taco.name).join(' ')}`).includes(normalized)) : places;
     const scored = filtered.map(localReputation);
     if (query.lat == null || query.lng == null) return scored.slice(0, query.limit);
     return scored
@@ -293,7 +297,7 @@ export async function discoverPlaces(query: DiscoverQuery): Promise<ApiPlace[]> 
   const predicates: string[] = ['b.is_active = true'];
   if (query.q) {
     values.push(`%${query.q.trim()}%`);
-    predicates.push(`(b.name ILIKE $${values.length} OR b.neighborhood ILIKE $${values.length} OR b.search_text ILIKE $${values.length} OR EXISTS (SELECT 1 FROM menu_items search_menu WHERE search_menu.branch_id = b.id AND search_menu.is_active = true AND search_menu.name ILIKE $${values.length}))`);
+    predicates.push(`(unaccent(b.name) ILIKE unaccent($${values.length}) OR unaccent(b.neighborhood) ILIKE unaccent($${values.length}) OR unaccent(b.search_text) ILIKE unaccent($${values.length}) OR EXISTS (SELECT 1 FROM menu_items search_menu WHERE search_menu.branch_id = b.id AND search_menu.is_active = true AND unaccent(search_menu.name) ILIKE unaccent($${values.length})))`);
   }
   const distanceSelect = query.lat != null && query.lng != null
     ? `ST_Distance(b.location, ST_SetSRID(ST_MakePoint($${values.length + 1}, $${values.length + 2}), 4326)::geography) / 1000 AS distance_km`
