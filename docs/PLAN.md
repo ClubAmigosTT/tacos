@@ -163,6 +163,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 7. Hacer que el perfil EAS `production` falle si la URL de API no es HTTPS o si Android no tiene `GOOGLE_MAPS_API_KEY`.
 8. Validar `render.yaml` con sintaxis local en cada CI y, cuando existan credenciales de workspace, ejecutar el Render CLI fijado para detectar referencias antes de sincronizar el Blueprint.
 9. Levantar PostgreSQL + PostGIS en CI, aplicar migraciones y correr el smoke autenticado contra la ruta de persistencia que usará Render.
+10. Mantener la CLI oficial de Render fijada a una versión vigente y verificar que el Blueprint también pase su validador local antes del primer deploy.
 
 **Aceptación:** la API responde desde `https://…onrender.com`, la app se conecta sin esta computadora encendida y el smoke test corre en CI.
 
