@@ -79,6 +79,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 23. Mantener el catálogo seed alineado con el fallback móvil mediante migraciones idempotentes.
 24. Mantener permisos nativos mínimos y no solicitar audio para una app que sólo usa ubicación, cámara y galería.
 25. Mostrar una salida de navegación útil para enlaces compartidos que ya no existan.
+26. Hacer explícito en cada pin qué taco determina el rating contextual del mapa.
 **Aceptación:** “Pastor”, “Abierto ahora”, “Barato” y “Para mí” producen resultados ordenados; negar ubicación no rompe el catálogo.
 
 ### Fase 5 — Visitas, diario y media (3–5 días)

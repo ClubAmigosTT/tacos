@@ -116,6 +116,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 82. Catálogo consistente: la Gringa de El Vilsito existe tanto en el fallback móvil como en PostgreSQL mediante una migración idempotente.
 83. Permisos mínimos: Android bloquea `RECORD_AUDIO`, que no forma parte de la experiencia de Tacos.
 84. Deep links resilientes: una ruta inexistente muestra una salida de marca hacia Inicio o el mapa.
+85. Pins explicativos: el mapa etiqueta el taco activo junto a su rating (`Suadero 4.9`) cuando la búsqueda es contextual.
 78. Cierre del registro: guardar una visita invalida diario, feed, recomendaciones, mapa y ficha, y el CTA vuelve al mapa sin duplicar la pantalla de formulario.
 
 ## Verificación
