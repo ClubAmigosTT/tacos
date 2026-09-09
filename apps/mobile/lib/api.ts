@@ -21,6 +21,13 @@ const API_URL = configuredUrl?.replace(/\/$/, '');
 const REQUEST_TIMEOUT_MS = 15_000;
 const ANONYMOUS_ID_KEY = 'tacos.analytics.anonymous_id';
 let anonymousIdPromise: Promise<string> | undefined;
+export class ApiError extends Error {
+  constructor(public readonly status: number) {
+    super(`API ${status}`);
+    this.name = 'ApiError';
+  }
+}
+
 export type ProductEventProperty = string | number | boolean | null;
 export type ProductEventName = 'app_open' | 'map_search' | 'map_filter' | 'radar_filter' | 'place_open' | 'visit_saved' | 'visit_deleted' | 'list_open' | 'list_created' | 'list_collaborator_changed' | 'profile_open' | 'feed_open';
 
@@ -69,7 +76,7 @@ async function request<T>(path: string, options?: RequestInit, token?: string): 
       headers,
       signal: controller.signal
     });
-    if (!response.ok) throw new Error(`API ${response.status}`);
+    if (!response.ok) throw new ApiError(response.status);
     return response.json() as Promise<T>;
   } finally {
     clearTimeout(timeout);

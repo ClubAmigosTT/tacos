@@ -83,6 +83,8 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 27. Excluir del filtro de un taco las sucursales que no ofrecen ese taco.
 28. No ignorar silenciosamente combinaciones imposibles del Radar; conservar fallback sólo cuando no existe distancia numérica.
 29. Mantener la posición geográfica de los pins también en la revisión web, independientemente del orden de resultados.
+30. Diferenciar carga y error en fichas compartidas, con una salida útil si la sucursal ya no existe.
+31. Reintentar únicamente fallos transitorios de API y resolver rápido los estados 4xx.
 **Aceptación:** “Pastor”, “Abierto ahora”, “Barato” y “Para mí” producen resultados ordenados; negar ubicación no rompe el catálogo.
 
 ### Fase 5 — Visitas, diario y media (3–5 días)
