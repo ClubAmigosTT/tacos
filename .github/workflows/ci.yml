@@ -15,6 +15,23 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tacos
+      NODE_ENV: test
+    services:
+      postgres:
+        image: postgis/postgis:16-3.5
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tacos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d tacos"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,6 +61,9 @@ jobs:
 
       - name: Build API
         run: pnpm build:api
+
+      - name: Apply PostgreSQL migrations
+        run: pnpm --filter @tacos/api migrate
 
       - name: Render maintenance smoke
         run: pnpm --filter @tacos/api nightly

@@ -153,6 +153,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 6. Fijar el entorno EAS en cada perfil y, para cambios JavaScript posteriores, usar `eas update --channel production --environment production`; para cambios nativos generar un nuevo build.
 7. Hacer que el perfil EAS `production` falle si la URL de API no es HTTPS o si Android no tiene `GOOGLE_MAPS_API_KEY`.
 8. Validar `render.yaml` con sintaxis local en cada CI y, cuando existan credenciales de workspace, ejecutar el Render CLI fijado para detectar referencias antes de sincronizar el Blueprint.
+9. Levantar PostgreSQL + PostGIS en CI, aplicar migraciones y correr el smoke autenticado contra la ruta de persistencia que usará Render.
 
 **Aceptación:** la API responde desde `https://…onrender.com`, la app se conecta sin esta computadora encendida y el smoke test corre en CI.
 
