@@ -36,5 +36,14 @@ jobs:
           sudo chmod +x /usr/local/bin/render
           render --version
 
-      - name: Validate Blueprint
-        run: render blueprints validate render.yaml
+      - name: Validate YAML locally
+        run: ruby -e "require 'yaml'; YAML.load_file('render.yaml'); YAML.load_file('.github/workflows/render-blueprint.yml'); puts 'Blueprint YAML syntax passed'"
+
+      # The remote validator also checks conflicts against a Render workspace.
+      # Keep it opt-in so public forks and first-time local CI stay green.
+      - name: Validate Blueprint with Render
+        if: ${{ secrets.RENDER_API_KEY != '' && secrets.RENDER_WORKSPACE_ID != '' }}
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_WORKSPACE_ID: ${{ secrets.RENDER_WORKSPACE_ID }}
+        run: render blueprints validate render.yaml --workspace "$RENDER_WORKSPACE_ID"
