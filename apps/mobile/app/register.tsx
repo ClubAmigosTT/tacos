@@ -37,8 +37,10 @@ export default function RegisterScreen() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const { data: nearbyPlaces = places, isError: nearbyPlacesError, refetch: refetchNearbyPlaces } = useQuery({ queryKey: ['discover', 'register', coordinates?.latitude, coordinates?.longitude, token], queryFn: () => discover({ lat: coordinates?.latitude, lng: coordinates?.longitude, limit: 3 }, token), placeholderData: places });
-  const visibleNearbyPlaces = token && nearbyPlacesError ? [] : nearbyPlaces;
+  const { data: nearbyPlaces, isLoading: nearbyPlacesLoading, isError: nearbyPlacesError, refetch: refetchNearbyPlaces } = useQuery({ queryKey: ['discover', 'register', coordinates?.latitude, coordinates?.longitude, token], queryFn: () => discover({ lat: coordinates?.latitude, lng: coordinates?.longitude, limit: 3 }, token) });
+  // Anonymous review can use the local catalog, but an authenticated visit
+  // must wait for the real nearby result instead of selecting a demo branch.
+  const visibleNearbyPlaces = token ? (nearbyPlaces ?? []) : (nearbyPlaces ?? places);
   // A deep link from a place detail is an explicit user choice. Keep that
   // branch in the selector even when the nearest-three query does not include
   // it, so location ranking never changes the visit behind the user's back.
@@ -83,6 +85,7 @@ export default function RegisterScreen() {
   if (remoteInitialPlace && initialPlaceLoading) return <View style={styles.authRequired}><Text style={styles.successText}>Buscando la sucursal…</Text></View>;
   if (remoteInitialPlace && (initialPlaceError || !fetchedInitialPlace)) return <AsyncErrorState title="No encontramos esa sucursal" detail="El enlace puede haber caducado o la conexión no estar disponible. Inténtalo de nuevo o vuelve al mapa." onAction={() => void refetchInitialPlace()} />;
   if (token && nearbyPlacesError && !hasExplicitPlace) return <View style={styles.authRequired}><AsyncErrorState title="No pudimos encontrar lugares cercanos" detail="No mostramos sucursales demo mientras tu sesión está activa. Revisa la conexión para registrar una visita real." onAction={() => void refetchNearbyPlaces()} /></View>;
+  if (token && nearbyPlacesLoading && !hasExplicitPlace) return <View style={styles.authRequired}><Text style={styles.successText}>Buscando lugares cercanos…</Text></View>;
 
   function selectPlace(id: string) {
     setPlaceId(id);
