@@ -113,7 +113,10 @@ export default function RegisterScreen() {
       if (!asset?.base64) { if (!result.canceled) setError('No pudimos leer esa foto. Prueba con otra imagen.'); return; }
       const contentType = asset.mimeType === 'image/png' ? 'image/png' : asset.mimeType === 'image/webp' ? 'image/webp' : 'image/jpeg';
       setPhoto({ uri: asset.uri, base64: asset.base64, contentType });
-      setPhotoSuggestion(source === 'camera' && coordinates ? availablePlaces[0] : undefined);
+      // Keep the explicit branch selected by a deep link, but base the camera
+      // hint on the actual nearest-place query rather than on the selector's
+      // first item (which may be the preserved explicit branch).
+      setPhotoSuggestion(source === 'camera' && coordinates ? nearbyPlaces[0] ?? availablePlaces[0] : undefined);
       setError('');
     } catch { setError('No pudimos abrir la cámara o galería.'); }
   }
