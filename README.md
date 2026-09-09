@@ -113,6 +113,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 79. Contexto navegable: el hero de Inicio puntúa el taco destacado y cada lugar de Actividad abre su ficha, sin confundir rating global con rating de menú.
 80. Deep links sin estados falsos: las rutas personales esperan la restauración de sesión antes de consultar o mostrar el estado anónimo.
 81. Sesión consistente en rutas privadas: ajustes sincroniza el nombre cuando llega el usuario y edición/comentarios no consultan el API hasta tener token.
+82. Catálogo consistente: la Gringa de El Vilsito existe tanto en el fallback móvil como en PostgreSQL mediante una migración idempotente.
 78. Cierre del registro: guardar una visita invalida diario, feed, recomendaciones, mapa y ficha, y el CTA vuelve al mapa sin duplicar la pantalla de formulario.
 
 ## Verificación
