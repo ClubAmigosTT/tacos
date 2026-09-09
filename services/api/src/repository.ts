@@ -453,6 +453,62 @@ export async function findPlace(id: string): Promise<ApiPlace | undefined> {
   return result.rows[0] ? normalizePlace(result.rows[0]) : undefined;
 }
 
+export type ApiBranchReview = {
+  id: string;
+  visitedAt: string;
+  rating: number;
+  note: string;
+  photoUrl?: string | null;
+  tacos: string;
+  user: { id: string; displayName: string };
+};
+
+/**
+ * Public branch reviews are sourced from visible visits and respect the
+ * author's activity preference. The email and any private account fields are
+ * intentionally excluded from this projection.
+ */
+export async function getBranchReviews(branchId: string): Promise<ApiBranchReview[] | undefined> {
+  if (pool) {
+    const branch = await pool.query('SELECT 1 FROM branches WHERE id = $1 AND is_active = true', [branchId]);
+    if (!branch.rowCount) return undefined;
+    const result = await pool.query(`
+      SELECT v.id, v.visited_at, v.rating, v.note, v.photo_url,
+        u.id AS user_id, u.display_name,
+        COALESCE(string_agg(m.name, ', ' ORDER BY m.name), '') AS tacos
+      FROM visits v
+      JOIN users u ON u.id = v.user_id AND u.is_active = true AND u.share_activity = true
+      LEFT JOIN visit_items vi ON vi.visit_id = v.id
+      LEFT JOIN menu_items m ON m.id = vi.menu_item_id
+      WHERE v.branch_id = $1 AND v.visibility = 'visible'
+      GROUP BY v.id, v.visited_at, v.rating, v.note, v.photo_url, u.id, u.display_name
+      ORDER BY v.visited_at DESC
+      LIMIT 50
+    `, [branchId]);
+    return result.rows.map((row) => ({
+      id: row.id,
+      visitedAt: new Date(row.visited_at).toISOString(),
+      rating: Number(row.rating),
+      note: row.note ?? '',
+      photoUrl: row.photo_url ?? null,
+      tacos: row.tacos ?? '',
+      user: { id: row.user_id, displayName: row.display_name }
+    }));
+  }
+
+  if (!places.some((place) => place.id === branchId)) return undefined;
+  return [...localVisits.entries()]
+    .filter(([, visit]) => visit.placeId === branchId && visit.visibility === 'visible' && localUsers.get(visit.userId)?.shareActivity !== false)
+    .sort(([, a], [, b]) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 50)
+    .map(([id, visit]) => {
+      const place = places.find((item) => item.id === visit.placeId);
+      const tacos = visit.tacoIds.map((tacoId) => place?.tacos.find((taco) => taco.id === tacoId)?.name ?? tacoId).join(', ');
+      const author = localUsers.get(visit.userId);
+      return { id, visitedAt: visit.createdAt, rating: visit.rating, note: visit.note ?? '', photoUrl: visit.photoUrl ?? null, tacos, user: { id: visit.userId, displayName: author?.displayName ?? 'Cuenta eliminada' } };
+    });
+}
+
 export async function getTaqueria(id: string): Promise<ApiTaqueria | undefined> {
   if (pool) {
     const parent = await pool.query(`

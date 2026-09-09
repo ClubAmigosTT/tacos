@@ -75,6 +75,9 @@ const visit = await request('/v1/visits', {
   body: JSON.stringify({ placeId: 'vilsito', tacoIds: ['vilsito-pastor'], tacoRatings: { 'vilsito-pastor': 5 }, rating: 5, price: 44, note: 'Smoke test' }),
   token: bob.token
 }, 201);
+const branchReviews = await request('/v1/branches/vilsito/reviews');
+if (!branchReviews.reviews?.some((review) => review.id === visit.id && review.note === 'Smoke test' && review.user?.id === bob.user.id)) throw new Error('Public branch reviews did not include the visible visit');
+await request('/v1/branches/branch-does-not-exist/reviews', {}, 404);
 const reputationAfterFirstReview = await request('/v1/discover?limit=3');
 const vilsitoAfterFirstReview = reputationAfterFirstReview.places?.find((place) => place.id === 'vilsito');
 const pastorAfterFirstReview = vilsitoAfterFirstReview?.tacos?.find((taco) => taco.id === 'vilsito-pastor');
@@ -98,6 +101,8 @@ if (privacy.privacy?.shareActivity !== true) throw new Error('Privacy defaults w
 await request('/v1/me/privacy', { method: 'PATCH', body: JSON.stringify({ shareActivity: false }), token: bob.token });
 const hiddenFeed = await request('/v1/feed', { token: alice.token });
 if (hiddenFeed.items?.length !== 0) throw new Error('Private activity still appeared in the feed');
+const hiddenBranchReviews = await request('/v1/branches/vilsito/reviews');
+if (hiddenBranchReviews.reviews?.some((review) => review.id === visit.id)) throw new Error('Private activity still appeared in branch reviews');
 const hiddenRecommendations = await request('/v1/recommendations', { token: alice.token });
 if (hiddenRecommendations.places?.some((place) => typeof place.socialMatch === 'number')) throw new Error('Private activity still influenced social recommendations');
 await request('/v1/me/privacy', { method: 'PATCH', body: JSON.stringify({ shareActivity: true }), token: bob.token });

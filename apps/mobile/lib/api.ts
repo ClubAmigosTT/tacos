@@ -9,6 +9,7 @@ export type ApiListCollaborator = { id: string; displayName: string; role: 'edit
 export type ApiListDetail = ApiList & { collaborators?: ApiListCollaborator[]; items: Array<{ branchId: string; note: string; position: number; place: Place }> };
 export type ApiTaqueria = { id: string; name: string; slug: string; description: string; branchCount: number; branches: Place[] };
 export type FeedItem = { id: string; visited_at: string; rating: number; note?: string; user_id: string; display_name: string; place_id: string; place_name: string; neighborhood: string; image_url: string; tacos: string; comment_count?: number };
+export type BranchReview = { id: string; visitedAt: string; rating: number; note: string; photoUrl?: string | null; tacos: string; user: { id: string; displayName: string } };
 export type VisitComment = { id: string; body: string; createdAt: string; author: { id: string; displayName: string }; own: boolean };
 export type TasteProfile = { title: string; description: string; tags: string[]; profile: { intensity: number; spicy: number; traditional: number; texture: number; value: number } };
 export type AdminReport = { id: string; visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string; reporter: { id: string; displayName: string }; author: { id: string; displayName: string }; place: { id: string; name: string }; rating: number; visitedAt: string };
@@ -144,6 +145,10 @@ export async function getPlace(id: string): Promise<Place> {
     if (!fallback) throw new Error('Taquería no encontrada');
     return fallback;
   }
+}
+
+export async function branchReviews(branchId: string) {
+  return request<{ reviews: BranchReview[] }>(`/v1/branches/${encodeURIComponent(branchId)}/reviews`);
 }
 
 export async function savedPlaces(token: string) {

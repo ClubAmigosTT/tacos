@@ -148,6 +148,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 113. Blueprint validado: la CLI oficial de Render 2.26.0 valida `render.yaml` localmente y el workflow puede repetir la comprobación contra un workspace cuando existan credenciales.
 114. Releases protegidos: el smoke de Expo comprueba por separado que production rechace tanto una API local como una build Android sin Google Maps.
 115. Builds por plataforma: el guard de production exige Google Maps para Android, pero permite iOS sin esa clave porque usa Apple Maps; ambos casos están cubiertos por CI.
+116. Reseñas públicas de sucursal: las fichas muestran visitas visibles con taco, rating, nota, fecha y autor; el endpoint excluye contenido moderado, cuentas inactivas y usuarios que desactivaron su actividad.
 
 ## Verificación
 
