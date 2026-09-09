@@ -9,8 +9,15 @@ const app = Fastify({ logger: true, bodyLimit: 12 * 1024 * 1024 });
 await app.register(cors, { origin: true });
 
 app.setErrorHandler((error, request, reply) => {
+  const errorCode = (error as { code?: string }).code;
   if (error instanceof z.ZodError) {
     return reply.code(400).send({ error: 'INVALID_REQUEST', issues: error.issues });
+  }
+  if (errorCode === 'FST_ERR_CTP_BODY_TOO_LARGE') {
+    return reply.code(413).send({ error: 'PAYLOAD_TOO_LARGE' });
+  }
+  if (errorCode === 'FST_ERR_CTP_INVALID_JSON_BODY' || errorCode === 'FST_ERR_CTP_EMPTY_JSON_BODY') {
+    return reply.code(400).send({ error: 'INVALID_JSON' });
   }
   request.log.error(error);
   return reply.code(500).send({ error: 'INTERNAL_ERROR' });

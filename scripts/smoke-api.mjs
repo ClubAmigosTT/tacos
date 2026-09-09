@@ -31,6 +31,10 @@ await request('/v1/events', {
   method: 'POST',
   body: JSON.stringify({ eventName: 'not_a_product_event' })
 }, 400);
+await request('/v1/events', {
+  method: 'POST',
+  body: '{"eventName":'
+}, 400);
 
 const alice = await createUser('Ana Smoke', 'ana');
 const bobDisplayName = `Beto Smoke ${suffix}`;
