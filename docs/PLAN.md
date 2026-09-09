@@ -134,6 +134,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 11. Usar la reputación de catálogo como media del prior bayesiano para que la primera visita no desplace artificialmente un lugar establecido.
 12. Mantener el Perfil autenticado consistente cuando fallan en conjunto sus consultas de Diario, Listas o Taste ID, con un reintento coordinado.
 13. Evitar que Inicio sustituya recomendaciones autenticadas por fixtures cuando el API falla; mostrar un estado de error recuperable y conservar el fallback local sólo para visitantes anónimos.
+14. Diferenciar en Inicio un feed autenticado vacío de una falla temporal y ofrecer reintento en la tarjeta de Actividad.
 
 **Aceptación:** el smoke test confirma follow, unfollow, feed con nota, perfil público, exclusión de listas privadas y edición autorizada de listas.
 

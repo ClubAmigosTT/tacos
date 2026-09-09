@@ -168,6 +168,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 133. Wrapped con memoria: el resumen anual calcula desde las visitas del usuario la colonia más frecuente, hora característica, kilómetros recorridos y gasto con precio registrado.
 134. Recomendaciones honestas: una sesión autenticada ya no cae silenciosamente al catálogo demo si falla `/v1/recommendations`; Inicio muestra el error y permite reintentar, mientras el modo anónimo conserva el fallback local.
 135. Descubrimiento honesto: Mapa y Registro no muestran sucursales demo cuando falla `/v1/discover` con sesión; ofrecen reintento y sólo mantienen un deep link de sucursal explícito para no perder la intención del usuario.
+136. Actividad honesta en Inicio: un fallo del feed autenticado ya no se confunde con un feed vacío; la tarjeta muestra el problema y permite reintentar sin ocultar las recomendaciones.
 
 ## Verificación
 
