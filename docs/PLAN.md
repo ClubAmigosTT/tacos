@@ -114,6 +114,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 3. Abrir perfiles públicos con Taste ID, estadísticas y listas públicas; no exponer correo en esa vista.
 4. Calcular reputación robusta (prior bayesiano, recencia, dispersión y límite por revisor) y afinidad de sabor; combinarla con señales de personas seguidas.
 5. Mostrar notas de visitas en el feed y llevar al perfil desde avatar/nombre.
+6. Exponer desde el Perfil una lectura de estadísticas basada en visitas reales: tacos recurrentes, zonas, gasto, promedio y ritmo mensual.
 
 **Aceptación:** el smoke test confirma follow, unfollow, feed con nota, perfil público, exclusión de listas privadas y edición autorizada de listas.
 
