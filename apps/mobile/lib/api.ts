@@ -130,7 +130,11 @@ export async function recommendations(token?: string): Promise<Place[]> {
   try {
     const result = await request<{ places: Place[] }>('/v1/recommendations', undefined, token);
     return result.places;
-  } catch {
+  } catch (cause) {
+    // Anonymous discovery can keep using the local catalog for design/offline
+    // review. Once a session exists, surface the failure so private affinity
+    // signals are never replaced silently by demo recommendations.
+    if (token) throw cause;
     return places;
   }
 }

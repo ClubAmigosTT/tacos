@@ -9,11 +9,12 @@ import { colors, radii, spacing } from '@/theme';
 import { PlaceCard } from '@/components/PlaceCard';
 import { SectionTitle } from '@/components/SectionTitle';
 import { RatingBadge } from '@/components/RatingBadge';
+import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 export default function HomeScreen() {
   const { token, user } = useAuth();
   const [search, setSearch] = useState('');
-  const { data = [] } = useQuery({ queryKey: ['recommendations', token], queryFn: () => recommendations(token) });
+  const { data = [], isError: recommendationsError, refetch: refetchRecommendations } = useQuery({ queryKey: ['recommendations', token], queryFn: () => recommendations(token) });
   const { data: feedData } = useQuery({ queryKey: ['feed', 'home', token], queryFn: () => feedRequest(token!), enabled: Boolean(token), staleTime: 60_000 });
   const featured = data[0];
   const featuredTaco = featured?.tacos.reduce((best, taco) => taco.rating > (best?.rating ?? 0) ? taco : best, featured.tacos[0]);
@@ -44,7 +45,7 @@ export default function HomeScreen() {
         <Pressable accessibilityRole="button" accessibilityLabel="Ejecutar búsqueda" style={styles.searchShortcut} onPress={submitSearch}><Text style={styles.shortcutText}>↵</Text></Pressable>
       </View>
 
-      {featured ? (
+      {token && recommendationsError ? <View style={styles.recommendationError}><AsyncErrorState title="No pudimos personalizar tu inicio" detail="Tus visitas siguen guardadas. Revisa la conexión para recuperar tus recomendaciones." onAction={() => void refetchRecommendations()} /></View> : featured ? (
         <Link href={`/place/${featured.id}`} asChild>
           <Pressable accessibilityRole="button" accessibilityLabel={`Abrir recomendación ${featured.name}, ${featuredTaco?.name ?? 'taco'} ${featuredTaco?.rating.toFixed(2) ?? featured.rating.toFixed(2)}`} style={styles.hero}>
             <Image source={{ uri: featured.image }} style={styles.heroImage} />
@@ -92,6 +93,7 @@ const styles = StyleSheet.create({
   heroPlace: { color: colors.ink, fontSize: 12, fontWeight: '700', flex: 1 },
   heroMatch: { color: colors.accent, fontSize: 13, fontWeight: '900' },
   heroSocial: { color: colors.ink, opacity: 0.75, fontSize: 10, fontWeight: '800', marginTop: 8 },
+  recommendationError: { minHeight: 260, borderRadius: radii.lg, overflow: 'hidden', marginBottom: spacing.xl },
   section: { marginBottom: spacing.xl },
   activity: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, gap: 12 },
   activityAvatars: { flexDirection: 'row', width: 66 },
