@@ -130,6 +130,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 95. Registro sin sorpresas: un deep link desde una ficha conserva la taquería elegida aunque el ranking de cercanía devuelva otros tres lugares.
 96. Navegación de Perfil: Diario, Reviews, Listas, Mapa y Estadísticas quedan accesibles desde una barra horizontal de acceso rápido.
 97. Errores honestos: las pantallas privadas diferencian una falla temporal de API de un diario vacío y ofrecen reintento explícito.
+98. Red social resiliente: Actividad, Personas y Quiero ir muestran reintento cuando falla su consulta, sin confundirlo con ausencia de contenido.
 
 ## Verificación
 
