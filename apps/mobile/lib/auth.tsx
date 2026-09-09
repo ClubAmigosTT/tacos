@@ -64,10 +64,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
+    let cachedProfileLoaded = false;
     void (async () => {
       try {
         const [saved, cachedUser] = await Promise.all([readToken(), readUser()]);
         if (!saved) return;
+        cachedProfileLoaded = Boolean(cachedUser);
         if (active) { setToken(saved); if (cachedUser) setUser(cachedUser); }
         const result = await me(saved);
         await writeUser(result.user);
@@ -79,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (unauthorized) {
           try { await writeToken(null); await writeUser(null); } catch { /* storage can be unavailable */ }
           if (active) { setToken(undefined); setUser(undefined); }
-        } else if (active) {
+        } else if (active && !cachedProfileLoaded) {
           // Without a cached profile, avoid rendering private screens with an
           // unresolved user while keeping the token for the next launch.
           setToken(undefined);
