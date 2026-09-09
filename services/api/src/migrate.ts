@@ -3,13 +3,15 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { Pool } from 'pg';
 
-if (!process.env.DATABASE_URL) {
+const configuredDatabaseUrl = process.env.DATABASE_URL?.trim();
+if (!configuredDatabaseUrl) {
+  if (process.env.NODE_ENV === 'production') throw new Error('DATABASE_URL is required in production');
   console.log('DATABASE_URL no configurada; se omite migración local.');
   process.exit(0);
 }
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined });
+const pool = new Pool({ connectionString: configuredDatabaseUrl, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined });
 const client = await pool.connect();
 let lockHeld = false;
 try {
