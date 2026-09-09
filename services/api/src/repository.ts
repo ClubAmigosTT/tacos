@@ -1059,7 +1059,16 @@ export async function getDiary(userId: string, includeHidden = true) {
       WHERE v.user_id = $1${visibilityFilter} GROUP BY v.id, v.price, v.note, v.photo_url, b.name, b.neighborhood, b.image_url, b.location
       ORDER BY v.visited_at DESC LIMIT 100
     `, [userId]);
-    return result.rows;
+    return result.rows.map((row) => ({
+      ...row,
+      // pg returns NUMERIC columns as strings. Keep the API contract
+      // identical to the in-memory fallback so mobile clients receive
+      // numbers for diary context and map coordinates in every environment.
+      rating: Number(row.rating),
+      price: row.price == null ? null : Number(row.price),
+      latitude: row.latitude == null ? null : Number(row.latitude),
+      longitude: row.longitude == null ? null : Number(row.longitude)
+    }));
   }
   return [...localVisits.entries()].filter(([, visit]) => visit.userId === userId && (includeHidden || visit.visibility === 'visible')).sort(([, a], [, b]) => b.createdAt.localeCompare(a.createdAt)).map(([id, visit]) => {
     const place = places.find((item) => item.id === visit.placeId);
