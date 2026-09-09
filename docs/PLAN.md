@@ -285,7 +285,8 @@ computadora; al completar esos datos se cambia al Blueprint de producción.
   migraciones se ejecutan idempotentemente al arrancar el servicio.
 - **EAS:** `EXPO_PUBLIC_API_URL` apunta al API HTTPS en los entornos `preview` y
   `production`. La build de simulador iOS
-  `f21afbed-d7ca-4e3e-8b3b-2122f9f6eee3` quedó encolada con el commit actual.
+  `f21afbed-d7ca-4e3e-8b3b-2122f9f6eee3` terminó correctamente y su artefacto
+  está disponible desde la página de EAS.
 - **Pendiente para producción:** configurar Resend/R2, importar un catálogo
   real con licencia, definir `APP_WEB_URL`/`CORS_ORIGINS`, añadir
   `GOOGLE_MAPS_API_KEY` para Android y configurar el certificado de distribución
