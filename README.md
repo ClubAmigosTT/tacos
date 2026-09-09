@@ -142,6 +142,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 107. Colaboración recuperable: la búsqueda de colaboradores muestra reintento explícito cuando falla, sin ocultar el estado de la lista.
 108. Cachés derivadas coherentes: guardar, editar o eliminar una visita invalida también Mapa, Ficha, Listas y Taste ID para que los ratings y progresos se actualicen inmediatamente.
 109. Enlaces profundos completos: una sesión anónima conserva el ID de la sucursal remota durante el acceso y vuelve al registro correcto después de autenticar.
+110. Sesión resistente: el perfil mínimo se conserva junto al token y sólo se borra ante `401/403`; una caída temporal del API no cierra la cuenta.
 
 ## Verificación
 
