@@ -137,6 +137,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 13. Evitar que Inicio sustituya recomendaciones autenticadas por fixtures cuando el API falla; mostrar un estado de error recuperable y conservar el fallback local sólo para visitantes anónimos.
 14. Diferenciar en Inicio un feed autenticado vacío de una falla temporal y ofrecer reintento en la tarjeta de Actividad.
 15. Alimentar la tarjeta editorial de Inicio desde listas públicas reales, sin filtrar listas privadas ni reemplazar una falla autenticada por contenido demo.
+16. Invalidar feed, recomendaciones y perfil al cambiar un seguimiento desde Personas, manteniendo el estado del botón y comunicando errores de la mutación.
 
 **Aceptación:** el smoke test confirma follow, unfollow, feed con nota, perfil público, exclusión de listas privadas y edición autorizada de listas.
 

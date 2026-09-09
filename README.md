@@ -172,6 +172,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 137. Curaduría viva en Inicio: la tarjeta de listas consume `/v1/lists`, respeta listas privadas y ofrece reintento autenticado; sólo el visitante anónimo conserva la selección demo cuando el API no está disponible.
 138. Radar tolerante: un branch eliminado ya no oculta los lugares guardados que siguen vivos; “Quiero ir” conserva los válidos y comunica cuántos necesitan reemplazo.
 139. Compartir accesible: ficha, lista y Wrapped anuncian sus acciones de compartir, guardar, colaboradores y edición a VoiceOver, TalkBack y teclado web.
+140. Grafo social coherente: seguir o dejar de seguir desde Personas invalida feed, recomendaciones y perfil para que las señales cambien sin recargar manualmente.
 
 ## Verificación
 
