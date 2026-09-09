@@ -7,12 +7,13 @@ import { lists as fixtureLists, type List } from '@/data/fixtures';
 import { addListItem, createList, lists as listsRequest, trackEvent } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
+import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 export default function ListsScreen() {
-  const { token, user } = useAuth();
+  const { token, user, loading: authLoading } = useAuth();
   const { placeId } = useLocalSearchParams<{ placeId?: string }>();
   const queryClient = useQueryClient();
-  const { data } = useQuery({ queryKey: ['lists', token], queryFn: () => listsRequest(token), enabled: true });
+  const { data, isError, refetch } = useQuery({ queryKey: ['lists', token], queryFn: () => listsRequest(token), enabled: true });
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
@@ -28,11 +29,15 @@ export default function ListsScreen() {
   const scopedLists = placeId && user ? apiLists.filter((list) => list.owner.id === user.id || list.canEdit) : apiLists;
   const visibleLists: List[] = scopedLists.length ? scopedLists : (!user ? fixtureLists : []);
 
+  if (authLoading) return <View style={styles.center}><Text style={styles.loadingText}>Cargando tus listas…</Text></View>;
+  if (token && isError) return <AsyncErrorState title="No pudimos cargar tus listas" detail="Tus listas siguen guardadas. Revisa la conexión e inténtalo de nuevo." onAction={() => void refetch()} />;
+
   return <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
     <View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable><View style={styles.headerCopy}><Text style={styles.eyebrow}>CURADURÍA PERSONAL</Text><Text style={styles.title}>Tus listas</Text></View><Ionicons name="albums-outline" size={22} color={colors.accent} /></View>
     <Text style={styles.intro}>{placeId ? 'Elige una lista para guardar esta taquería. Después podrás volver a ella desde tu perfil.' : 'Guarda lugares por antojo, colonia o estado de ánimo. Las listas convierten tus visitas en una forma de recomendar.'}</Text>
     {user ? <View style={styles.createCard}><Text style={styles.createEyebrow}>NUEVA LISTA</Text><TextInput value={title} onChangeText={setTitle} placeholder="Ej. Pastor que sí defendería" placeholderTextColor={colors.dim} style={styles.input} maxLength={80} /><TextInput value={description} onChangeText={setDescription} placeholder="Una descripción breve (opcional)" placeholderTextColor={colors.dim} style={[styles.input, styles.descriptionInput]} maxLength={240} multiline /><View style={styles.visibilityRow}><Text style={styles.visibilityLabel}>VISIBILIDAD</Text><View style={styles.visibilityOptions}><Pressable onPress={() => setVisibility('public')} style={[styles.visibilityOption, visibility === 'public' && styles.visibilityActive]}><Ionicons name="globe-outline" size={13} color={visibility === 'public' ? colors.background : colors.muted} /><Text style={[styles.visibilityText, visibility === 'public' && styles.visibilityTextActive]}>Pública</Text></Pressable><Pressable onPress={() => setVisibility('private')} style={[styles.visibilityOption, visibility === 'private' && styles.visibilityActive]}><Ionicons name="lock-closed-outline" size={13} color={visibility === 'private' ? colors.background : colors.muted} /><Text style={[styles.visibilityText, visibility === 'private' && styles.visibilityTextActive]}>Privada</Text></Pressable></View></View><Pressable style={[styles.createButton, (!title.trim() || mutation.isPending) && styles.disabled]} disabled={!title.trim() || mutation.isPending} onPress={() => mutation.mutate()}><Ionicons name="add" size={18} color={colors.background} /><Text style={styles.createButtonText}>{mutation.isPending ? 'Guardando…' : 'Crear lista'}</Text></Pressable></View> : <Pressable style={styles.loginCard} onPress={() => router.push('/auth')}><View style={styles.loginIcon}><Ionicons name="person-add-outline" size={18} color={colors.background} /></View><View style={{ flex: 1 }}><Text style={styles.loginTitle}>Crea listas públicas</Text><Text style={styles.loginDetail}>Entra para guardar lugares y compartir tu criterio.</Text></View><Ionicons name="chevron-forward" size={17} color={colors.muted} /></Pressable>}
     <View style={styles.listHeader}><Text style={styles.sectionTitle}>{placeId ? 'Elige una lista' : 'Selecciones'}</Text><Text style={styles.count}>{visibleLists.length} LISTAS</Text></View>
+    {mutation.isError ? <Text style={styles.error}>No pudimos crear la lista. Inténtalo de nuevo.</Text> : null}
     {saveMutation.isError ? <Text style={styles.error}>No pudimos guardar el lugar en esa lista.</Text> : null}
     {visibleLists.length ? visibleLists.map((list) => <ListCard key={list.id} list={list} saveMode={Boolean(placeId)} saved={saveMutation.isSuccess && saveMutation.variables === list.id} onPress={placeId ? () => { if (user) saveMutation.mutate(list.id); else router.push({ pathname: '/auth', params: { returnTo: '/lists', placeId } }); } : () => router.push(`/list/${list.id}`)} />) : <View style={styles.empty}><Ionicons name="bookmark-outline" size={25} color={colors.dim} /><Text style={styles.emptyTitle}>Todavía no tienes listas</Text><Text style={styles.emptyText}>Crea la primera y empieza a construir tu mapa de antojos.</Text></View>}
   </ScrollView>;
@@ -45,6 +50,8 @@ function ListCard({ list, saveMode, saved, onPress }: { list: List; saveMode?: b
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  loadingText: { color: colors.muted, fontSize: 13 },
   content: { padding: spacing.lg, paddingTop: 58, paddingBottom: 100 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 13, marginBottom: spacing.lg },
   back: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },

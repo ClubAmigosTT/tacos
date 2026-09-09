@@ -139,6 +139,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 10. Mantener el fallback local alineado con PostgreSQL para poder validar el flujo de reputación sin depender de una base local.
 11. Compartir fichas, listas y Wrapped con deep links del esquema `tacos://`, manteniendo una ruta web equivalente en Expo Router.
 12. Derivar periodos y resúmenes del Diario desde las fechas reales para que el producto no dependa de un año fijo.
+13. Mantener la pantalla de Listas alineada con el resto de rutas privadas: esperar la sesión, diferenciar error de API de estado vacío y ofrecer reintento.
 
 **Aceptación:** un reporte aparece en `/v1/admin/reports`, un admin puede ocultarlo, el feed deja de mostrarlo, el perfil público no lo cuenta y `pnpm smoke:admin` confirma que no contamina recomendaciones.
 
