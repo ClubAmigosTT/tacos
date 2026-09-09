@@ -187,6 +187,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 152. Radar testeable fuera de Expo: el módulo usa imports ESM explícitos y el smoke ejecuta la misma lógica sin depender del alias del bundler.
 153. Mutaciones honestas: guardar una sucursal, publicar o borrar una nota y quitar colaboradores muestran feedback de error y permiten reintentar sin perder contexto.
 154. Moderación recuperable: ocultar/restaurar comentarios y resolver reportes avisa los fallos de red sin perder la cola activa.
+155. Pins contextuales consistentes: el mapa web y los mapas nativos normalizan acentos al mostrar el rating del taco buscado.
 
 ## Verificación
 

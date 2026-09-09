@@ -181,6 +181,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 27. Etiquetar las acciones iconográficas de compartir y gestión de listas para que las rutas sociales sean operables sin depender del aspecto visual.
 28. Comunicar fallos de mutaciones sociales y de guardado con feedback accesible o nativo, evitando acciones que fallen en silencio y conservando el contexto para reintentar.
 29. Hacer recuperables las mutaciones del panel de moderación (reportes y comentarios), manteniendo la cola y el filtro actuales tras un error.
+30. Compartir la normalización de nombres de taco entre Radar y pins web/nativos para que la búsqueda contextual tenga la misma lectura en todas las plataformas.
 
 **Aceptación:** un reporte aparece en `/v1/admin/reports`, un admin puede ocultarlo, el feed deja de mostrarlo, el perfil público no lo cuenta y `pnpm smoke:admin` confirma que no contamina recomendaciones.
 
