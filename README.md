@@ -127,6 +127,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 78. Cierre del registro: guardar una visita invalida diario, feed, recomendaciones, mapa y ficha, y el CTA vuelve al mapa sin duplicar la pantalla de formulario.
 93. Estadísticas de gusto: el Perfil abre un resumen real de tacos, zonas, gasto, promedio y ritmo de visitas mensual.
 94. Reviews personales: el Perfil separa ratings y notas del timeline del Diario, con edición directa de cada visita.
+95. Registro sin sorpresas: un deep link desde una ficha conserva la taquería elegida aunque el ranking de cercanía devuelva otros tres lugares.
 
 ## Verificación
 

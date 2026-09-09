@@ -104,6 +104,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 11. Registrar eventos de producto anónimos y acotados para medir descubrimiento, conversión a visita y uso social sin almacenar búsquedas ni PII; usar un identificador aleatorio persistido localmente para medir recurrencia.
 12. Permitir eliminar una visita propia con confirmación y limpiar sus señales derivadas sin afectar entradas ajenas.
 13. Proponer la sucursal más cercana después de usar la cámara, manteniendo la selección explícita del usuario hasta confirmar.
+14. Mantener la sucursal elegida al entrar al registro desde una ficha, aunque la consulta de cercanía se actualice después.
 
 **Aceptación:** una visita aparece en diario, feed y estadísticas; una foto inválida no se persiste; una falla de media permite guardar sin foto; una edición propia persiste y una edición ajena responde 404.
 

@@ -28,7 +28,14 @@ export default function RegisterScreen() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const { data: availablePlaces = places } = useQuery({ queryKey: ['discover', 'register', coordinates?.latitude, coordinates?.longitude], queryFn: () => discover({ lat: coordinates?.latitude, lng: coordinates?.longitude, limit: 3 }), placeholderData: places });
+  const { data: nearbyPlaces = places } = useQuery({ queryKey: ['discover', 'register', coordinates?.latitude, coordinates?.longitude], queryFn: () => discover({ lat: coordinates?.latitude, lng: coordinates?.longitude, limit: 3 }), placeholderData: places });
+  // A deep link from a place detail is an explicit user choice. Keep that
+  // branch in the selector even when the nearest-three query does not include
+  // it, so location ranking never changes the visit behind the user's back.
+  const hasExplicitPlace = Boolean(initialPlaceId && initialPlace.id === initialPlaceId);
+  const availablePlaces = hasExplicitPlace && !nearbyPlaces.some((item) => item.id === initialPlace.id)
+    ? [initialPlace, ...nearbyPlaces]
+    : nearbyPlaces;
   const place = availablePlaces.find((item) => item.id === placeId) ?? availablePlaces[0] ?? places[0];
 
   useEffect(() => {
