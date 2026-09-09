@@ -12,6 +12,9 @@ El repositorio ya contiene un MVP ejecutable para iOS, Android y web: mapa conte
 - `render.yaml`: Blueprint gratuito de API web y PostgreSQL para el MVP. Los
   trabajos de mantenimiento se ejecutan manualmente o desde GitHub Actions;
   no se crean workers, cron ni Redis en Render.
+- `render.free-demo.yaml`: Blueprint aislado para una demo gratuita sin
+  secretos externos. Usa datos semilla y desactiva temporalmente el correo;
+  no es la configuración para producción.
 
 ## Arranque local
 
@@ -264,6 +267,15 @@ permite desplegar sin un worker pagado y sin depender de esta computadora.
 El PostgreSQL Free de Render es temporal: tiene 1 GB, no incluye backups y
 expira a los 30 días. Antes de usar datos reales de usuarios, programa una
 exportación y migra la base a un proveedor persistente o a un plan pagado.
+
+### Demo gratuita sin proveedor de correo
+
+Si todavía no tienes una clave de Resend, crea el Blueprint usando el archivo
+`render.free-demo.yaml` en el campo **Blueprint Path**. Esta variante crea
+`tacos-api-free` y `tacos-postgres-free`, deja visible el catálogo semilla y
+permite registrar cuentas sin verificación de correo para validar la UX. No
+debe usarse para tráfico público: antes de producción cambia a `render.yaml`,
+configura Resend/R2 y conserva `REQUIRE_EMAIL_VERIFICATION=true`.
 
 ### Builds iOS y Android
 

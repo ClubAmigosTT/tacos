@@ -220,6 +220,11 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
     y no tiene backups. Programar exportaciones y migrar a almacenamiento
     persistente antes de usarlo como producción.
 
+18. Mientras no exista un proveedor de correo, usar únicamente
+    `render.free-demo.yaml` para una demo aislada: permite el catálogo semilla y
+    desactiva temporalmente la verificación. El Blueprint de producción sigue
+    siendo `render.yaml` con `REQUIRE_EMAIL_VERIFICATION=true`.
+
 **Aceptación:** la API responde desde `https://…onrender.com`, la app se conecta sin esta computadora encendida y el smoke test corre en CI.
 
 ## 3. Comandos de trabajo
