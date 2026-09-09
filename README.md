@@ -189,6 +189,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 154. Moderación recuperable: ocultar/restaurar comentarios y resolver reportes avisa los fallos de red sin perder la cola activa.
 155. Pins contextuales consistentes: el mapa web y los mapas nativos normalizan acentos al mostrar el rating del taco buscado.
 156. Búsqueda universal por intención: las consultas con varias palabras combinan taco, sucursal, zona y estilo en memoria y PostgreSQL, sin exigir que aparezcan contiguas.
+157. Consultas vacías honestas: una búsqueda compuesta sólo por puntuación devuelve cero resultados en vez de mostrar accidentalmente todo el catálogo.
 
 ## Verificación
 

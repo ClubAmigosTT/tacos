@@ -54,6 +54,8 @@ const tacoSearch = await request('/v1/discover?q=suadero&limit=10');
 if (!['vilsito', 'oriente'].every((placeId) => tacoSearch.places?.some((place) => place.id === placeId))) throw new Error('Menu-item discovery did not find every branch serving suadero');
 const contextualSearch = await request('/v1/discover?q=grínga%20narvarte&limit=10');
 if (contextualSearch.places?.length !== 1 || contextualSearch.places[0]?.id !== 'vilsito') throw new Error('Multi-term contextual search did not combine taco and neighborhood');
+const punctuationSearch = await request('/v1/discover?q=%21%21%21&limit=10');
+if (punctuationSearch.places?.length !== 0) throw new Error('Punctuation-only discovery query should not return the full catalog');
 const saved = await request('/v1/branches/vilsito/saved', { method: 'POST', token: bob.token });
 if (saved.status !== 'saved') throw new Error('Place was not saved');
 const savedPlaces = await request('/v1/me/saved', { token: bob.token });
