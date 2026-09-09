@@ -5,12 +5,13 @@ import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-nat
 import { Ionicons } from '@expo/vector-icons';
 import { privacy as privacyRequest, updatePrivacy } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { AsyncErrorState } from '@/components/AsyncErrorState';
 import { colors, radii, spacing } from '@/theme';
 
 export default function PrivacyScreen() {
   const { token, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
-  const { data, isLoading, isError } = useQuery({ queryKey: ['privacy', token], queryFn: () => privacyRequest(token!), enabled: Boolean(token) });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['privacy', token], queryFn: () => privacyRequest(token!), enabled: Boolean(token) });
   const [shareActivity, setShareActivity] = useState(true);
   const mutation = useMutation({
     mutationFn: (value: boolean) => updatePrivacy({ shareActivity: value }, token!),
@@ -22,6 +23,7 @@ export default function PrivacyScreen() {
 
   if (authLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando tu privacidad…</Text></View>;
   if (!token) return <View style={styles.center}><View style={styles.icon}><Ionicons name="lock-closed-outline" size={24} color={colors.background} /></View><Text style={styles.title}>Tu privacidad necesita una cuenta</Text><Text style={styles.muted}>Entra para administrar qué compartes con tu red.</Text><Pressable style={styles.primary} onPress={() => router.push('/auth')}><Text style={styles.primaryText}>Entrar o crear cuenta</Text></Pressable></View>;
+  if (isError) return <AsyncErrorState title="No pudimos cargar tu privacidad" detail="Tus preferencias no se modificaron. Revisa la conexión e inténtalo de nuevo." onAction={() => void refetch()} />;
   return <ScrollView style={styles.screen} contentContainerStyle={styles.content}><View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable><View><Text style={styles.eyebrow}>CONTROL DE DATOS</Text><Text style={styles.headerTitle}>Privacidad</Text></View><Ionicons name="shield-checkmark-outline" size={21} color={colors.accent} /></View><Text style={styles.intro}>Decide qué señales de tu diario pueden alimentar la conversación de tu comunidad.</Text>{isLoading ? <Text style={styles.muted}>Cargando preferencias…</Text> : isError ? <Text style={styles.error}>No pudimos cargar tus preferencias.</Text> : <View style={styles.card}><View style={styles.row}><View style={styles.rowIcon}><Ionicons name="people-outline" size={18} color={colors.accent} /></View><View style={styles.copy}><Text style={styles.rowTitle}>Compartir actividad</Text><Text style={styles.rowDetail}>{shareActivity ? 'Tus visitas visibles aparecen en el feed de quienes te siguen.' : 'Tus visitas no aparecen en el feed de tus seguidores.'}</Text></View><Switch value={shareActivity} onValueChange={(value) => { setShareActivity(value); mutation.mutate(value); }} disabled={mutation.isPending} trackColor={{ false: colors.surfaceRaised, true: colors.accent }} thumbColor={colors.ink} /></View>{mutation.isError ? <Text style={styles.error}>No pudimos guardar el cambio. Inténtalo de nuevo.</Text> : null}</View>}<View style={styles.note}><Ionicons name="information-circle-outline" size={17} color={colors.muted} /><Text style={styles.noteText}>Esto no borra tu diario: tus registros siempre siguen visibles para ti y pueden seguir aportando a tus estadísticas privadas.</Text></View></ScrollView>;
 }
 

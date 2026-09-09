@@ -151,6 +151,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 14. Traducir errores de parser de Fastify a respuestas 400/413 para que clientes y observabilidad distingan entradas inválidas de fallos internos.
 15. Ofrecer reintento visible en la búsqueda de colaboradores cuando la consulta social no está disponible.
 16. Ofrecer reintento visible al cargar comentarios de una visita para no confundir una caída temporal con una conversación vacía.
+17. Mantener reintento visible también en Privacidad, Moderación y Comentarios administrativos cuando el API no esté disponible.
 
 **Aceptación:** un reporte aparece en `/v1/admin/reports`, un admin puede ocultarlo, el feed deja de mostrarlo, el perfil público no lo cuenta y `pnpm smoke:admin` confirma que no contamina recomendaciones.
 
