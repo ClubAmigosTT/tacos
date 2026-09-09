@@ -6,14 +6,16 @@ import { getPlace, savedPlaces } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
 import { PlaceCard } from '@/components/PlaceCard';
+import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 export default function SavedScreen() {
   const { token, loading: authLoading } = useAuth();
-  const { data: savedData, isLoading: loadingIds } = useQuery({ queryKey: ['saved-places', token], queryFn: () => savedPlaces(token!), enabled: Boolean(token) });
+  const { data: savedData, isLoading: loadingIds, isError: idsError, refetch: refetchIds } = useQuery({ queryKey: ['saved-places', token], queryFn: () => savedPlaces(token!), enabled: Boolean(token) });
   const ids = savedData?.placeIds ?? [];
-  const { data: places = [], isLoading: loadingPlaces } = useQuery({ queryKey: ['saved-place-details', ids], queryFn: () => Promise.all(ids.map((id) => getPlace(id))), enabled: savedData !== undefined });
+  const { data: places = [], isLoading: loadingPlaces, isError: placesError, refetch: refetchPlaces } = useQuery({ queryKey: ['saved-place-details', ids], queryFn: () => Promise.all(ids.map((id) => getPlace(id))), enabled: savedData !== undefined });
   if (authLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando tu radar…</Text></View>;
   if (!token) return <View style={styles.center}><View style={styles.icon}><Ionicons name="bookmark-outline" size={24} color={colors.background} /></View><Text style={styles.title}>Tu radar necesita una cuenta</Text><Text style={styles.muted}>Entra para guardar lugares y volver a ellos cuando llegue el antojo.</Text><Pressable style={styles.primary} onPress={() => router.push('/auth')}><Text style={styles.primaryText}>Entrar o crear cuenta</Text></Pressable></View>;
+  if (idsError || placesError) return <AsyncErrorState title="No pudimos cargar tu radar" detail="Tus lugares guardados siguen intactos. Revisa la conexión e inténtalo de nuevo." onAction={() => { void refetchIds(); if (savedData !== undefined) void refetchPlaces(); }} />;
   const loading = loadingIds || loadingPlaces;
   return <ScrollView style={styles.screen} contentContainerStyle={styles.content}><View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable><View><Text style={styles.eyebrow}>TU RADAR</Text><Text style={styles.headerTitle}>Quiero ir</Text></View><Ionicons name="bookmark" size={21} color={colors.accent} /></View><Text style={styles.intro}>Lugares que guardaste para una próxima salida, una noche larga o un antojo pendiente.</Text>{loading ? <Text style={styles.muted}>Cargando tu radar…</Text> : places.length ? <View>{places.map((place) => <PlaceCard key={place.id} place={place} compact />)}</View> : <View style={styles.empty}><Ionicons name="compass-outline" size={28} color={colors.dim} /><Text style={styles.emptyTitle}>Tu radar está vacío</Text><Text style={styles.muted}>Abre una taquería y toca “Quiero ir” para guardarla aquí.</Text><Pressable style={styles.secondary} onPress={() => router.push('/(tabs)/map')}><Text style={styles.secondaryText}>Explorar el mapa</Text><Ionicons name="arrow-forward" size={17} color={colors.accent} /></Pressable></View>}</ScrollView>;
 }

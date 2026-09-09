@@ -6,15 +6,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { followUser, searchUsers, unfollowUser } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
+import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 export default function PeopleScreen() {
-  const { token, user } = useAuth();
+  const { token, user, loading: authLoading } = useAuth();
   const [query, setQuery] = useState('');
   const [following, setFollowing] = useState<string[]>([]);
-  const { data, isFetching } = useQuery({ queryKey: ['people', query, token], queryFn: () => searchUsers(query, token), enabled: Boolean(token && query.trim().length >= 2) });
+  const { data, isFetching, isError, refetch } = useQuery({ queryKey: ['people', query, token], queryFn: () => searchUsers(query, token), enabled: Boolean(token && query.trim().length >= 2) });
   useEffect(() => { if (data?.users) setFollowing(data.users.filter((person) => person.following).map((person) => person.id)); }, [data]);
   const followMutation = useMutation({ mutationFn: (userId: string) => followUser(userId, token!), onSuccess: (_, userId) => setFollowing((current) => [...current, userId]) });
   const unfollowMutation = useMutation({ mutationFn: (userId: string) => unfollowUser(userId, token!), onSuccess: (_, userId) => setFollowing((current) => current.filter((id) => id !== userId)) });
+  if (authLoading) return <View style={styles.center}><Text style={styles.hint}>Cargando el directorio…</Text></View>;
+  if (token && isError) return <AsyncErrorState title="No pudimos buscar personas" detail="El directorio no está disponible ahora. Revisa la conexión e inténtalo de nuevo." onAction={() => void refetch()} />;
   return <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
     <View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable><View style={styles.headerCopy}><Text style={styles.eyebrow}>GRAFO SOCIAL</Text><Text style={styles.title}>Encuentra criterio</Text></View><Ionicons name="people-outline" size={22} color={colors.accent} /></View>
     {!user ? <Pressable style={styles.loginCard} onPress={() => router.push('/auth')}><View style={styles.loginIcon}><Ionicons name="person-add-outline" size={18} color={colors.background} /></View><View style={{ flex: 1 }}><Text style={styles.loginTitle}>Entra para seguir personas</Text><Text style={styles.loginDetail}>Tu feed mejora cuando aprende de gente con gustos parecidos.</Text></View><Ionicons name="chevron-forward" size={17} color={colors.muted} /></Pressable> : null}
@@ -25,6 +28,7 @@ export default function PeopleScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   content: { padding: spacing.lg, paddingTop: 58, paddingBottom: 100 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 13, marginBottom: spacing.xl },
   back: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
