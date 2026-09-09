@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      RENDER_CLI_VERSION: v2.7.0
+      RENDER_CLI_VERSION: v2.26.0
     steps:
       - name: Checkout
         uses: actions/checkout@v4
