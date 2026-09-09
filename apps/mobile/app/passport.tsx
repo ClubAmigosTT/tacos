@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { colors, radii, spacing } from '@/theme';
 import { useAuth } from '@/lib/auth';
 import { diary as diaryRequest } from '@/lib/api';
+import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 const zones = [
   { name: 'Narvarte', note: 'Pastor y suadero' },
@@ -19,7 +20,7 @@ const zones = [
 
 export default function PassportScreen() {
   const { token, loading: authLoading } = useAuth();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['diary', 'passport', token],
     queryFn: () => diaryRequest(token!),
     enabled: Boolean(token),
@@ -29,6 +30,7 @@ export default function PassportScreen() {
   const progress = Math.round((visitedCount / zones.length) * 100);
 
   if (authLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando tu pasaporte…</Text></View>;
+  if (token && isError) return <AsyncErrorState title="No pudimos cargar tu pasaporte" detail="Tus zonas visitadas siguen guardadas. Revisa la conexión e inténtalo de nuevo." onAction={() => void refetch()} />;
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.header}>

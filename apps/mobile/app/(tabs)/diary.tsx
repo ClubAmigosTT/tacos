@@ -8,11 +8,13 @@ import { useQuery } from '@tanstack/react-query';
 import { colors, radii, spacing } from '@/theme';
 import { RatingBadge } from '@/components/RatingBadge';
 import { SectionTitle } from '@/components/SectionTitle';
+import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 export default function DiaryScreen() {
   const { token, loading } = useAuth();
-  const { data } = useQuery({ queryKey: ['diary', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
+  const { data, isError, refetch } = useQuery({ queryKey: ['diary', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
   if (loading) return <View style={styles.loading}><Text style={styles.loadingText}>Cargando tu historia…</Text></View>;
+  if (token && isError) return <AsyncErrorState title="No pudimos cargar tu diario" detail="Tu información sigue guardada. Revisa la conexión e inténtalo de nuevo." onAction={() => void refetch()} />;
   const entries = data ? data.entries.map((entry) => ({ id: entry.id, date: new Date(entry.visited_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }).toUpperCase(), place: entry.place_name, taco: entry.tacos, rating: Number(entry.rating), image: entry.image_url })) : token ? [] : diaryEntries;
   const diaryPeriod = data?.entries[0]?.visited_at
     ? new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' }).format(new Date(data.entries[0].visited_at))

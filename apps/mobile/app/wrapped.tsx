@@ -7,12 +7,13 @@ import { diary as diaryRequest } from '@/lib/api';
 import { diaryEntries } from '@/data/fixtures';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
+import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 type WrappedEntry = { id: string; rating: number; place_name: string; neighborhood: string; tacos: string; visited_at?: string };
 
 export default function WrappedScreen() {
   const { token, loading: authLoading } = useAuth();
-  const { data, isLoading } = useQuery({ queryKey: ['diary', 'wrapped', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['diary', 'wrapped', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
   const wrappedYear = new Date().getFullYear();
   const sourceEntries: WrappedEntry[] = data?.entries ?? (token ? [] : diaryEntries.map((entry) => ({ id: entry.id, rating: entry.rating, place_name: entry.place, neighborhood: 'CDMX', tacos: entry.taco })));
   // Wrapped is an annual recap: use the visit's actual calendar year rather
@@ -33,6 +34,7 @@ export default function WrappedScreen() {
   }
 
   if (authLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando tu resumen…</Text></View>;
+  if (token && isError) return <AsyncErrorState title="No pudimos armar tu resumen" detail="Tu diario sigue intacto. Comprueba la conexión e inténtalo de nuevo." onAction={() => void refetch()} />;
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="arrow-back" size={20} color={colors.ink} /></Pressable><View><Text style={styles.eyebrow}>MEMORIA GASTRONÓMICA</Text><Text style={styles.title}>Tu año en tacos</Text></View></View>

@@ -6,6 +6,7 @@ import { diary as diaryRequest } from '@/lib/api';
 import { diaryEntries } from '@/data/fixtures';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing } from '@/theme';
+import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 type StatsEntry = { visited_at?: string; rating: number; price?: number | null; place_name: string; neighborhood: string; tacos: string };
 
@@ -13,7 +14,7 @@ const monthFormatter = new Intl.DateTimeFormat('es-MX', { month: 'short' });
 
 export default function StatsScreen() {
   const { token, loading: authLoading } = useAuth();
-  const { data, isLoading } = useQuery({ queryKey: ['diary', 'stats', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['diary', 'stats', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
   const sourceEntries: StatsEntry[] = data?.entries ?? (token ? [] : diaryEntries.map((entry) => ({ rating: entry.rating, place_name: entry.place, neighborhood: 'CDMX', tacos: entry.taco, price: null })));
   const entries = sourceEntries;
   const tacoNames = entries.flatMap((entry) => entry.tacos.split(',').map((taco) => taco.trim()).filter(Boolean));
@@ -41,6 +42,7 @@ export default function StatsScreen() {
   const maxMonth = Math.max(...months.map((month) => month.count), 1);
 
   if (authLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando tus estadísticas…</Text></View>;
+  if (token && isError) return <AsyncErrorState title="No pudimos calcular tus estadísticas" detail="Tus registros no se han perdido. Comprueba la conexión y vuelve a intentarlo." onAction={() => void refetch()} />;
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="arrow-back" size={20} color={colors.ink} /></Pressable><View><Text style={styles.eyebrow}>TU GUSTO</Text><Text style={styles.title}>Estadísticas</Text></View><Ionicons name="stats-chart-outline" size={21} color={colors.accent} /></View>

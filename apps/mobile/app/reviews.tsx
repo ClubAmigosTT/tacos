@@ -7,16 +7,18 @@ import { diaryEntries } from '@/data/fixtures';
 import { useAuth } from '@/lib/auth';
 import { RatingBadge } from '@/components/RatingBadge';
 import { colors, radii, spacing } from '@/theme';
+import { AsyncErrorState } from '@/components/AsyncErrorState';
 
 type ReviewEntry = { id: string; visited_at?: string; rating: number; note?: string; place_name: string; neighborhood: string; tacos: string; image_url: string };
 
 export default function ReviewsScreen() {
   const { token, loading: authLoading } = useAuth();
-  const { data, isLoading } = useQuery({ queryKey: ['diary', 'reviews', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['diary', 'reviews', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token) });
   const entries: ReviewEntry[] = data?.entries ?? (token ? [] : diaryEntries.map((entry) => ({ id: entry.id, rating: entry.rating, note: entry.rating >= 4.8 ? 'Volvería por otro; gran textura y salsa.' : 'Buena información para mi futuro yo.', place_name: entry.place, neighborhood: 'CDMX', tacos: entry.taco, image_url: entry.image })));
   const average = entries.length ? (entries.reduce((sum, entry) => sum + Number(entry.rating), 0) / entries.length).toFixed(2) : '—';
 
   if (authLoading) return <View style={styles.center}><Text style={styles.muted}>Cargando tus reviews…</Text></View>;
+  if (token && isError) return <AsyncErrorState title="No pudimos cargar tus reviews" detail="Tus ratings siguen guardados. Revisa la conexión e inténtalo de nuevo." onAction={() => void refetch()} />;
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="arrow-back" size={20} color={colors.ink} /></Pressable><View><Text style={styles.eyebrow}>TU VOZ</Text><Text style={styles.title}>Reviews</Text></View><Ionicons name="chatbubble-ellipses-outline" size={21} color={colors.accent} /></View>
