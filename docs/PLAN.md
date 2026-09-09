@@ -73,6 +73,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 17. Priorizar en la ficha el precio promedio calculado, distancia y estado de apertura, reutilizando la regla de horarios compartida.
 18. Evitar que la restauración de sesión muestre datos demo o un bloqueo de cuenta transitorio en Diario, Perfil y Registro.
 19. Cerrar el registro con una ruta explícita al mapa e invalidar las consultas derivadas para que la visita recién guardada sea visible al regresar.
+20. Mantener el contexto de taco en el hero de Inicio y hacer navegables las sucursales mostradas en Actividad.
 19. Cerrar el registro con una ruta explícita al mapa e invalidar las consultas derivadas para que la visita recién guardada sea visible al regresar.
 
 **Aceptación:** “Pastor”, “Abierto ahora”, “Barato” y “Para mí” producen resultados ordenados; negar ubicación no rompe el catálogo.

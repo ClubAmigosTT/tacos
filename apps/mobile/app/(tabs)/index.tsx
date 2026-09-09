@@ -52,7 +52,7 @@ export default function HomeScreen() {
             <View style={styles.heroContent}>
               <View style={styles.heroPill}><Text style={styles.heroPillText}>RECOMENDADO AHORA</Text></View>
               <Text style={styles.heroTitle}>{featuredTaco?.name ?? 'Taco'} preciso{`\n`}cerca de ti.</Text>
-              <View style={styles.heroMeta}><RatingBadge rating={featured.rating} accent /><Text style={styles.heroPlace}>{featured.name} · {featured.distance}</Text><Text style={styles.heroMatch}>{featured.match}%</Text></View>
+              <View style={styles.heroMeta}><RatingBadge rating={featuredTaco?.rating ?? featured.rating} accent /><Text style={styles.heroPlace}>{featured.name} · {featured.distance}</Text><Text style={styles.heroMatch}>{featured.match}%</Text></View>
               {featured.friendCount ? <Text style={styles.heroSocial}>{featured.socialMatch}% entre tus amigos · {featured.friendCount} personas</Text> : null}
             </View>
           </Pressable>
