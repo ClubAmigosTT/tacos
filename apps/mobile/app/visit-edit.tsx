@@ -18,11 +18,11 @@ export default function VisitEditScreen() {
   const [note, setNote] = useState('');
   const mutation = useMutation({
     mutationFn: () => updateVisit(id, { rating, price: price.trim() ? Number(price) : null, note: note.trim() }, token!),
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['diary'] }); void queryClient.invalidateQueries({ queryKey: ['feed'] }); void queryClient.invalidateQueries({ queryKey: ['recommendations'] }); router.replace('/(tabs)/diary'); }
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['diary'] }); void queryClient.invalidateQueries({ queryKey: ['feed'] }); void queryClient.invalidateQueries({ queryKey: ['recommendations'] }); void queryClient.invalidateQueries({ queryKey: ['discover'] }); void queryClient.invalidateQueries({ queryKey: ['place'] }); void queryClient.invalidateQueries({ queryKey: ['lists'] }); void queryClient.invalidateQueries({ queryKey: ['taste'] }); router.replace('/(tabs)/diary'); }
   });
   const deleteMutation = useMutation({
     mutationFn: () => deleteVisit(id, token!),
-    onSuccess: () => { void trackEvent('visit_deleted', {}, token); void queryClient.invalidateQueries({ queryKey: ['diary'] }); void queryClient.invalidateQueries({ queryKey: ['feed'] }); void queryClient.invalidateQueries({ queryKey: ['recommendations'] }); void queryClient.invalidateQueries({ queryKey: ['taste'] }); void queryClient.invalidateQueries({ queryKey: ['lists'] }); router.replace('/(tabs)/diary'); }
+    onSuccess: () => { void trackEvent('visit_deleted', {}, token); void queryClient.invalidateQueries({ queryKey: ['diary'] }); void queryClient.invalidateQueries({ queryKey: ['feed'] }); void queryClient.invalidateQueries({ queryKey: ['recommendations'] }); void queryClient.invalidateQueries({ queryKey: ['discover'] }); void queryClient.invalidateQueries({ queryKey: ['place'] }); void queryClient.invalidateQueries({ queryKey: ['taste'] }); void queryClient.invalidateQueries({ queryKey: ['lists'] }); router.replace('/(tabs)/diary'); }
   });
 
   useEffect(() => {

@@ -131,6 +131,8 @@ export default function RegisterScreen() {
       void queryClient.invalidateQueries({ queryKey: ['recommendations'] });
       void queryClient.invalidateQueries({ queryKey: ['discover'] });
       void queryClient.invalidateQueries({ queryKey: ['place', placeId] });
+      void queryClient.invalidateQueries({ queryKey: ['lists'] });
+      void queryClient.invalidateQueries({ queryKey: ['taste'] });
       setSaved(true);
     } catch {
       setError(photo ? 'No pudimos subir la foto. Revisa la conexión o quítala para guardar la visita sin imagen.' : 'No pudimos guardar la visita. Revisa tu conexión e inténtalo de nuevo.');

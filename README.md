@@ -140,6 +140,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 105. Perfil honesto: Diario, Listas y Taste ID ya no se degradan a ceros o fixtures cuando falla una consulta autenticada; el Perfil ofrece reintento conjunto.
 106. Errores HTTP precisos: JSON inválido devuelve 400 y cuerpos que superan el límite del API devuelven 413, con cobertura en el smoke test.
 107. Colaboración recuperable: la búsqueda de colaboradores muestra reintento explícito cuando falla, sin ocultar el estado de la lista.
+108. Cachés derivadas coherentes: guardar, editar o eliminar una visita invalida también Mapa, Ficha, Listas y Taste ID para que los ratings y progresos se actualicen inmediatamente.
 
 ## Verificación
 
