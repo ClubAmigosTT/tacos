@@ -54,7 +54,7 @@ export default function MapScreen() {
     if (moved) { setPendingMapCenter(next); setMapMoved(true); }
     else { setPendingMapCenter(undefined); setMapMoved(false); }
   };
-  const { data = places } = useQuery({ queryKey: ['discover', 'map', searchQuery, searchCoordinates?.latitude, searchCoordinates?.longitude], queryFn: () => discover({ q: searchQuery, lat: searchCoordinates?.latitude, lng: searchCoordinates?.longitude }), placeholderData: places });
+  const { data = places } = useQuery({ queryKey: ['discover', 'map', searchQuery, searchCoordinates?.latitude, searchCoordinates?.longitude, token], queryFn: () => discover({ q: searchQuery, lat: searchCoordinates?.latitude, lng: searchCoordinates?.longitude }, token), placeholderData: places });
   const requestedTaco = useMemo(() => {
     const normalized = searchQuery.trim().toLowerCase();
     if (normalized.length < 3) return undefined;

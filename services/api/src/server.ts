@@ -120,7 +120,8 @@ app.patch('/v1/me/privacy', async (request, reply) => {
 
 app.get('/v1/discover', async (request) => {
   const query = z.object({ q: z.string().optional(), lat: z.coerce.number().optional(), lng: z.coerce.number().optional(), limit: z.coerce.number().int().min(1).max(50).default(20) }).parse(request.query);
-  return { places: await discoverPlaces(query), context: { query: query.q ?? null, generatedAt: new Date().toISOString() } };
+  const user = await resolveUser(request);
+  return { places: await discoverPlaces(query, user?.id), context: { query: query.q ?? null, personalized: Boolean(user), generatedAt: new Date().toISOString() } };
 });
 
 app.get('/v1/recommendations', async (request) => {

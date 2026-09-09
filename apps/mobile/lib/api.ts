@@ -102,7 +102,7 @@ export async function adminAnalytics(token: string, days = 14) {
   return request<{ analytics: AdminAnalytics }>(`/v1/admin/analytics?days=${days}`, undefined, token);
 }
 
-export async function discover(options: { q?: string; lat?: number; lng?: number; limit?: number } = {}): Promise<Place[]> {
+export async function discover(options: { q?: string; lat?: number; lng?: number; limit?: number } = {}, token?: string): Promise<Place[]> {
   try {
     const params = new URLSearchParams();
     if (options.q?.trim()) params.set('q', options.q.trim());
@@ -110,7 +110,7 @@ export async function discover(options: { q?: string; lat?: number; lng?: number
     if (options.lng != null) params.set('lng', String(options.lng));
     if (options.limit != null) params.set('limit', String(options.limit));
     const query = params.toString();
-    const result = await request<{ places: Place[] }>(`/v1/discover${query ? `?${query}` : ''}`);
+    const result = await request<{ places: Place[] }>(`/v1/discover${query ? `?${query}` : ''}`, undefined, token);
     return result.places;
   } catch {
     const normalized = options.q?.trim() ? normalizeSearchText(options.q.trim()) : undefined;

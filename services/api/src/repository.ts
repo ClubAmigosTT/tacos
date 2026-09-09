@@ -287,31 +287,30 @@ function localReputation(place: ApiPlace): ApiPlace {
   return { ...place, rating: Number(localRobustScore(reviews, 10, place.rating).toFixed(2)), tacos, ...(reviews.length ? { reviewCount: reviews.length } : {}) };
 }
 
-export async function discoverPlaces(query: DiscoverQuery): Promise<ApiPlace[]> {
+export async function discoverPlaces(query: DiscoverQuery, userId?: string): Promise<ApiPlace[]> {
+  let discovered: ApiPlace[];
   if (!pool) {
     const normalized = query.q?.trim() ? normalizeSearchText(query.q.trim()) : undefined;
     const filtered = normalized ? places.filter((place) => normalizeSearchText(`${place.name} ${place.neighborhood} ${place.style} ${place.tags.join(' ')} ${place.tacos.map((taco) => taco.name).join(' ')}`).includes(normalized)) : places;
     const scored = filtered.map(localReputation);
-    if (query.lat == null || query.lng == null) return scored.slice(0, query.limit);
-    return scored
+    discovered = query.lat == null || query.lng == null ? scored.slice(0, query.limit) : scored
       .map((place) => ({ ...place, distance: `${haversineKm({ latitude: query.lat!, longitude: query.lng! }, place.coordinates).toFixed(1)} km` }))
       .sort((a, b) => Number.parseFloat(a.distance) - Number.parseFloat(b.distance))
       .slice(0, query.limit);
-  }
-
-  const values: unknown[] = [];
-  const predicates: string[] = ['b.is_active = true'];
-  if (query.q) {
-    values.push(`%${query.q.trim()}%`);
-    predicates.push(`(unaccent(b.name) ILIKE unaccent($${values.length}) OR unaccent(b.neighborhood) ILIKE unaccent($${values.length}) OR unaccent(b.search_text) ILIKE unaccent($${values.length}) OR EXISTS (SELECT 1 FROM menu_items search_menu WHERE search_menu.branch_id = b.id AND search_menu.is_active = true AND unaccent(search_menu.name) ILIKE unaccent($${values.length})))`);
-  }
-  const distanceSelect = query.lat != null && query.lng != null
-    ? `ST_Distance(b.location, ST_SetSRID(ST_MakePoint($${values.length + 1}, $${values.length + 2}), 4326)::geography) / 1000 AS distance_km`
-    : 'NULL::numeric AS distance_km';
-  if (query.lat != null && query.lng != null) values.push(query.lng, query.lat);
-  values.push(query.limit);
-  const orderBy = query.lat != null && query.lng != null ? 'distance_km ASC NULLS LAST, rating DESC' : 'rating DESC';
-  const result = await pool.query(`
+  } else {
+    const values: unknown[] = [];
+    const predicates: string[] = ['b.is_active = true'];
+    if (query.q) {
+      values.push(`%${query.q.trim()}%`);
+      predicates.push(`(unaccent(b.name) ILIKE unaccent($${values.length}) OR unaccent(b.neighborhood) ILIKE unaccent($${values.length}) OR unaccent(b.search_text) ILIKE unaccent($${values.length}) OR EXISTS (SELECT 1 FROM menu_items search_menu WHERE search_menu.branch_id = b.id AND search_menu.is_active = true AND unaccent(search_menu.name) ILIKE unaccent($${values.length})))`);
+    }
+    const distanceSelect = query.lat != null && query.lng != null
+      ? `ST_Distance(b.location, ST_SetSRID(ST_MakePoint($${values.length + 1}, $${values.length + 2}), 4326)::geography) / 1000 AS distance_km`
+      : 'NULL::numeric AS distance_km';
+    if (query.lat != null && query.lng != null) values.push(query.lng, query.lat);
+    values.push(query.limit);
+    const orderBy = query.lat != null && query.lng != null ? 'distance_km ASC NULLS LAST, rating DESC' : 'rating DESC';
+    const result = await pool.query(`
       SELECT b.id, b.taqueria_id, t.name AS taqueria_name, b.name, b.neighborhood, b.open_until,
       ${reputationSelect}
       b.match_score, b.style,
@@ -326,8 +325,19 @@ export async function discoverPlaces(query: DiscoverQuery): Promise<ApiPlace[]> 
       LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
     WHERE ${predicates.join(' AND ')}
     GROUP BY b.id, t.name, reviews.review_count, reviews.score ORDER BY ${orderBy} LIMIT $${values.length}
-  `, values);
-  return result.rows.map(normalizePlace);
+    `, values);
+    discovered = result.rows.map(normalizePlace);
+  }
+  if (!userId || !discovered.length) return discovered;
+  // Keep discovery's geographic/textual result set intact while replacing
+  // only the affinity fields with the same recommendation model used by the
+  // home screen. No social or private profile data is returned here.
+  const personalized = await getRecommendations(userId);
+  const scores = new Map(personalized.map((place) => [place.id, place]));
+  return discovered.map((place) => {
+    const match = scores.get(place.id);
+    return match ? { ...place, match: match.match, tasteMatch: match.tasteMatch, socialMatch: match.socialMatch, friendCount: match.friendCount } : place;
+  });
 }
 
 function tokenise(value: string) {

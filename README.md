@@ -162,6 +162,7 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 127. Acceso inclusivo: autenticación, perfil, pestañas y navegación secundaria anuncian sus acciones y cambios de estado sin depender de iconos o color.
 128. Radar contextual completo: distancia, precio, antojo y nivel de hambre modifican filtros y orden; “Para mí” sólo recomienda dentro del conjunto resultante.
 129. Motor Radar modular: las reglas viven en `apps/mobile/lib/radar.ts`, de modo que mapa, listas y futuras superficies puedan compartir el mismo filtrado contextual.
+130. Mapa personalizado: `/v1/discover` acepta la sesión y devuelve `match`, `tasteMatch` y señales sociales del mismo motor de recomendaciones sin cambiar el conjunto geográfico ni filtrar datos privados.
 
 ## Verificación
 

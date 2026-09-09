@@ -161,6 +161,7 @@ Este documento convierte la visión de producto en una secuencia ejecutable para
 23. Mantener la analítica del panel admin desacoplada de la cola de moderación, con estado de error y reintento propio.
 24. Conectar las variables visuales del Radar (distancia, precio, antojo y hambre) al conjunto y al orden de recomendaciones.
 25. Mantener el motor de filtros y ranking del Radar fuera de las rutas visuales para reutilizarlo y probarlo de forma aislada.
+26. Propagar la sesión a Descubrimiento para que “Para mí” use afinidad real y conserve contexto geográfico, con regresión en el smoke autenticado.
 
 **Aceptación:** un reporte aparece en `/v1/admin/reports`, un admin puede ocultarlo, el feed deja de mostrarlo, el perfil público no lo cuenta y `pnpm smoke:admin` confirma que no contamina recomendaciones.
 
