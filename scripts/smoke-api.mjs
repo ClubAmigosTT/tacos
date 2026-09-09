@@ -109,6 +109,8 @@ const hiddenBranchReviews = await request('/v1/branches/vilsito/reviews');
 if (hiddenBranchReviews.reviews?.some((review) => review.id === visit.id)) throw new Error('Private activity still appeared in branch reviews');
 const hiddenProfile = await request(`/v1/users/${bob.user.id}/profile`, { token: alice.token });
 if (hiddenProfile.stats?.visits !== 0 || hiddenProfile.stats?.averageRating !== null) throw new Error('Private activity still appeared in the public profile aggregates');
+const ownerProfileWhilePrivate = await request(`/v1/users/${bob.user.id}/profile`, { token: bob.token });
+if (ownerProfileWhilePrivate.stats?.visits !== 1 || ownerProfileWhilePrivate.stats?.averageRating !== 5) throw new Error('Owner lost access to their own private profile aggregates');
 const hiddenRecommendations = await request('/v1/recommendations', { token: alice.token });
 if (hiddenRecommendations.places?.some((place) => typeof place.socialMatch === 'number')) throw new Error('Private activity still influenced social recommendations');
 await request('/v1/me/privacy', { method: 'PATCH', body: JSON.stringify({ shareActivity: true }), token: bob.token });
