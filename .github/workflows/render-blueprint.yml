@@ -1,18 +1,8 @@
 name: Validate Render Blueprint
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - render.yaml
-      - render.free-demo.yaml
-      - .github/workflows/render-blueprint.yml
-  push:
-    branches: [main]
-    paths:
-      - render.yaml
-      - render.free-demo.yaml
-      - .github/workflows/render-blueprint.yml
+  # Optional mobile publication is intentionally local + EAS. Keep this remote
+  # Blueprint check available only as an optional diagnostic to avoid blocked runs.
   workflow_dispatch:
 
 permissions:

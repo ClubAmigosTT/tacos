@@ -307,21 +307,20 @@ R2 para cargas reales y el certificado Apple de distribución.
   provocar un primer request lento. Neon sustituye al PostgreSQL temporal de
   Render, por lo que los datos de producción no expiran a los 30 días.
 
-### 5.2 Entrega continua móvil
+### 5.2 Release móvil iniciado localmente
 
-Cada cambio entra por una rama y un pull request. `Tacos CI` se ejecuta en
-Ubuntu para validar tipos, API, PostgreSQL/PostGIS, seguridad y exportación web.
-Después de integrar en `main`, `Mobile Release` sólo actúa si el commit aprobado
-modificó la app móvil o sus dependencias. La compilación y la firma ocurren en
-EAS; iOS puede enviarse después a TestFlight sin almacenar certificados dentro
-del repositorio.
+La publicación móvil no depende de GitHub Actions ni de una Mac propiedad del
+equipo. Desde Windows, `pnpm release:ios` ejecuta typecheck, los guards de Expo,
+una exportación real y después entrega el código a EAS. EAS usa infraestructura
+macOS temporal, firma el IPA y lo envía a App Store Connect/TestFlight. El
+proceso continúa en la nube aunque esta computadora se apague después de subir
+el proyecto.
 
-El entorno protegido `production` de GitHub debe contener `EXPO_TOKEN`. La
-variable de repositorio `MOBILE_RELEASE_ENABLED=true` activa los releases
-automáticos y `IOS_AUTO_SUBMIT=true` habilita TestFlight cuando las credenciales
-de Apple y el registro de App Store Connect estén listos. El workflow también
-puede ejecutarse manualmente para una sola plataforma sin activar releases en
-cada merge.
+`pnpm release:ios:build` genera el IPA sin enviarlo a TestFlight y
+`pnpm release:android` genera el Android App Bundle. La primera ejecución iOS
+es interactiva porque Apple exige vincular la cuenta Developer, crear el
+certificado de distribución y seleccionar o crear el registro de la app. Las
+ejecuciones siguientes reutilizan esas credenciales protegidas en EAS.
 
 ## 6. Evolución después del MVP
 
