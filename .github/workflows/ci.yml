@@ -1,9 +1,10 @@
 name: Tacos CI
 
 on:
-  # Keep the verification suite available without consuming the private
-  # repository's free Actions allowance on every push. Re-enable push/PR
-  # triggers when the monthly allowance resets if desired.
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -16,6 +17,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tacos
       NODE_ENV: test
