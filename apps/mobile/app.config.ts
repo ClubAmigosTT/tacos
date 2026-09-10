@@ -31,7 +31,7 @@ const config: ExpoConfig = {
     // The first release is intentionally iPhone-first. Enabling iPad here
     // would advertise a layout that has not yet completed tablet QA.
     supportsTablet: false,
-    bundleIdentifier: 'com.tacos.app',
+    bundleIdentifier: 'com.clubamigostt.tacos',
     config: {
       usesNonExemptEncryption: false
     },
