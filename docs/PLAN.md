@@ -307,6 +307,22 @@ R2 para cargas reales y el certificado Apple de distribución.
   provocar un primer request lento. Neon sustituye al PostgreSQL temporal de
   Render, por lo que los datos de producción no expiran a los 30 días.
 
+### 5.2 Entrega continua móvil
+
+Cada cambio entra por una rama y un pull request. `Tacos CI` se ejecuta en
+Ubuntu para validar tipos, API, PostgreSQL/PostGIS, seguridad y exportación web.
+Después de integrar en `main`, `Mobile Release` sólo actúa si el commit aprobado
+modificó la app móvil o sus dependencias. La compilación y la firma ocurren en
+EAS; iOS puede enviarse después a TestFlight sin almacenar certificados dentro
+del repositorio.
+
+El entorno protegido `production` de GitHub debe contener `EXPO_TOKEN`. La
+variable de repositorio `MOBILE_RELEASE_ENABLED=true` activa los releases
+automáticos y `IOS_AUTO_SUBMIT=true` habilita TestFlight cuando las credenciales
+de Apple y el registro de App Store Connect estén listos. El workflow también
+puede ejecutarse manualmente para una sola plataforma sin activar releases en
+cada merge.
+
 ## 6. Evolución después del MVP
 
 - Medir latencia y volumen antes de separar recomendaciones, búsqueda o media en microservicios.

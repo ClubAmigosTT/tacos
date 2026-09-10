@@ -1,8 +1,18 @@
 name: Validate Render Blueprint
 
 on:
-  # Manual while this private repository is using the account's included
-  # GitHub Actions minutes. Local smoke tests remain the deployment gate.
+  pull_request:
+    branches: [main]
+    paths:
+      - render.yaml
+      - render.free-demo.yaml
+      - .github/workflows/render-blueprint.yml
+  push:
+    branches: [main]
+    paths:
+      - render.yaml
+      - render.free-demo.yaml
+      - .github/workflows/render-blueprint.yml
   workflow_dispatch:
 
 permissions:
