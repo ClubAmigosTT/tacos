@@ -21,6 +21,12 @@ const config: ExpoConfig = {
   orientation: 'portrait',
   scheme: 'tacos',
   userInterfaceStyle: 'automatic',
+  updates: {
+    url: 'https://u.expo.dev/155a5800-f93e-4680-9cc4-02450eb830b6'
+  },
+  runtimeVersion: {
+    policy: 'appVersion'
+  },
   ios: {
     // The first release is intentionally iPhone-first. Enabling iPad here
     // would advertise a layout that has not yet completed tablet QA.
