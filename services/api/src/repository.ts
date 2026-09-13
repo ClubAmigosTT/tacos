@@ -497,7 +497,11 @@ export async function discoverPlaces(query: DiscoverQuery, userId?: string): Pro
       values.push(offset);
       return ` OFFSET $${offsetParam}`;
     })();
-    const orderBy = query.lat != null && query.lng != null ? 'distance_km ASC NULLS LAST, rating DESC' : 'rating DESC';
+    // Keep offset pagination stable when catalog rows share the same rating.
+    // Without a deterministic tie-breaker, PostgreSQL may repeat or skip rows
+    // between pages, which is especially visible in a new catalog with no
+    // user reviews yet.
+    const orderBy = query.lat != null && query.lng != null ? 'distance_km ASC NULLS LAST, rating DESC, b.id ASC' : 'rating DESC, b.id ASC';
     const result = await pool.query(`
       SELECT b.id, b.taqueria_id, t.name AS taqueria_name, b.name, b.neighborhood, b.address, b.phone, b.weekly_hours, b.price_min, b.price_max, b.source_name, b.source_url, b.source_license, b.source_attribution, b.source_updated_at, b.image_license, b.image_attribution, b.open_until,
       ${reputationSelect}
