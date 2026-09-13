@@ -38,6 +38,7 @@ export default function AuthScreen() {
       } else await signIn({ email: normalizedEmail, password });
       if (returnTo === '/register') router.replace({ pathname: '/register', params: placeId ? { placeId } : undefined });
       else if (returnTo === '/catalog-proposal') router.replace({ pathname: '/catalog-proposal', params: { ...(branchId ? { branchId } : {}), ...(kind ? { kind } : {}) } });
+      else if (returnTo === '/photo-upload') router.replace({ pathname: '/photo-upload', params: { ...(branchId ? { branchId } : {}), ...(placeName ? { placeName } : {}) } });
       else if (returnTo === '/lists') router.replace({ pathname: '/lists', params: placeId ? { placeId } : undefined });
       else if (returnTo === '/comments') router.replace({ pathname: '/comments', params: { visitId, placeName } });
       else if (returnTo?.startsWith('/place/')) router.replace(returnTo as never);

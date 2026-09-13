@@ -33,6 +33,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="register" options={{ presentation: 'modal', gestureEnabled: true }} />
             <Stack.Screen name="auth" options={{ presentation: 'modal', gestureEnabled: true }} />
+            <Stack.Screen name="photo-upload" options={{ presentation: 'modal', gestureEnabled: true }} />
             <Stack.Screen name="place/[id]" />
           </Stack>
         </AuthProvider>

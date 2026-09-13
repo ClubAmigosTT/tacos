@@ -52,6 +52,10 @@ services:
           name: tacos-api
           type: web
           envVarKey: RENDER_EXTERNAL_URL
+      # Server-only Google Places key for the temporary on-demand photo
+      # fallback. It is never bundled into the mobile application.
+      - key: GOOGLE_PLACES_API_KEY
+        sync: false
       - key: APP_WEB_URL
         fromService:
           name: tacos-web

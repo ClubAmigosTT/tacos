@@ -1,9 +1,10 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListCollaborator, addListItemForUser, authenticateUser, closeRepository, consumeAuthRateLimit, createCatalogProposal, createEmailVerificationToken, createListForUser, createPasswordResetToken, createSession, createVisitComment, createVisitForUser, deleteUserAccount, deleteVisitComment, deleteVisitForUser, discoverPlaces, exportUserData, findPlace, findUnverifiedUserByEmail, findUserById, followUser, getAdminAnalytics, getAdminComments, getAdminReports, getBranchReviews, getCatalogProposals, getDiary, getFeed, getHealth, getListDetails, getLists, getPassport, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, getVisitComments, isSessionActive, listSessions, recordProductEvent, registerUser, removeListCollaborator, removeListItemForUser, reportVisitForUser, resetPassword, revokeAllSessions, revokeSession, reviewAdminComment, reviewAdminReport, reviewCatalogProposal, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateUserProfileForUser, updateVisitForUser, verifyEmailToken, type PublicUser } from './repository.js';
+import { addListCollaborator, addListItemForUser, authenticateUser, closeRepository, consumeAuthRateLimit, createBranchPhotoForUser, createCatalogProposal, createEmailVerificationToken, createListForUser, createPasswordResetToken, createSession, createVisitComment, createVisitForUser, deleteBranchPhotoForUser, deleteUserAccount, deleteVisitComment, deleteVisitForUser, discoverPlaces, exportUserData, findPlace, findUnverifiedUserByEmail, findUserById, followUser, getAdminAnalytics, getAdminBranchPhotos, getAdminComments, getAdminReports, getBranchReviews, getCatalogProposals, getDiary, getFeed, getHealth, getListDetails, getLists, getPassport, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, getVisitComments, isSessionActive, listSessions, recordProductEvent, registerUser, removeListCollaborator, removeListItemForUser, reportVisitForUser, resetPassword, revokeAllSessions, revokeSession, reviewAdminComment, reviewAdminReport, reviewBranchPhoto, reviewCatalogProposal, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateUserProfileForUser, updateVisitForUser, verifyEmailToken, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
-import { uploadVisitImage } from './storage.js';
+import { getGooglePlacePhotos } from './google-places.js';
+import { uploadBranchPhotoImage, uploadVisitImage } from './storage.js';
 import { passwordResetUrl, sendTransactionalEmail, verificationUrl } from './email.js';
 
 const app = Fastify({ logger: true, bodyLimit: 12 * 1024 * 1024, trustProxy: true });
@@ -316,6 +317,55 @@ app.get('/v1/branches/:id', async (request, reply) => {
   return place;
 });
 
+app.get('/v1/branches/:id/google-photos', async (request, reply) => {
+  const params = z.object({ id: z.string() }).parse(request.params);
+  const place = await findPlace(params.id);
+  if (!place) return reply.code(404).send({ error: 'BRANCH_NOT_FOUND' });
+  // Google photo references and URLs are runtime content. Do not let a proxy,
+  // browser, or CDN turn this temporary fallback into a permanent catalog.
+  reply.header('Cache-Control', 'no-store');
+  return getGooglePlacePhotos({ name: place.name, address: place.address, coordinates: place.coordinates });
+});
+
+app.post('/v1/branches/:id/photos', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const params = z.object({ id: z.string() }).parse(request.params);
+  const body = z.object({
+    // An 8 MB binary image expands by roughly 4/3 when sent as base64.
+    // Keep the JSON request below Fastify's 12 MiB body limit.
+    base64: z.string().min(1).max(12_000_000),
+    contentType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+    sourceType: z.enum(['community', 'owner']).default('community'),
+    consentGranted: z.literal(true)
+  }).parse(request.body);
+  try {
+    const uploaded = await uploadBranchPhotoImage({ userId: user.id, base64: body.base64, contentType: body.contentType });
+    const photo = await createBranchPhotoForUser({ branchId: params.id, url: uploaded.url, sourceType: body.sourceType, consentGranted: true }, user.id, user.displayName);
+    if (photo === 'not_found') return reply.code(404).send({ error: 'BRANCH_NOT_FOUND' });
+    if (photo === 'branch_limit') return reply.code(409).send({ error: 'PHOTO_LIMIT_REACHED' });
+    if (photo === 'rate_limited') {
+      reply.header('Retry-After', '86400');
+      return reply.code(429).send({ error: 'PHOTO_RATE_LIMIT' });
+    }
+    return reply.code(201).send(photo);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'STORAGE_NOT_CONFIGURED') return reply.code(503).send({ error: 'PHOTO_STORAGE_UNAVAILABLE' });
+    if (error instanceof Error && error.message === 'IMAGE_TOO_LARGE') return reply.code(413).send({ error: 'IMAGE_TOO_LARGE' });
+    if (error instanceof Error && error.message === 'INVALID_IMAGE') return reply.code(400).send({ error: 'INVALID_IMAGE' });
+    throw error;
+  }
+});
+
+app.delete('/v1/branches/:branchId/photos/:photoId', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const params = z.object({ branchId: z.string(), photoId: z.string().uuid() }).parse(request.params);
+  const removed = await deleteBranchPhotoForUser(params.photoId, params.branchId, user.id, user.role === 'admin');
+  if (!removed) return reply.code(404).send({ error: 'PHOTO_NOT_FOUND' });
+  return { status: 'removed', photoId: params.photoId };
+});
+
 app.get('/v1/branches/:id/reviews', async (request, reply) => {
   const params = z.object({ id: z.string() }).parse(request.params);
   const reviews = await getBranchReviews(params.id);
@@ -575,6 +625,23 @@ app.get('/v1/admin/analytics', async (request, reply) => {
   if (!user) return;
   const query = z.object({ days: z.coerce.number().int().min(1).max(90).default(14) }).parse(request.query);
   return { analytics: await getAdminAnalytics(query.days) };
+});
+
+app.get('/v1/admin/photos', async (request, reply) => {
+  const user = await requireAdmin(request, reply);
+  if (!user) return;
+  const query = z.object({ status: z.enum(['pending', 'approved', 'rejected', 'removed', 'all']).default('pending') }).parse(request.query);
+  return { photos: await getAdminBranchPhotos(query.status) };
+});
+
+app.patch('/v1/admin/photos/:id', async (request, reply) => {
+  const user = await requireAdmin(request, reply);
+  if (!user) return;
+  const params = z.object({ id: z.string().uuid() }).parse(request.params);
+  const body = z.object({ action: z.enum(['approve', 'reject']), moderationNote: z.string().trim().max(500).optional() }).parse(request.body);
+  const updated = await reviewBranchPhoto(params.id, body.action, user.id, body.moderationNote ?? '');
+  if (!updated) return reply.code(404).send({ error: 'PHOTO_NOT_FOUND_OR_ALREADY_REVIEWED' });
+  return { status: body.action === 'approve' ? 'approved' : 'rejected', photoId: params.id };
 });
 
 app.get('/v1/admin/reports', async (request, reply) => {

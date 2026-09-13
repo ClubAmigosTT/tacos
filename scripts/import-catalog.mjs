@@ -165,8 +165,11 @@ try {
       `, [id, taqueriaId, name, neighborhood, address, text(row?.phone) || null, longitude, latitude, openUntil, JSON.stringify(normalizedHours), priceMin ?? null, priceMax ?? null, text(row?.style, 'Clásico callejero'), imageUrl, primary?.license || null, primary?.attribution || null, primary?.sourceUrl || null, text(row?.description), tags, `${name} ${neighborhood} ${text(row?.style)} ${tags.join(' ')} ${Array.isArray(row?.tacos) ? row.tacos.map((taco) => text(taco?.name)).join(' ') : ''}`, rating, matchScore ?? null, sourceName, sourcePlaceId, sourceUrl, sourceLicense, sourceAttribution, sourceUpdatedAt, key, catalogStatus, catalogQuality, catalogQuality === 'verified' ? new Date() : null]);
       importedBranchIds.add(id);
 
-      await client.query('DELETE FROM branch_photos WHERE branch_id = $1', [id]);
-      for (const photo of photos) await client.query('INSERT INTO branch_photos (id, branch_id, url, source_url, license, attribution, is_primary) VALUES ($1, $2, $3, $4, $5, $6, $7)', [randomUUID(), id, photo.url, photo.sourceUrl || null, photo.license, photo.attribution, photo === primary]);
+      // Keep user/business contributions across the biweekly catalog refresh.
+      // Legacy rows predate source_type and are treated as catalog rows by the
+      // migration's default, so only catalog-owned photos are replaced here.
+      await client.query("DELETE FROM branch_photos WHERE branch_id = $1 AND source_type = 'catalog'", [id]);
+      for (const photo of photos) await client.query('INSERT INTO branch_photos (id, branch_id, url, source_url, license, attribution, is_primary, source_type, status) VALUES ($1, $2, $3, $4, $5, $6, $7, \'catalog\', \'approved\')', [randomUUID(), id, photo.url, photo.sourceUrl || null, photo.license, photo.attribution, photo === primary]);
 
       if (Array.isArray(row?.tacos) && (!allowPartial || row.tacos.length > 0)) {
         const activeTacoIds = [];

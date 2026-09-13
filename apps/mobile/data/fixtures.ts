@@ -6,7 +6,14 @@ export type Taco = {
   note: string;
 };
 
-export type Photo = { url: string; sourceUrl?: string; license: string; attribution: string };
+export type Photo = {
+  url: string;
+  sourceUrl?: string;
+  license: string;
+  attribution: string;
+  source?: 'catalog' | 'community' | 'owner' | 'google_maps';
+  googleMapsUri?: string;
+};
 
 export type RatingCategory = 'tortilla' | 'service' | 'price' | 'meat' | 'salsas';
 export type CategoryRatings = Partial<Record<RatingCategory, number | null>>;

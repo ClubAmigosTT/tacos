@@ -11,6 +11,8 @@ export type ApiListDetail = ApiList & { collaborators?: ApiListCollaborator[]; i
 export type ApiTaqueria = { id: string; name: string; slug: string; description: string; branchCount: number; branches: Place[] };
 export type FeedItem = { id: string; visited_at: string; rating: number; note?: string; user_id: string; display_name: string; place_id: string; place_name: string; neighborhood: string; image_url: string; tacos: string; comment_count?: number };
 export type BranchReview = { id: string; visitedAt: string; rating: number; categoryRatings: CategoryRatings; note: string; photoUrl?: string | null; tacos: string; user: { id: string; displayName: string } };
+export type RuntimeGooglePhoto = { url: string; source: 'google_maps'; sourceUrl: string; googleMapsUri: string; attribution: string };
+export type AdminBranchPhoto = { id: string; branchId: string; url: string; sourceUrl?: string; license: string; attribution: string; sourceType: 'catalog' | 'community' | 'owner'; status: 'pending' | 'approved' | 'rejected' | 'removed'; isPrimary: boolean; moderationNote: string; createdAt: string; updatedAt: string; uploader?: { id: string; displayName: string }; place: { id: string; name: string; neighborhood: string } };
 export type VisitComment = { id: string; body: string; createdAt: string; author: { id: string; displayName: string }; own: boolean };
 export type TasteProfile = { title: string; description: string; tags: string[]; profile: { intensity: number; spicy: number; traditional: number; texture: number; value: number }; hasData?: boolean };
 export type PassportZone = { name: string; note: string; branchCount: number; visitCount: number; unlocked: boolean };
@@ -97,6 +99,14 @@ export async function adminAnalytics(token: string, days = 14) {
   return request<{ analytics: AdminAnalytics }>(`/v1/admin/analytics?days=${days}`, undefined, token);
 }
 
+export async function adminBranchPhotos(token: string, status: AdminBranchPhoto['status'] | 'all' = 'pending') {
+  return request<{ photos: AdminBranchPhoto[] }>(`/v1/admin/photos?status=${status}`, undefined, token);
+}
+
+export async function reviewBranchPhoto(photoId: string, action: 'approve' | 'reject', token: string, moderationNote = '') {
+  return request<{ status: string; photoId: string }>(`/v1/admin/photos/${encodeURIComponent(photoId)}`, { method: 'PATCH', body: JSON.stringify({ action, moderationNote }) }, token);
+}
+
 export async function discover(options: { q?: string; lat?: number; lng?: number; radiusKm?: number; offset?: number; openNow?: boolean; limit?: number } = {}, token?: string): Promise<Place[]> {
   try {
     const params = new URLSearchParams();
@@ -155,6 +165,18 @@ export async function getPlace(id: string, token?: string): Promise<Place> {
 
 export async function branchReviews(branchId: string) {
   return request<{ reviews: BranchReview[] }>(`/v1/branches/${encodeURIComponent(branchId)}/reviews`);
+}
+
+export async function googleBranchPhotos(branchId: string) {
+  return request<{ configured: boolean; photos: RuntimeGooglePhoto[] }>(`/v1/branches/${encodeURIComponent(branchId)}/google-photos`);
+}
+
+export async function submitBranchPhoto(branchId: string, input: { base64: string; contentType: 'image/jpeg' | 'image/png' | 'image/webp'; sourceType: 'community' | 'owner'; consentGranted: true }, token: string) {
+  return request<AdminBranchPhoto>(`/v1/branches/${encodeURIComponent(branchId)}/photos`, { method: 'POST', body: JSON.stringify(input) }, token);
+}
+
+export async function deleteBranchPhoto(branchId: string, photoId: string, token: string) {
+  return request<{ status: string; photoId: string }>(`/v1/branches/${encodeURIComponent(branchId)}/photos/${encodeURIComponent(photoId)}`, { method: 'DELETE' }, token);
 }
 
 export async function savedPlaces(token: string) {

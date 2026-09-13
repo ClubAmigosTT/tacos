@@ -24,6 +24,24 @@ type VisitInput = { placeId: string; tacoIds: string[]; rating: number; tacoRati
 type ReportInput = { visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details?: string };
 export type PublicUser = { id: string; email: string; displayName: string; role: 'user' | 'admin'; following?: boolean; emailVerified?: boolean };
 export type AdminReport = { id: string; visitId: string; reason: ReportInput['reason']; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string; reporter: { id: string; displayName: string }; author: { id: string; displayName: string }; place: { id: string; name: string }; rating: number; visitedAt: string };
+export type BranchPhotoStatus = 'pending' | 'approved' | 'rejected' | 'removed';
+export type BranchPhotoSourceType = 'catalog' | 'community' | 'owner';
+export type AdminBranchPhoto = {
+  id: string;
+  branchId: string;
+  url: string;
+  sourceUrl?: string;
+  license: string;
+  attribution: string;
+  sourceType: BranchPhotoSourceType;
+  status: BranchPhotoStatus;
+  isPrimary: boolean;
+  moderationNote: string;
+  createdAt: string;
+  updatedAt: string;
+  uploader?: { id: string; displayName: string };
+  place: { id: string; name: string; neighborhood: string };
+};
 
 type LocalUser = PublicUser & { passwordHash: string; shareActivity: boolean; emailVerifiedAt?: string };
 const localUsers = new Map<string, LocalUser>();
@@ -40,6 +58,22 @@ const localComments = new Map<string, { id: string; visitId: string; authorId: s
 const localListCollaborators = new Map<string, { listId: string; userId: string; role: 'editor' | 'viewer'; createdAt: string }>();
 const localProductEvents: Array<{ eventName: string; userId?: string; anonymousId?: string; properties: Record<string, string | number | boolean | null>; createdAt: string }> = [];
 const localCatalogProposals = new Map<string, { id: string; proposerId: string; kind: CatalogProposalKind; branchId?: string; payload: Record<string, unknown>; evidenceUrl?: string; status: CatalogProposalStatus; reviewNote: string; reviewedBy?: string; createdAt: string; updatedAt: string }>();
+const localBranchPhotos = new Map<string, {
+  id: string;
+  branchId: string;
+  url: string;
+  sourceUrl?: string;
+  license: string;
+  attribution: string;
+  sourceType: 'catalog' | 'community' | 'owner';
+  status: 'pending' | 'approved' | 'rejected' | 'removed';
+  uploadedBy?: string;
+  uploaderName?: string;
+  isPrimary: boolean;
+  moderationNote: string;
+  createdAt: string;
+  updatedAt: string;
+}>();
 
 export type CatalogProposalKind = 'branch' | 'menu_item' | 'correction';
 export type CatalogProposalStatus = 'pending' | 'approved' | 'rejected';
@@ -335,15 +369,223 @@ function normalizePlace(row: any): ApiPlace {
   };
 }
 
-async function getBranchPhotos(branchId: string): Promise<ApiPhoto[] | undefined> {
-  if (!pool) return undefined;
-  const result = await pool.query(`
-    SELECT url, source_url, license, attribution
-    FROM branch_photos
-    WHERE branch_id = $1
-    ORDER BY is_primary DESC, created_at ASC
-  `, [branchId]);
-  return result.rows.map((row) => ({ url: row.url, sourceUrl: row.source_url ?? undefined, license: row.license, attribution: row.attribution }));
+const effectiveBranchImageSql = `COALESCE(NULLIF(b.image_url, ''), (
+  SELECT bp.url
+  FROM branch_photos bp
+  WHERE bp.branch_id = b.id AND bp.status = 'approved'
+  ORDER BY bp.is_primary DESC, bp.created_at ASC
+  LIMIT 1
+))`;
+
+async function getBranchPhotos(branchId: string): Promise<ApiPhoto[]> {
+  if (pool) {
+    const result = await pool.query(`
+      SELECT url, source_url, license, attribution, source_type
+      FROM branch_photos
+      WHERE branch_id = $1 AND status = 'approved'
+      ORDER BY is_primary DESC, created_at ASC
+    `, [branchId]);
+    return result.rows.map((row) => ({
+      url: row.url,
+      sourceUrl: row.source_url ?? undefined,
+      license: row.license,
+      attribution: row.attribution,
+      source: row.source_type === 'owner' ? 'owner' : row.source_type === 'community' ? 'community' : 'catalog'
+    }));
+  }
+  return [...localBranchPhotos.values()]
+    .filter((photo) => photo.branchId === branchId && photo.status === 'approved')
+    .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.createdAt.localeCompare(b.createdAt))
+    .map((photo) => ({ url: photo.url, sourceUrl: photo.sourceUrl, license: photo.license, attribution: photo.attribution, source: photo.sourceType }));
+}
+
+function branchPhotoDate(value: unknown) {
+  return value && typeof (value as { toISOString?: unknown }).toISOString === 'function'
+    ? (value as { toISOString: () => string }).toISOString()
+    : String(value ?? '');
+}
+
+function adminBranchPhotoFromRow(row: any): AdminBranchPhoto {
+  return {
+    id: row.id,
+    branchId: row.branch_id,
+    url: row.url,
+    sourceUrl: row.source_url ?? undefined,
+    license: row.license,
+    attribution: row.attribution,
+    sourceType: row.source_type,
+    status: row.status,
+    isPrimary: Boolean(row.is_primary),
+    moderationNote: row.moderation_note ?? '',
+    createdAt: branchPhotoDate(row.created_at),
+    updatedAt: branchPhotoDate(row.updated_at),
+    uploader: row.uploader_id ? { id: row.uploader_id, displayName: row.uploader_name ?? 'Cuenta eliminada' } : undefined,
+    place: { id: row.place_id, name: row.place_name, neighborhood: row.neighborhood }
+  };
+}
+
+export async function createBranchPhotoForUser(input: {
+  branchId: string;
+  url: string;
+  sourceType: 'community' | 'owner';
+  consentGranted: true;
+}, userId: string, displayName: string): Promise<'not_found' | 'branch_limit' | 'rate_limited' | AdminBranchPhoto> {
+  const attribution = input.sourceType === 'owner'
+    ? `Foto enviada por el negocio · ${displayName}`
+    : `Foto subida por ${displayName}`;
+  const license = 'Autorización del remitente';
+
+  if (pool) {
+    const branch = await pool.query(`
+      SELECT id FROM branches
+      WHERE id = $1 AND is_active = true AND catalog_status = 'active'
+        ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"}
+    `, [input.branchId]);
+    if (!branch.rowCount) return 'not_found';
+    const [branchCount, userCount] = await Promise.all([
+      pool.query("SELECT COUNT(*)::int AS count FROM branch_photos WHERE branch_id = $1 AND status IN ('pending', 'approved')", [input.branchId]),
+      pool.query("SELECT COUNT(*)::int AS count FROM branch_photos WHERE uploaded_by = $1 AND created_at > now() - interval '24 hours' AND status <> 'removed'", [userId])
+    ]);
+    if (Number(branchCount.rows[0]?.count ?? 0) >= 20) return 'branch_limit';
+    if (Number(userCount.rows[0]?.count ?? 0) >= 10) return 'rate_limited';
+    const result = await pool.query(`
+      INSERT INTO branch_photos (
+        id, branch_id, url, source_url, license, attribution, source_type,
+        status, uploaded_by, consent_granted, is_primary
+      )
+      VALUES ($1, $2, $3, NULL, $4, $5, $6, 'pending', $7, true, false)
+      RETURNING id, branch_id, url, source_url, license, attribution, source_type,
+        status, is_primary, moderation_note, created_at, updated_at
+    `, [crypto.randomUUID(), input.branchId, input.url, license, attribution, input.sourceType, userId]);
+    return adminBranchPhotoFromRow({
+      ...result.rows[0],
+      place_id: input.branchId,
+      place_name: 'Sucursal',
+      neighborhood: '',
+      uploader_id: userId,
+      uploader_name: displayName
+    });
+  }
+
+  const place = localCatalogPlaces().find((item) => item.id === input.branchId);
+  if (!place) return 'not_found';
+  const activePhotos = [...localBranchPhotos.values()].filter((photo) => photo.branchId === input.branchId && ['pending', 'approved'].includes(photo.status));
+  if (activePhotos.length >= 20) return 'branch_limit';
+  const recentUserPhotos = [...localBranchPhotos.values()].filter((photo) => photo.uploadedBy === userId && photo.status !== 'removed' && Date.parse(photo.createdAt) > Date.now() - 24 * 60 * 60 * 1000);
+  if (recentUserPhotos.length >= 10) return 'rate_limited';
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const photo = { id, branchId: input.branchId, url: input.url, license, attribution, sourceType: input.sourceType, status: 'pending' as const, uploadedBy: userId, uploaderName: displayName, isPrimary: false, moderationNote: '', createdAt: now, updatedAt: now };
+  localBranchPhotos.set(id, photo);
+  return { id, branchId: photo.branchId, url: photo.url, license: photo.license, attribution: photo.attribution, sourceType: photo.sourceType, status: photo.status, isPrimary: false, moderationNote: '', createdAt: now, updatedAt: now, uploader: { id: userId, displayName }, place: { id: place.id, name: place.name, neighborhood: place.neighborhood } };
+}
+
+export async function getAdminBranchPhotos(status: BranchPhotoStatus | 'all' = 'pending'): Promise<AdminBranchPhoto[]> {
+  if (pool) {
+    const result = await pool.query(`
+      SELECT p.id, p.branch_id, p.url, p.source_url, p.license, p.attribution,
+        p.source_type, p.status, p.is_primary, p.moderation_note,
+        p.created_at, p.updated_at,
+        u.id AS uploader_id, u.display_name AS uploader_name,
+        b.id AS place_id, b.name AS place_name, b.neighborhood
+      FROM branch_photos p
+      JOIN branches b ON b.id = p.branch_id
+      LEFT JOIN users u ON u.id = p.uploaded_by
+      ${status === 'all' ? '' : 'WHERE p.status = $1'}
+      ORDER BY p.created_at DESC
+      LIMIT 100
+    `, status === 'all' ? [] : [status]);
+    return result.rows.map(adminBranchPhotoFromRow);
+  }
+  return [...localBranchPhotos.values()]
+    .filter((photo) => status === 'all' || photo.status === status)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((photo) => {
+      const place = localCatalogPlaces().find((item) => item.id === photo.branchId);
+      return {
+        id: photo.id,
+        branchId: photo.branchId,
+        url: photo.url,
+        sourceUrl: photo.sourceUrl,
+        license: photo.license,
+        attribution: photo.attribution,
+        sourceType: photo.sourceType,
+        status: photo.status,
+        isPrimary: photo.isPrimary,
+        moderationNote: photo.moderationNote,
+        createdAt: photo.createdAt,
+        updatedAt: photo.updatedAt,
+        uploader: photo.uploadedBy ? { id: photo.uploadedBy, displayName: photo.uploaderName ?? 'Cuenta eliminada' } : undefined,
+        place: { id: photo.branchId, name: place?.name ?? 'Lugar desconocido', neighborhood: place?.neighborhood ?? '' }
+      } satisfies AdminBranchPhoto;
+    });
+}
+
+export async function reviewBranchPhoto(photoId: string, action: 'approve' | 'reject', reviewerId: string, moderationNote = '') {
+  if (pool) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const current = await client.query("SELECT id, branch_id FROM branch_photos WHERE id = $1 AND status = 'pending' FOR UPDATE", [photoId]);
+      if (!current.rowCount) {
+        await client.query('ROLLBACK');
+        return false;
+      }
+      const branchId = current.rows[0].branch_id;
+      if (action === 'approve') {
+        const primary = await client.query("SELECT id FROM branch_photos WHERE branch_id = $1 AND status = 'approved' AND is_primary = true LIMIT 1", [branchId]);
+        await client.query(`
+          UPDATE branch_photos
+          SET status = 'approved',
+              is_primary = $2,
+              moderation_note = $3,
+              moderated_by = $4,
+              moderated_at = now(),
+              updated_at = now()
+          WHERE id = $1
+        `, [photoId, !primary.rowCount, moderationNote.trim(), reviewerId]);
+      } else {
+        await client.query(`
+          UPDATE branch_photos
+          SET status = 'rejected', is_primary = false, moderation_note = $2,
+              moderated_by = $3, moderated_at = now(), updated_at = now()
+          WHERE id = $1
+        `, [photoId, moderationNote.trim(), reviewerId]);
+      }
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  const photo = localBranchPhotos.get(photoId);
+  if (!photo || photo.status !== 'pending') return false;
+  photo.status = action === 'approve' ? 'approved' : 'rejected';
+  photo.moderationNote = moderationNote.trim();
+  photo.isPrimary = action === 'approve' && ![...localBranchPhotos.values()].some((item) => item.branchId === photo.branchId && item.id !== photo.id && item.status === 'approved' && item.isPrimary);
+  photo.updatedAt = new Date().toISOString();
+  return true;
+}
+
+export async function deleteBranchPhotoForUser(photoId: string, branchId: string, userId: string, isAdmin = false) {
+  if (pool) {
+    const result = await pool.query(`
+      UPDATE branch_photos
+      SET status = 'removed', is_primary = false, removed_at = now(), updated_at = now()
+      WHERE id = $1 AND branch_id = $2 AND ($3::boolean OR uploaded_by = $4) AND status <> 'removed'
+      RETURNING id
+    `, [photoId, branchId, isAdmin, userId]);
+    return Boolean(result.rowCount);
+  }
+  const photo = localBranchPhotos.get(photoId);
+  if (!photo || photo.branchId !== branchId || (!isAdmin && photo.uploadedBy !== userId) || photo.status === 'removed') return false;
+  photo.status = 'removed';
+  photo.isPrimary = false;
+  photo.updatedAt = new Date().toISOString();
+  return true;
 }
 
 function haversineKm(from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }) {
@@ -566,7 +808,7 @@ export async function discoverPlaces(query: DiscoverQuery, userId?: string): Pro
       ${reputationSelect}
       ${categoryRatingsSelect}
       b.match_score, b.style,
-      b.image_url, b.description, b.tags, b.flavor_profile, ST_Y(b.location::geometry) AS latitude,
+      ${effectiveBranchImageSql} AS image_url, b.description, b.tags, b.flavor_profile, ST_Y(b.location::geometry) AS latitude,
       ST_X(b.location::geometry) AS longitude, ${distanceSelect},
       COALESCE(json_agg(json_build_object('id', m.id, 'name', m.name, 'rating', COALESCE((
         ${tacoReputationSelect}
@@ -716,7 +958,7 @@ export async function findPlace(id: string, userId?: string): Promise<ApiPlace |
       ${reputationSelect}
       ${categoryRatingsSelect}
       b.match_score, b.style,
-      b.image_url, b.description, b.tags, b.flavor_profile, ST_Y(b.location::geometry) AS latitude,
+      ${effectiveBranchImageSql} AS image_url, b.description, b.tags, b.flavor_profile, ST_Y(b.location::geometry) AS latitude,
       ST_X(b.location::geometry) AS longitude, NULL::numeric AS distance_km,
       COALESCE(json_agg(json_build_object('id', m.id, 'name', m.name, 'rating', COALESCE((
         ${tacoReputationSelect}
@@ -730,7 +972,10 @@ export async function findPlace(id: string, userId?: string): Promise<ApiPlace |
     `, [id]);
     found = result.rows[0] ? normalizePlace(result.rows[0]) : undefined;
   }
-  if (found && pool) found = { ...found, photos: await getBranchPhotos(id) };
+  if (found) {
+    const photos = await getBranchPhotos(id);
+    if (photos.length) found = { ...found, photos, image: found.image || photos[0].url };
+  }
   if (!found || !userId) return found && allowDemoCatalog ? found : found ? withoutPersonalMatch(found) : found;
   const personalized = await getRecommendations(userId);
   const match = personalized.find((place) => place.id === id);

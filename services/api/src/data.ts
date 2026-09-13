@@ -1,5 +1,12 @@
 export type ApiTaco = { id: string; name: string; rating: number; price: number; note: string };
-export type ApiPhoto = { url: string; sourceUrl?: string; license: string; attribution: string };
+export type ApiPhoto = {
+  url: string;
+  sourceUrl?: string;
+  license: string;
+  attribution: string;
+  source?: 'catalog' | 'community' | 'owner' | 'google_maps';
+  googleMapsUri?: string;
+};
 export type FlavorProfile = { intensity: number; spicy: number; traditional: number; texture: number; value: number };
 export type RatingCategory = 'tortilla' | 'service' | 'price' | 'meat' | 'salsas';
 export type CategoryRatings = Partial<Record<RatingCategory, number | null>>;

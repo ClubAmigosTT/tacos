@@ -199,6 +199,8 @@ Para abrir la app nativa con Expo, deja la API corriendo en otra terminal y ejec
 158. Sesión persistente ante outage: una falla transitoria del API conserva el JWT en memoria, muestra estados recuperables y sólo cierra la cuenta ante `401/403`.
 159. Pins semánticos: una búsqueda de colonia o sucursal muestra rating general en los pins aunque el filtro visual “Pastor” siga seleccionado.
 160. Navegación honesta: “Ver mapa →” en Inicio es un control accesible y abre directamente la pantalla de Mapa.
+161. Fotos de sucursal: usuarios y negocios pueden enviar fotos propias o autorizadas; quedan pendientes de moderación, sobreviven las actualizaciones quincenales del catálogo y sólo una foto aprobada puede convertirse en portada.
+162. Fallback temporal de Google Maps: cuando una ficha no tiene foto propia, el servidor consulta bajo demanda hasta dos fotos de Google, las muestra con atribución y enlace a Google Maps y no las guarda en la base de datos ni en el catálogo offline.
 
 ## Verificación
 
@@ -231,7 +233,11 @@ Los checks de GitHub Actions quedan disponibles bajo `workflow_dispatch`, sin ej
    MVP (`STORAGE_REQUIRED=false`); configura `STORAGE_BUCKET_URL`, `S3_BUCKET`,
    `S3_ACCESS_KEY_ID` y `S3_SECRET_ACCESS_KEY` cuando conectes R2/S3.
    `S3_ENDPOINT` permite usar R2, MinIO u otro proveedor compatible.
-5. Comprueba `https://<tu-api>.onrender.com/health`.
+5. En Google Cloud habilita **Places API (New)**, crea una clave restringida al
+   servicio y guárdala en Render como `GOOGLE_PLACES_API_KEY`. Esta clave sólo
+   la usa el API para buscar hasta dos fotos al abrir una ficha sin imagen
+   propia; nunca la pongas en `EXPO_PUBLIC_*` ni en la app móvil.
+6. Comprueba `https://<tu-api>.onrender.com/health`.
 
 El Blueprint enlaza `PUBLIC_API_URL`, `APP_WEB_URL`, `CORS_ORIGINS` y
 `EXPO_PUBLIC_API_URL` mediante las URLs HTTPS de los servicios. Para Cloudflare R2 usa `S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`,
@@ -241,6 +247,13 @@ El Blueprint enlaza `PUBLIC_API_URL`, `APP_WEB_URL`, `CORS_ORIGINS` y
 HTTPS automáticamente en las URLs `onrender.com`; si conectas un dominio
 propio, actualiza las variables correspondientes.
 
+La integración temporal de fotos de Google es sólo bajo demanda en la ficha:
+las referencias y URLs no se guardan en PostgreSQL ni se precargan para todo el
+catálogo. Cada foto conserva la atribución y abre su fuente en Google Maps.
+Para que aparezcan fotos propias, configura además el bucket S3/R2; sin él la
+app seguirá funcionando, pero `Agregar foto` mostrará que el almacenamiento no
+está disponible.
+
 Las cuentas tienen sesiones revocables, verificación de correo, recuperación de
 contraseña, exportación JSON y eliminación. Las rutas de soporte son
 `POST /v1/auth/verify-email`, `POST /v1/auth/forgot-password`,
@@ -249,9 +262,11 @@ contraseña, exportación JSON y eliminación. Las rutas de soporte son
 
 ### Catálogo real
 
-Las migraciones `022_catalog_sources.sql` y `023_catalog_operations.sql`
+Las migraciones `022_catalog_sources.sql`, `023_catalog_operations.sql` y
+`026_branch_photo_contributions.sql`
 añaden horarios semanales, teléfono, rango de precios, procedencia, licencia
-de cada foto y la cola de propuestas comunitarias. Copia
+de cada foto, la cola de propuestas comunitarias y el flujo moderado de fotos
+de usuarios/negocios. Copia
 `catalog/branches.json.example` a `catalog/branches.json` y ejecuta
 `pnpm catalog:import` con `DATABASE_URL` y las variables `CATALOG_SOURCE_*`.
 El importador hace upsert por el ID de la fuente, marca duplicados como
