@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import bcrypt from 'bcryptjs';
 import { createHash } from 'node:crypto';
-import { lists as fixtureLists, places, type ApiList, type ApiListDetail, type ApiPhoto, type ApiPlace, type ApiTaqueria, type FlavorProfile, type TasteProfile } from './data.js';
+import { lists as fixtureLists, places, type ApiList, type ApiListDetail, type ApiPhoto, type ApiPlace, type ApiTaqueria, type CategoryRatings, type FlavorProfile, type RatingBreakdown, type RatingCategory, type TasteProfile } from './data.js';
 import { isOpenNow } from './hours.js';
 
 const configuredDatabaseUrl = process.env.DATABASE_URL?.trim();
@@ -20,7 +20,7 @@ function localCatalogPlaces() {
 }
 
 type DiscoverQuery = { q?: string; lat?: number; lng?: number; radiusKm?: number; offset?: number; openNow?: boolean; limit: number };
-type VisitInput = { placeId: string; tacoIds: string[]; rating: number; tacoRatings?: Record<string, number>; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number };
+type VisitInput = { placeId: string; tacoIds: string[]; rating: number; tacoRatings?: Record<string, number>; categoryRatings?: CategoryRatings; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number };
 type ReportInput = { visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details?: string };
 export type PublicUser = { id: string; email: string; displayName: string; role: 'user' | 'admin'; following?: boolean; emailVerified?: boolean };
 export type AdminReport = { id: string; visitId: string; reason: ReportInput['reason']; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string; reporter: { id: string; displayName: string }; author: { id: string; displayName: string }; place: { id: string; name: string }; rating: number; visitedAt: string };
@@ -31,7 +31,7 @@ const localSessions = new Map<string, { id: string; userId: string; tokenHash: s
 const localVerificationTokens = new Map<string, { userId: string; tokenHash: string; expiresAt: string }>();
 const localPasswordResetTokens = new Map<string, { userId: string; tokenHash: string; expiresAt: string }>();
 const localAuthRateLimits = new Map<string, { windowStartedAt: number; attempts: number }>();
-const localVisits = new Map<string, { userId: string; placeId: string; tacoIds: string[]; tacoRatings?: Record<string, number>; rating: number; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number; createdAt: string; visibility: 'visible' | 'hidden' }>();
+const localVisits = new Map<string, { userId: string; placeId: string; tacoIds: string[]; tacoRatings?: Record<string, number>; categoryRatings?: CategoryRatings; rating: number; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number; createdAt: string; visibility: 'visible' | 'hidden' }>();
 const localFollows = new Set<string>();
 const localSavedPlaces = new Set<string>();
 const localLists = new Map<string, { id: string; ownerId: string; title: string; description: string; visibility: 'public' | 'private'; coverImage: string; placeIds: string[]; createdAt: string }>();
@@ -279,6 +279,30 @@ function publicUser(user: LocalUser): PublicUser {
   return { id: user.id, email: user.email, displayName: user.displayName, role: user.role, emailVerified: Boolean(user.emailVerifiedAt) };
 }
 
+const ratingCategoryColumns: Record<RatingCategory, string> = {
+  tortilla: 'tortilla_rating',
+  service: 'service_rating',
+  price: 'price_rating',
+  meat: 'meat_rating',
+  salsas: 'salsas_rating'
+};
+const ratingCategoryKeys = Object.keys(ratingCategoryColumns) as RatingCategory[];
+
+function nullableNumber(value: unknown) {
+  return value == null ? null : Number(value);
+}
+
+function normalizeRatingBreakdown(value: any): RatingBreakdown | undefined {
+  if (!value) return undefined;
+  return {
+    tortilla: nullableNumber(value.tortilla),
+    service: nullableNumber(value.service),
+    price: nullableNumber(value.price),
+    meat: nullableNumber(value.meat),
+    salsas: nullableNumber(value.salsas)
+  };
+}
+
 function normalizePlace(row: any): ApiPlace {
   const fallbackProfile: FlavorProfile = places.find((place) => place.id === row.id)?.flavorProfile ?? { intensity: 50, spicy: 50, traditional: 50, texture: 50, value: 50 };
   return {
@@ -298,6 +322,7 @@ function normalizePlace(row: any): ApiPlace {
     openUntil: row.open_until ?? '23:00',
     rating: Number(row.rating),
     reviewCount: row.review_count == null ? undefined : Number(row.review_count),
+    ratingBreakdown: normalizeRatingBreakdown(row.rating_breakdown),
     match: row.match_score == null ? undefined : Number(row.match_score),
     style: row.style,
     coordinates: { latitude: Number(row.latitude), longitude: Number(row.longitude) },
@@ -348,7 +373,7 @@ const reputationJoin = `
         SELECT stats.review_count,
           CASE WHEN stats.review_count = 0 THEN b.rating
             ELSE LEAST(5::numeric, GREATEST(1::numeric,
-              (((stats.effective_count * ((stats.average_rating * 0.65) + (stats.recent_rating * 0.35))) + (10 * COALESCE(b.rating, 4.2))) / (stats.effective_count + 10))
+              (((stats.effective_count * ((stats.average_rating * 0.65) + (stats.recent_rating * 0.35))) + (10 * COALESCE(NULLIF(b.rating, 0), 4.2))) / (stats.effective_count + 10))
               - LEAST(0.25::numeric, stats.dispersion * 0.08)
               + LEAST(0.08::numeric, GREATEST(0::numeric, stats.recent_rating - stats.average_rating) * 0.12)
             ))
@@ -365,11 +390,12 @@ const reputationJoin = `
                   GREATEST(0::double precision, EXTRACT(EPOCH FROM (now() - v.visited_at))::double precision / 15552000.0))), 0)
               )::numeric,
               AVG(v.rating)::numeric,
-              b.rating
+              NULLIF(b.rating, 0),
+              4.2
             ) AS recent_rating,
             GREATEST(1::numeric, LEAST(COUNT(*)::numeric, GREATEST(1::numeric, COUNT(DISTINCT v.user_id)::numeric * 3))) AS effective_count
           FROM visits v
-          WHERE v.branch_id = b.id AND v.visibility = 'visible'
+          WHERE v.branch_id = b.id AND v.visibility = 'visible' AND v.rating > 0
         ) stats
       ) reviews ON true`;
 
@@ -377,10 +403,31 @@ const reputationSelect = `
       CASE WHEN COALESCE(reviews.review_count, 0) = 0 THEN b.rating ELSE reviews.score END AS rating,
       COALESCE(reviews.review_count, 0)::int AS review_count,`;
 
+const categoryRatingsJoin = `
+      LEFT JOIN LATERAL (
+        SELECT
+          AVG(NULLIF(v.tortilla_rating, 0))::numeric AS tortilla,
+          AVG(NULLIF(v.service_rating, 0))::numeric AS service,
+          AVG(NULLIF(v.price_rating, 0))::numeric AS price,
+          AVG(NULLIF(v.meat_rating, 0))::numeric AS meat,
+          AVG(NULLIF(v.salsas_rating, 0))::numeric AS salsas
+        FROM visits v
+        WHERE v.branch_id = b.id AND v.visibility = 'visible'
+      ) category_ratings ON true`;
+
+const categoryRatingsSelect = `
+      json_build_object(
+        'tortilla', category_ratings.tortilla,
+        'service', category_ratings.service,
+        'price', category_ratings.price,
+        'meat', category_ratings.meat,
+        'salsas', category_ratings.salsas
+      ) AS rating_breakdown,`;
+
 const tacoReputationSelect = `(
         SELECT CASE WHEN stats.review_count = 0 THEN m.rating
           ELSE LEAST(5::numeric, GREATEST(1::numeric,
-            (((stats.effective_count * ((stats.average_rating * 0.65) + (stats.recent_rating * 0.35))) + (5 * COALESCE(m.rating, 4.2))) / (stats.effective_count + 5))
+            (((stats.effective_count * ((stats.average_rating * 0.65) + (stats.recent_rating * 0.35))) + (5 * COALESCE(NULLIF(m.rating, 0), 4.2))) / (stats.effective_count + 5))
             - LEAST(0.25::numeric, stats.dispersion * 0.08)
             + LEAST(0.08::numeric, GREATEST(0::numeric, stats.recent_rating - stats.average_rating) * 0.12)
           ))
@@ -397,7 +444,8 @@ const tacoReputationSelect = `(
                   GREATEST(0::double precision, EXTRACT(EPOCH FROM (now() - vv.visited_at))::double precision / 15552000.0))), 0)
               )::numeric,
               AVG(vi.rating)::numeric,
-              m.rating
+              NULLIF(m.rating, 0),
+              4.2
             ) AS recent_rating,
             GREATEST(1::numeric, LEAST(COUNT(*)::numeric, GREATEST(1::numeric, COUNT(DISTINCT vv.user_id)::numeric * 3))) AS effective_count
           FROM visit_items vi JOIN visits vv ON vv.id = vi.visit_id
@@ -417,7 +465,7 @@ function localRobustScore(reviews: LocalReview[], priorStrength: number, fallbac
   const weightTotal = weights.reduce((sum, weight) => sum + weight, 0);
   const recent = reviews.reduce((sum, review, index) => sum + review.rating * weights[index], 0) / weightTotal;
   const effectiveCount = Math.max(1, Math.min(reviews.length, Math.max(1, new Set(reviews.map((review) => review.userId)).size * 3)));
-  const priorMean = Math.max(1, Math.min(5, fallback));
+  const priorMean = fallback > 0 ? Math.max(1, Math.min(5, fallback)) : 4.2;
   return Math.max(1, Math.min(5,
     ((effectiveCount * (average * 0.65 + recent * 0.35)) + (priorStrength * priorMean)) / (effectiveCount + priorStrength)
       - Math.min(0.25, dispersion * 0.08)
@@ -427,7 +475,7 @@ function localRobustScore(reviews: LocalReview[], priorStrength: number, fallbac
 
 function localReputation(place: ApiPlace): ApiPlace {
   const visits = [...localVisits.values()].filter((visit) => visit.placeId === place.id && visit.visibility === 'visible');
-  const reviews = visits.map((visit) => ({ rating: visit.rating, userId: visit.userId, createdAt: visit.createdAt }));
+  const reviews = visits.filter((visit) => visit.rating > 0).map((visit) => ({ rating: visit.rating, userId: visit.userId, createdAt: visit.createdAt }));
   const tacos = place.tacos.map((taco) => {
     const tacoReviews = visits.flatMap((visit) => {
       const rating = visit.tacoRatings?.[taco.id];
@@ -435,7 +483,18 @@ function localReputation(place: ApiPlace): ApiPlace {
     });
     return { ...taco, rating: Number(localRobustScore(tacoReviews, 5, taco.rating).toFixed(2)) };
   });
-  return { ...place, rating: Number(localRobustScore(reviews, 10, place.rating).toFixed(2)), tacos, ...(reviews.length ? { reviewCount: reviews.length } : {}) };
+  const ratingBreakdown = Object.fromEntries(ratingCategoryKeys.map((key) => {
+    const ratings = visits.map((visit) => visit.categoryRatings?.[key]).filter((value): value is number => typeof value === 'number' && value > 0);
+    return [key, ratings.length ? Number((ratings.reduce((sum, value) => sum + value, 0) / ratings.length).toFixed(2)) : null];
+  })) as RatingBreakdown;
+  const hasRatingBreakdown = ratingCategoryKeys.some((key) => ratingBreakdown[key] != null);
+  return {
+    ...place,
+    rating: Number(localRobustScore(reviews, 10, place.rating).toFixed(2)),
+    tacos,
+    ...(reviews.length ? { reviewCount: reviews.length } : {}),
+    ...(hasRatingBreakdown ? { ratingBreakdown } : {})
+  };
 }
 
 function withoutPersonalMatch(place: ApiPlace): ApiPlace {
@@ -505,6 +564,7 @@ export async function discoverPlaces(query: DiscoverQuery, userId?: string): Pro
     const result = await pool.query(`
       SELECT b.id, b.taqueria_id, t.name AS taqueria_name, b.name, b.neighborhood, b.address, b.phone, b.weekly_hours, b.price_min, b.price_max, b.source_name, b.source_url, b.source_license, b.source_attribution, b.source_updated_at, b.image_license, b.image_attribution, b.open_until,
       ${reputationSelect}
+      ${categoryRatingsSelect}
       b.match_score, b.style,
       b.image_url, b.description, b.tags, b.flavor_profile, ST_Y(b.location::geometry) AS latitude,
       ST_X(b.location::geometry) AS longitude, ${distanceSelect},
@@ -514,9 +574,10 @@ export async function discoverPlaces(query: DiscoverQuery, userId?: string): Pro
         'price', m.price, 'note', m.note)) FILTER (WHERE m.id IS NOT NULL), '[]') AS tacos
     FROM branches b JOIN taquerias t ON t.id = b.taqueria_id
       ${reputationJoin}
+      ${categoryRatingsJoin}
       LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
     WHERE ${predicates.join(' AND ')}
-    GROUP BY b.id, t.name, reviews.review_count, reviews.score ORDER BY ${orderBy} LIMIT $${limitParam}${offsetSql}
+    GROUP BY b.id, t.name, reviews.review_count, reviews.score, category_ratings.tortilla, category_ratings.service, category_ratings.price, category_ratings.meat, category_ratings.salsas ORDER BY ${orderBy} LIMIT $${limitParam}${offsetSql}
     `, values);
     discovered = result.rows.map(normalizePlace);
     if (query.openNow) discovered = discovered.filter((place) => isOpenNow(place.openUntil, new Date(), place.weeklyHours, place.hoursKnown)).slice(offset, offset + limit);
@@ -653,6 +714,7 @@ export async function findPlace(id: string, userId?: string): Promise<ApiPlace |
     const result = await pool.query(`
     SELECT b.id, b.taqueria_id, t.name AS taqueria_name, b.name, b.neighborhood, b.address, b.phone, b.weekly_hours, b.price_min, b.price_max, b.source_name, b.source_url, b.source_license, b.source_attribution, b.source_updated_at, b.image_license, b.image_attribution, b.open_until,
       ${reputationSelect}
+      ${categoryRatingsSelect}
       b.match_score, b.style,
       b.image_url, b.description, b.tags, b.flavor_profile, ST_Y(b.location::geometry) AS latitude,
       ST_X(b.location::geometry) AS longitude, NULL::numeric AS distance_km,
@@ -662,8 +724,9 @@ export async function findPlace(id: string, userId?: string): Promise<ApiPlace |
         'price', m.price, 'note', m.note)) FILTER (WHERE m.id IS NOT NULL), '[]') AS tacos
     FROM branches b JOIN taquerias t ON t.id = b.taqueria_id
       ${reputationJoin}
+      ${categoryRatingsJoin}
       LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
-    WHERE b.id = $1 AND b.is_active = true AND b.catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(b.source_name, '') <> 'demo'"} GROUP BY b.id, t.name, reviews.review_count, reviews.score
+    WHERE b.id = $1 AND b.is_active = true AND b.catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(b.source_name, '') <> 'demo'"} GROUP BY b.id, t.name, reviews.review_count, reviews.score, category_ratings.tortilla, category_ratings.service, category_ratings.price, category_ratings.meat, category_ratings.salsas
     `, [id]);
     found = result.rows[0] ? normalizePlace(result.rows[0]) : undefined;
   }
@@ -679,6 +742,7 @@ export type ApiBranchReview = {
   id: string;
   visitedAt: string;
   rating: number;
+  categoryRatings: CategoryRatings;
   note: string;
   photoUrl?: string | null;
   tacos: string;
@@ -695,7 +759,7 @@ export async function getBranchReviews(branchId: string): Promise<ApiBranchRevie
     const branch = await pool.query(`SELECT 1 FROM branches WHERE id = $1 AND is_active = true AND catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"}`, [branchId]);
     if (!branch.rowCount) return undefined;
     const result = await pool.query(`
-      SELECT v.id, v.visited_at, v.rating, v.note, v.photo_url,
+      SELECT v.id, v.visited_at, v.rating, v.tortilla_rating, v.service_rating, v.price_rating, v.meat_rating, v.salsas_rating, v.note, v.photo_url,
         u.id AS user_id, u.display_name,
         COALESCE(string_agg(m.name, ', ' ORDER BY m.name), '') AS tacos
       FROM visits v
@@ -703,7 +767,7 @@ export async function getBranchReviews(branchId: string): Promise<ApiBranchRevie
       LEFT JOIN visit_items vi ON vi.visit_id = v.id
       LEFT JOIN menu_items m ON m.id = vi.menu_item_id
       WHERE v.branch_id = $1 AND v.visibility = 'visible'
-      GROUP BY v.id, v.visited_at, v.rating, v.note, v.photo_url, u.id, u.display_name
+      GROUP BY v.id, v.visited_at, v.rating, v.tortilla_rating, v.service_rating, v.price_rating, v.meat_rating, v.salsas_rating, v.note, v.photo_url, u.id, u.display_name
       ORDER BY v.visited_at DESC
       LIMIT 50
     `, [branchId]);
@@ -711,6 +775,13 @@ export async function getBranchReviews(branchId: string): Promise<ApiBranchRevie
       id: row.id,
       visitedAt: new Date(row.visited_at).toISOString(),
       rating: Number(row.rating),
+      categoryRatings: {
+        tortilla: nullableNumber(row.tortilla_rating),
+        service: nullableNumber(row.service_rating),
+        price: nullableNumber(row.price_rating),
+        meat: nullableNumber(row.meat_rating),
+        salsas: nullableNumber(row.salsas_rating)
+      },
       note: row.note ?? '',
       photoUrl: row.photo_url ?? null,
       tacos: row.tacos ?? '',
@@ -727,7 +798,7 @@ export async function getBranchReviews(branchId: string): Promise<ApiBranchRevie
       const place = localCatalogPlaces().find((item) => item.id === visit.placeId);
       const tacos = visit.tacoIds.map((tacoId) => place?.tacos.find((taco) => taco.id === tacoId)?.name ?? tacoId).join(', ');
       const author = localUsers.get(visit.userId);
-      return { id, visitedAt: visit.createdAt, rating: visit.rating, note: visit.note ?? '', photoUrl: visit.photoUrl ?? null, tacos, user: { id: visit.userId, displayName: author?.displayName ?? 'Cuenta eliminada' } };
+      return { id, visitedAt: visit.createdAt, rating: visit.rating, categoryRatings: visit.categoryRatings ?? {}, note: visit.note ?? '', photoUrl: visit.photoUrl ?? null, tacos, user: { id: visit.userId, displayName: author?.displayName ?? 'Cuenta eliminada' } };
     });
 }
 
@@ -1115,11 +1186,11 @@ export async function createVisitForUser(input: VisitInput, userId: string) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query(`INSERT INTO visits (id, user_id, branch_id, rating, price, note, photo_url, visit_location)
-        VALUES ($1, $2, $3, $4, $5, $6, $7,
-          CASE WHEN $8::numeric IS NULL OR $9::numeric IS NULL THEN NULL
-            ELSE ST_SetSRID(ST_MakePoint($9::numeric, $8::numeric), 4326)::geography END)`,
-        [id, userId, input.placeId, input.rating, input.price ?? null, input.note?.trim() ?? '', input.photoUrl ?? null, input.latitude ?? null, input.longitude ?? null]);
+      await client.query(`INSERT INTO visits (id, user_id, branch_id, rating, tortilla_rating, service_rating, price_rating, meat_rating, salsas_rating, price, note, photo_url, visit_location)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+          CASE WHEN $13::numeric IS NULL OR $14::numeric IS NULL THEN NULL
+            ELSE ST_SetSRID(ST_MakePoint($14::numeric, $13::numeric), 4326)::geography END)`,
+        [id, userId, input.placeId, input.rating, input.categoryRatings?.tortilla ?? null, input.categoryRatings?.service ?? null, input.categoryRatings?.price ?? null, input.categoryRatings?.meat ?? null, input.categoryRatings?.salsas ?? null, input.price ?? null, input.note?.trim() ?? '', input.photoUrl ?? null, input.latitude ?? null, input.longitude ?? null]);
       for (const tacoId of input.tacoIds) await client.query('INSERT INTO visit_items (visit_id, menu_item_id, rating) VALUES ($1, $2, $3)', [id, tacoId, input.tacoRatings?.[tacoId] ?? null]);
       await client.query('COMMIT');
     } catch (error) {
@@ -1134,7 +1205,7 @@ export async function createVisitForUser(input: VisitInput, userId: string) {
   return { id, ...input, createdAt, status: 'recorded' };
 }
 
-type VisitUpdateInput = { rating?: number; tacoRatings?: Record<string, number>; price?: number | null; note?: string };
+type VisitUpdateInput = { rating?: number; tacoRatings?: Record<string, number>; categoryRatings?: CategoryRatings; price?: number | null; note?: string };
 
 export async function updateVisitForUser(visitId: string, input: VisitUpdateInput, userId: string): Promise<'not_found' | 'invalid_taco' | { id: string; status: 'updated' }> {
   if (pool) {
@@ -1148,6 +1219,12 @@ export async function updateVisitForUser(visitId: string, input: VisitUpdateInpu
     const values: unknown[] = [visitId, userId];
     const assignments: string[] = [];
     if (input.rating !== undefined) { values.push(input.rating); assignments.push(`rating = $${values.length}`); }
+    if (input.categoryRatings) {
+      for (const key of Object.keys(input.categoryRatings) as RatingCategory[]) {
+        values.push(input.categoryRatings[key] ?? null);
+        assignments.push(`${ratingCategoryColumns[key]} = $${values.length}`);
+      }
+    }
     if (input.price !== undefined) { values.push(input.price); assignments.push(`price = $${values.length}`); }
     if (input.note !== undefined) { values.push(input.note.trim()); assignments.push(`note = $${values.length}`); }
     const client = await pool.connect();
@@ -1172,6 +1249,7 @@ export async function updateVisitForUser(visitId: string, input: VisitUpdateInpu
   if (!visit || visit.userId !== userId) return 'not_found';
   if (input.tacoRatings && Object.keys(input.tacoRatings).some((tacoId) => !visit.tacoIds.includes(tacoId))) return 'invalid_taco';
   if (input.rating !== undefined) visit.rating = input.rating;
+  if (input.categoryRatings) visit.categoryRatings = { ...(visit.categoryRatings ?? {}), ...input.categoryRatings };
   if (input.price !== undefined) visit.price = input.price ?? undefined;
   if (input.note !== undefined) visit.note = input.note.trim();
   if (input.tacoRatings) visit.tacoRatings = { ...(visit.tacoRatings ?? {}), ...input.tacoRatings };
@@ -1330,7 +1408,7 @@ export async function exportUserData(userId: string) {
   if (pool) {
     const [user, visits, lists, listItems, follows, saved, comments] = await Promise.all([
       pool.query('SELECT id, email, display_name, role, email_verified_at, created_at FROM users WHERE id = $1 AND is_active = true', [userId]),
-      pool.query('SELECT id, branch_id, rating, visited_at, created_at, price, note, photo_url, visibility FROM visits WHERE user_id = $1 ORDER BY visited_at DESC', [userId]),
+      pool.query('SELECT id, branch_id, rating, tortilla_rating, service_rating, price_rating, meat_rating, salsas_rating, visited_at, created_at, price, note, photo_url, visibility FROM visits WHERE user_id = $1 ORDER BY visited_at DESC', [userId]),
       pool.query('SELECT id, title, description, visibility, created_at, updated_at FROM lists WHERE owner_id = $1 ORDER BY created_at DESC', [userId]),
       pool.query('SELECT li.list_id, li.branch_id, li.position, li.note, li.created_at FROM list_items li JOIN lists l ON l.id = li.list_id WHERE l.owner_id = $1 ORDER BY li.list_id, li.position', [userId]),
       pool.query('SELECT follower_id, followed_id, created_at FROM follows WHERE follower_id = $1 OR followed_id = $1 ORDER BY created_at DESC', [userId]),
@@ -1433,7 +1511,7 @@ export async function getUserProfile(userId: string, viewerId?: string) {
   const privacy = await getPrivacyForUser(userId);
   const canViewActivity = viewerId === userId || privacy?.shareActivity !== false;
   const entries = canViewActivity ? await getDiary(userId, false) : [];
-  const ratings = entries.map((entry) => Number(entry.rating)).filter(Number.isFinite);
+  const ratings = entries.map((entry) => Number(entry.rating)).filter((rating) => Number.isFinite(rating) && rating > 0);
   const allLists = await getLists(viewerId === userId ? userId : viewerId);
   const lists = allLists.filter((list) => list.owner.id === userId && (list.visibility !== 'private' || viewerId === userId));
   return {
@@ -1448,7 +1526,7 @@ export async function getDiary(userId: string, includeHidden = true) {
   if (pool) {
     const visibilityFilter = includeHidden ? '' : " AND v.visibility = 'visible'";
     const result = await pool.query(`
-      SELECT v.id, v.visited_at, v.rating, v.price, v.note, v.photo_url, b.name AS place_name, b.neighborhood,
+      SELECT v.id, v.visited_at, v.rating, v.tortilla_rating, v.service_rating, v.price_rating, v.meat_rating, v.salsas_rating, v.price, v.note, v.photo_url, b.name AS place_name, b.neighborhood,
         COALESCE(string_agg(m.name, ', ' ORDER BY m.name), '') AS tacos,
       COALESCE(json_object_agg(m.id, vi.rating) FILTER (WHERE m.id IS NOT NULL), '{}'::json) AS taco_ratings,
         COALESCE(v.photo_url, b.image_url, '') AS image_url,
@@ -1457,7 +1535,7 @@ export async function getDiary(userId: string, includeHidden = true) {
       FROM visits v JOIN branches b ON b.id = v.branch_id
       LEFT JOIN visit_items vi ON vi.visit_id = v.id
       LEFT JOIN menu_items m ON m.id = vi.menu_item_id
-      WHERE v.user_id = $1${visibilityFilter} GROUP BY v.id, v.price, v.note, v.photo_url, b.name, b.neighborhood, b.image_url, b.location
+      WHERE v.user_id = $1${visibilityFilter} GROUP BY v.id, v.tortilla_rating, v.service_rating, v.price_rating, v.meat_rating, v.salsas_rating, v.price, v.note, v.photo_url, b.name, b.neighborhood, b.image_url, b.location
       ORDER BY v.visited_at DESC LIMIT 100
     `, [userId]);
     return result.rows.map((row) => ({
@@ -1466,6 +1544,13 @@ export async function getDiary(userId: string, includeHidden = true) {
       // identical to the in-memory fallback so mobile clients receive
       // numbers for diary context and map coordinates in every environment.
       rating: Number(row.rating),
+      category_ratings: {
+        tortilla: nullableNumber(row.tortilla_rating),
+        service: nullableNumber(row.service_rating),
+        price: nullableNumber(row.price_rating),
+        meat: nullableNumber(row.meat_rating),
+        salsas: nullableNumber(row.salsas_rating)
+      },
       price: row.price == null ? null : Number(row.price),
       latitude: row.latitude == null ? null : Number(row.latitude),
       longitude: row.longitude == null ? null : Number(row.longitude)
@@ -1474,7 +1559,7 @@ export async function getDiary(userId: string, includeHidden = true) {
   return [...localVisits.entries()].filter(([, visit]) => visit.userId === userId && (includeHidden || visit.visibility === 'visible')).sort(([, a], [, b]) => b.createdAt.localeCompare(a.createdAt)).map(([id, visit]) => {
     const place = localCatalogPlaces().find((item) => item.id === visit.placeId);
     const tacoNames = visit.tacoIds.map((tacoId) => place?.tacos.find((taco) => taco.id === tacoId)?.name ?? tacoId).join(', ');
-    return { id, visited_at: visit.createdAt, rating: visit.rating, price: visit.price ?? null, note: visit.note ?? '', photo_url: visit.photoUrl ?? null, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', tacos: tacoNames, taco_ratings: visit.tacoRatings ?? {}, latitude: visit.latitude ?? place?.coordinates.latitude ?? null, longitude: visit.longitude ?? place?.coordinates.longitude ?? null, image_url: visit.photoUrl ?? place?.image ?? '' };
+    return { id, visited_at: visit.createdAt, rating: visit.rating, category_ratings: visit.categoryRatings ?? {}, price: visit.price ?? null, note: visit.note ?? '', photo_url: visit.photoUrl ?? null, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', tacos: tacoNames, taco_ratings: visit.tacoRatings ?? {}, latitude: visit.latitude ?? place?.coordinates.latitude ?? null, longitude: visit.longitude ?? place?.coordinates.longitude ?? null, image_url: visit.photoUrl ?? place?.image ?? '' };
   });
 }
 

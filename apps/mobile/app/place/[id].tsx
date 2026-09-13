@@ -9,6 +9,7 @@ import { branchReviews, getPlace, savePlace, savedPlaces, trackEvent, unsavePlac
 import { useAuth } from '@/lib/auth';
 import { colors, radii, shadows, spacing, typography } from '@/theme';
 import { RatingBadge } from '@/components/RatingBadge';
+import { StarRating } from '@/components/StarRating';
 import { isOpenNow } from '@/lib/hours';
 import type { Place } from '@/data/fixtures';
 import { CatalogImage } from '@/components/CatalogImage';
@@ -59,6 +60,14 @@ const scheduleDays = [
   ['mon', 'Lun'], ['tue', 'Mar'], ['wed', 'Mié'], ['thu', 'Jue'], ['fri', 'Vie'], ['sat', 'Sáb'], ['sun', 'Dom']
 ] as const;
 
+const ratingCategories: Array<{ key: keyof NonNullable<Place['ratingBreakdown']>; label: string }> = [
+  { key: 'tortilla', label: 'Tortilla' },
+  { key: 'service', label: 'Servicio' },
+  { key: 'price', label: 'Precio' },
+  { key: 'meat', label: 'Carne' },
+  { key: 'salsas', label: 'Salsas' }
+];
+
 function PlaceInfo({ place }: { place: Place }) {
   function openMaps() {
     const { latitude, longitude } = place.coordinates;
@@ -68,11 +77,19 @@ function PlaceInfo({ place }: { place: Place }) {
     if (place.phone) void Linking.openURL(`tel:${place.phone.replace(/[^+\d]/g, '')}`);
   }
   return <View style={styles.infoBlock}>
+    <CommunityRatingBreakdown place={place} />
     {place.address ? <Pressable accessibilityRole="button" accessibilityLabel="Abrir dirección en mapas" style={styles.infoRow} onPress={openMaps}><Ionicons name="navigate-outline" size={17} color={colors.tortilla} /><Text style={styles.infoText}>{place.address}</Text><Ionicons name="open-outline" size={15} color={colors.textTertiary} /></Pressable> : null}
     {place.phone ? <Pressable accessibilityRole="button" accessibilityLabel="Llamar a la taquería" style={styles.infoRow} onPress={callPlace}><Ionicons name="call-outline" size={17} color={colors.tortilla} /><Text style={styles.infoText}>{place.phone}</Text><Ionicons name="call-outline" size={15} color={colors.textTertiary} /></Pressable> : null}
     <View style={styles.hoursBlock}><View style={styles.hoursHeading}><Ionicons name="time-outline" size={17} color={colors.tortilla} /><Text style={styles.infoHeading}>HORARIO SEMANAL</Text></View>{place.weeklyHours ? scheduleDays.map(([key, label]) => <View key={key} style={styles.hoursRow}><Text style={styles.dayLabel}>{label}</Text><Text style={styles.hoursText}>{place.weeklyHours?.[key]?.length ? place.weeklyHours[key].map((interval) => `${interval.open}–${interval.close}`).join(', ') : 'Cerrado'}</Text></View>) : <Text style={styles.unverified}>{place.hoursKnown === false ? 'Horario no disponible en la fuente. Puedes proponer una actualización.' : `Horario semanal aún no verificado. Referencia: cierre a las ${place.openUntil}.`}</Text>}</View>
     {place.source?.attribution || place.source?.name ? <Text style={styles.sourceText}>Fuente: {place.source.attribution ?? place.source.name}{place.source.updatedAt ? ` · actualizado ${new Date(place.source.updatedAt).toLocaleDateString('es-MX')}` : ''}</Text> : null}
   </View>;
+}
+
+function CommunityRatingBreakdown({ place }: { place: Place }) {
+  const breakdown = place.ratingBreakdown;
+  const ratedCategories = breakdown ? ratingCategories.filter(({ key }) => (breakdown[key] ?? 0) > 0) : [];
+  if (!ratedCategories.length) return null;
+  return <View style={styles.breakdownCard} accessibilityLabel="Calificaciones de la comunidad por categoría"><View style={styles.breakdownHeader}><View><Text style={styles.breakdownEyebrow}>DETALLES DE LA COMUNIDAD</Text><Text style={styles.breakdownTitle}>Calidad en cada bocado</Text></View><Text style={styles.breakdownCount}>{place.reviewCount ?? ratedCategories.length} reseñas</Text></View>{ratedCategories.map(({ key, label }) => <View style={styles.breakdownRow} key={key}><Text style={styles.breakdownLabel}>{label}</Text><StarRating value={breakdown?.[key] ?? 0} readOnly size={18} accessibilityLabel={`Promedio de ${label}`} /></View>)}</View>;
 }
 
 function BranchReviewsSection({ reviews, isLoading, isError, onRetry }: { reviews: BranchReview[]; isLoading: boolean; isError: boolean; onRetry: () => void }) {
@@ -112,6 +129,13 @@ const styles = StyleSheet.create({
   statLabel: { color: colors.textSecondary, fontFamily: typography.fontFamily.semibold, fontSize: typography.size.micro, fontWeight: typography.weight.semibold, letterSpacing: 1, marginTop: 4 },
   description: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular, fontSize: 15, lineHeight: 22, marginTop: spacing.lg },
   infoBlock: { marginTop: spacing.lg, backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, ...shadows.card },
+  breakdownCard: { backgroundColor: colors.surfaceElevated, borderRadius: radii.md, padding: spacing.md, marginBottom: spacing.sm },
+  breakdownHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm, marginBottom: spacing.sm },
+  breakdownEyebrow: { color: colors.tortilla, fontFamily: typography.fontFamily.semibold, fontSize: typography.size.micro, fontWeight: typography.weight.semibold, letterSpacing: 1 },
+  breakdownTitle: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, fontSize: 15, fontWeight: typography.weight.semibold, marginTop: 3 },
+  breakdownCount: { color: colors.textTertiary, fontFamily: typography.fontFamily.medium, fontSize: 10, fontWeight: typography.weight.medium, marginTop: 2 },
+  breakdownRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 43, borderTopWidth: 1, borderTopColor: colors.border },
+  breakdownLabel: { color: colors.textPrimary, fontFamily: typography.fontFamily.medium, fontSize: 12, fontWeight: typography.weight.medium, flex: 1 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 9, minHeight: 34, borderBottomWidth: 1, borderBottomColor: colors.border },
   infoText: { color: colors.textPrimary, fontFamily: typography.fontFamily.regular, fontSize: 12, flex: 1, lineHeight: 18 },
   hoursBlock: { paddingTop: spacing.sm },

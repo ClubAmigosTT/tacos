@@ -8,6 +8,10 @@ export type Taco = {
 
 export type Photo = { url: string; sourceUrl?: string; license: string; attribution: string };
 
+export type RatingCategory = 'tortilla' | 'service' | 'price' | 'meat' | 'salsas';
+export type CategoryRatings = Partial<Record<RatingCategory, number | null>>;
+export type RatingBreakdown = Record<RatingCategory, number | null>;
+
 export type Place = {
   id: string;
   taqueriaId?: string;
@@ -18,6 +22,7 @@ export type Place = {
   openUntil: string;
   rating: number;
   reviewCount?: number;
+  ratingBreakdown?: RatingBreakdown;
   match?: number;
   style: string;
   coordinates: { latitude: number; longitude: number };

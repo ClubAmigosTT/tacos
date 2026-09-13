@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { places, type Place } from '@/data/fixtures';
+import { places, type CategoryRatings, type Place } from '@/data/fixtures';
 
 export type AuthUser = { id: string; email: string; displayName: string; role?: 'user' | 'admin'; following?: boolean; emailVerified?: boolean };
 export type ApiList = { id: string; title: string; description: string; owner: { id: string; displayName: string }; itemCount: number; visitedCount: number; coverImage: string; visibility?: 'public' | 'private'; collaboratorCount?: number; canEdit?: boolean };
@@ -9,7 +9,7 @@ export type ApiListCollaborator = { id: string; displayName: string; role: 'edit
 export type ApiListDetail = ApiList & { collaborators?: ApiListCollaborator[]; items: Array<{ branchId: string; note: string; position: number; place: Place }> };
 export type ApiTaqueria = { id: string; name: string; slug: string; description: string; branchCount: number; branches: Place[] };
 export type FeedItem = { id: string; visited_at: string; rating: number; note?: string; user_id: string; display_name: string; place_id: string; place_name: string; neighborhood: string; image_url: string; tacos: string; comment_count?: number };
-export type BranchReview = { id: string; visitedAt: string; rating: number; note: string; photoUrl?: string | null; tacos: string; user: { id: string; displayName: string } };
+export type BranchReview = { id: string; visitedAt: string; rating: number; categoryRatings: CategoryRatings; note: string; photoUrl?: string | null; tacos: string; user: { id: string; displayName: string } };
 export type VisitComment = { id: string; body: string; createdAt: string; author: { id: string; displayName: string }; own: boolean };
 export type TasteProfile = { title: string; description: string; tags: string[]; profile: { intensity: number; spicy: number; traditional: number; texture: number; value: number }; hasData?: boolean };
 export type PassportZone = { name: string; note: string; branchCount: number; visitCount: number; unlocked: boolean };
@@ -211,11 +211,11 @@ export async function getTaqueria(id: string) {
   }
 }
 
-export async function createVisit(input: { placeId: string; tacoIds: string[]; rating: number; tacoRatings?: Record<string, number>; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number }, token: string) {
+export async function createVisit(input: { placeId: string; tacoIds: string[]; rating: number; categoryRatings?: CategoryRatings; tacoRatings?: Record<string, number>; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number }, token: string) {
   return request('/v1/visits', { method: 'POST', body: JSON.stringify(input) }, token);
 }
 
-export async function updateVisit(visitId: string, input: { rating?: number; tacoRatings?: Record<string, number>; price?: number | null; note?: string }, token: string) {
+export async function updateVisit(visitId: string, input: { rating?: number; categoryRatings?: CategoryRatings; tacoRatings?: Record<string, number>; price?: number | null; note?: string }, token: string) {
   return request<{ id: string; status: string }>(`/v1/visits/${encodeURIComponent(visitId)}`, { method: 'PATCH', body: JSON.stringify(input) }, token);
 }
 
@@ -287,8 +287,10 @@ export async function updatePrivacy(input: { shareActivity: boolean }, token: st
   return request<{ privacy: { shareActivity: boolean } }>('/v1/me/privacy', { method: 'PATCH', body: JSON.stringify(input) }, token);
 }
 
+export type DiaryEntry = { id: string; visited_at: string; rating: number; category_ratings?: CategoryRatings; price?: number | null; note?: string; photo_url?: string | null; place_name: string; neighborhood: string; tacos: string; taco_ratings?: Record<string, number | null>; latitude?: number | null; longitude?: number | null; image_url: string };
+
 export async function diary(token: string) {
-  return request<{ entries: Array<{ id: string; visited_at: string; rating: number; price?: number | null; note?: string; photo_url?: string | null; place_name: string; neighborhood: string; tacos: string; taco_ratings?: Record<string, number | null>; latitude?: number | null; longitude?: number | null; image_url: string }> }>('/v1/diary', undefined, token);
+  return request<{ entries: DiaryEntry[] }>('/v1/diary', undefined, token);
 }
 
 export async function lists(token?: string) {

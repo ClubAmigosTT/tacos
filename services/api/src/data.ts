@@ -1,6 +1,9 @@
 export type ApiTaco = { id: string; name: string; rating: number; price: number; note: string };
 export type ApiPhoto = { url: string; sourceUrl?: string; license: string; attribution: string };
 export type FlavorProfile = { intensity: number; spicy: number; traditional: number; texture: number; value: number };
+export type RatingCategory = 'tortilla' | 'service' | 'price' | 'meat' | 'salsas';
+export type CategoryRatings = Partial<Record<RatingCategory, number | null>>;
+export type RatingBreakdown = Record<RatingCategory, number | null>;
 export type TasteProfile = { title: string; description: string; tags: string[]; profile: FlavorProfile; hasData: boolean };
 export type ApiPlace = {
   id: string;
@@ -21,6 +24,8 @@ export type ApiPlace = {
   rating: number;
   /** Number of visible reviews contributing to the reputation score. */
   reviewCount?: number;
+  /** Community averages for the five taqueria quality dimensions. */
+  ratingBreakdown?: RatingBreakdown;
   match?: number;
   style: string;
   coordinates: { latitude: number; longitude: number };

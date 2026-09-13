@@ -80,9 +80,14 @@ await request('/v1/visits', {
   body: JSON.stringify({ placeId: 'vilsito', tacoIds: ['oriente-suadero'], rating: 5 }),
   token: bob.token
 }, 400);
+await request('/v1/visits', {
+  method: 'POST',
+  body: JSON.stringify({ placeId: 'vilsito', tacoIds: [], rating: 4.25, categoryRatings: { tortilla: 4.25 } }),
+  token: bob.token
+}, 400);
 const visit = await request('/v1/visits', {
   method: 'POST',
-  body: JSON.stringify({ placeId: 'vilsito', tacoIds: ['vilsito-pastor'], tacoRatings: { 'vilsito-pastor': 5 }, rating: 5, price: 44, note: 'Smoke test' }),
+  body: JSON.stringify({ placeId: 'vilsito', tacoIds: ['vilsito-pastor'], tacoRatings: { 'vilsito-pastor': 5 }, rating: 4.5, categoryRatings: { tortilla: 4.5, service: 4, price: 3.5, meat: 5, salsas: 4.5 }, price: 44, note: 'Smoke test' }),
   token: bob.token
 }, 201);
 const personalizedDiscover = await request('/v1/discover?limit=3', { token: bob.token });
@@ -92,12 +97,13 @@ if (typeof personalizedDetail.tasteMatch !== 'number') throw new Error('Authenti
 const passport = await request('/v1/me/passport', { token: bob.token });
 if (passport.visitedZones !== 1 || !passport.zones?.some((zone) => zone.name === 'Narvarte' && zone.unlocked && zone.visitCount === 1)) throw new Error('Passport did not derive unlocked zones from the visible diary');
 const branchReviews = await request('/v1/branches/vilsito/reviews');
-if (!branchReviews.reviews?.some((review) => review.id === visit.id && review.note === 'Smoke test' && review.user?.id === bob.user.id)) throw new Error('Public branch reviews did not include the visible visit');
+if (!branchReviews.reviews?.some((review) => review.id === visit.id && review.note === 'Smoke test' && review.user?.id === bob.user.id && review.categoryRatings?.tortilla === 4.5 && review.categoryRatings?.salsas === 4.5)) throw new Error('Public branch reviews did not include the visible visit ratings');
 await request('/v1/branches/branch-does-not-exist/reviews', {}, 404);
 const reputationAfterFirstReview = await request('/v1/discover?limit=3');
 const vilsitoAfterFirstReview = reputationAfterFirstReview.places?.find((place) => place.id === 'vilsito');
 const pastorAfterFirstReview = vilsitoAfterFirstReview?.tacos?.find((taco) => taco.id === 'vilsito-pastor');
 if (Number(vilsitoAfterFirstReview?.rating) < 4.6 || Number(pastorAfterFirstReview?.rating) < 4.7) throw new Error('A single review artificially displaced the seeded reputation prior');
+if (Number(vilsitoAfterFirstReview?.ratingBreakdown?.tortilla) !== 4.5 || Number(vilsitoAfterFirstReview?.ratingBreakdown?.price) !== 3.5) throw new Error('Category rating breakdown was not aggregated');
 
 const feed = await request('/v1/feed', { token: alice.token });
 if (feed.items?.length !== 1 || feed.items?.[0]?.note !== 'Smoke test') throw new Error(`Expected one feed item with its note, got ${feed.items?.length ?? 0}`);
@@ -122,17 +128,17 @@ if (hiddenBranchReviews.reviews?.some((review) => review.id === visit.id)) throw
 const hiddenProfile = await request(`/v1/users/${bob.user.id}/profile`, { token: alice.token });
 if (hiddenProfile.stats?.visits !== 0 || hiddenProfile.stats?.averageRating !== null) throw new Error('Private activity still appeared in the public profile aggregates');
 const ownerProfileWhilePrivate = await request(`/v1/users/${bob.user.id}/profile`, { token: bob.token });
-if (ownerProfileWhilePrivate.stats?.visits !== 1 || ownerProfileWhilePrivate.stats?.averageRating !== 5) throw new Error('Owner lost access to their own private profile aggregates');
+if (ownerProfileWhilePrivate.stats?.visits !== 1 || ownerProfileWhilePrivate.stats?.averageRating !== 4.5) throw new Error('Owner lost access to their own private profile aggregates');
 const hiddenRecommendations = await request('/v1/recommendations', { token: alice.token });
 if (hiddenRecommendations.places?.some((place) => typeof place.socialMatch === 'number')) throw new Error('Private activity still influenced social recommendations');
 await request('/v1/me/privacy', { method: 'PATCH', body: JSON.stringify({ shareActivity: true }), token: bob.token });
 const restoredFeed = await request('/v1/feed', { token: alice.token });
 if (restoredFeed.items?.length !== 1) throw new Error('Activity did not return after privacy was restored');
 const diary = await request('/v1/diary', { token: bob.token });
-if (diary.entries?.[0]?.price !== 44 || diary.entries?.[0]?.note !== 'Smoke test') throw new Error('Diary context was not persisted');
+if (diary.entries?.[0]?.price !== 44 || diary.entries?.[0]?.note !== 'Smoke test' || diary.entries?.[0]?.category_ratings?.service !== 4) throw new Error('Diary context or category ratings were not persisted');
 const editedVisit = await request(`/v1/visits/${visit.id}`, {
   method: 'PATCH',
-  body: JSON.stringify({ rating: 4, price: 52, note: 'Edited smoke' }),
+  body: JSON.stringify({ rating: 4, categoryRatings: { tortilla: 4, service: 4.5 }, price: 52, note: 'Edited smoke' }),
   token: bob.token
 });
 if (editedVisit.status !== 'updated') throw new Error('Visit owner could not edit the diary entry');
@@ -147,7 +153,7 @@ await request(`/v1/visits/${visit.id}`, {
   token: bob.token
 }, 400);
 const editedDiary = await request('/v1/diary', { token: bob.token });
-if (editedDiary.entries?.[0]?.rating !== 4 || editedDiary.entries?.[0]?.price !== 52 || editedDiary.entries?.[0]?.note !== 'Edited smoke') throw new Error('Edited diary context was not persisted');
+if (editedDiary.entries?.[0]?.rating !== 4 || editedDiary.entries?.[0]?.price !== 52 || editedDiary.entries?.[0]?.note !== 'Edited smoke' || editedDiary.entries?.[0]?.category_ratings?.tortilla !== 4) throw new Error('Edited diary context or category ratings were not persisted');
 const deletableVisit = await request('/v1/visits', {
   method: 'POST',
   body: JSON.stringify({ placeId: 'oriente', tacoIds: ['oriente-suadero'], tacoRatings: { 'oriente-suadero': 4 }, rating: 4 }),

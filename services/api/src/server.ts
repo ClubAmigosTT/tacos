@@ -40,6 +40,15 @@ async function resolveUser(request: FastifyRequest) {
   return findUserById(claims.userId);
 }
 
+const halfStarRating = z.number().min(0).max(5).refine((value) => Number.isInteger(value * 2), { message: 'Rating must use half-star increments' });
+const categoryRatingsSchema = z.object({
+  tortilla: halfStarRating.nullable().optional(),
+  service: halfStarRating.nullable().optional(),
+  price: halfStarRating.nullable().optional(),
+  meat: halfStarRating.nullable().optional(),
+  salsas: halfStarRating.nullable().optional()
+});
+
 async function enforceAuthRateLimit(request: FastifyRequest, reply: FastifyReply, discriminator: string) {
   const key = `${request.ip}:${discriminator}`.slice(0, 220);
   const result = await consumeAuthRateLimit(key);
@@ -361,7 +370,7 @@ app.post('/v1/catalog/proposals', async (request, reply) => {
 app.post('/v1/visits', async (request, reply) => {
   const user = await requireUser(request, reply);
   if (!user) return;
-  const body = z.object({ placeId: z.string(), tacoIds: z.array(z.string()).min(1), rating: z.number().min(1).max(5), tacoRatings: z.record(z.string(), z.number().min(1).max(5)).optional(), price: z.number().min(0).max(100000).optional(), note: z.string().trim().max(500).optional(), photoUrl: z.string().url().max(2000).optional(), latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional() }).parse(request.body);
+  const body = z.object({ placeId: z.string(), tacoIds: z.array(z.string()).default([]), rating: halfStarRating, categoryRatings: categoryRatingsSchema.optional(), tacoRatings: z.record(z.string(), z.number().min(1).max(5)).optional(), price: z.number().min(0).max(100000).optional(), note: z.string().trim().max(500).optional(), photoUrl: z.string().url().max(2000).optional(), latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional() }).parse(request.body);
   const place = await findPlace(body.placeId);
   if (!place) return reply.code(404).send({ error: 'BRANCH_NOT_FOUND' });
   const allowedTacos = new Set(place.tacos.map((taco) => taco.id));
@@ -378,7 +387,7 @@ app.patch('/v1/visits/:id', async (request, reply) => {
   const user = await requireUser(request, reply);
   if (!user) return;
   const params = z.object({ id: z.string() }).parse(request.params);
-  const body = z.object({ rating: z.number().min(1).max(5).optional(), tacoRatings: z.record(z.string(), z.number().min(1).max(5)).optional(), price: z.number().min(0).max(100000).nullable().optional(), note: z.string().trim().max(500).optional() }).refine((value) => Object.keys(value).length > 0, { message: 'At least one field is required' }).parse(request.body);
+  const body = z.object({ rating: halfStarRating.optional(), categoryRatings: categoryRatingsSchema.optional(), tacoRatings: z.record(z.string(), z.number().min(1).max(5)).optional(), price: z.number().min(0).max(100000).nullable().optional(), note: z.string().trim().max(500).optional() }).refine((value) => Object.keys(value).length > 0, { message: 'At least one field is required' }).parse(request.body);
   const updated = await updateVisitForUser(params.id, body, user.id);
   if (updated === 'not_found') return reply.code(404).send({ error: 'VISIT_NOT_FOUND' });
   if (updated === 'invalid_taco') return reply.code(400).send({ error: 'TACO_RATING_NOT_SELECTED' });
