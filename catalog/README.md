@@ -102,8 +102,11 @@ CATALOG_REPLACE_DEMO=true \
 pnpm catalog:import
 ```
 
-En Render, después de que el servicio tenga desplegadas las migraciones, la
-misma importación se puede ejecutar desde el Shell del servicio con:
+En Render, el arranque de producción ejecuta automáticamente un bootstrap
+idempotente después de las migraciones. Importa el feed sólo si nunca se ha
+importado o si el archivo versionado es más reciente; no corre cada vez que
+una persona abre la app. Si el plan permite Shell, la misma importación también
+se puede ejecutar manualmente con:
 
 ```bash
 CATALOG_REPLACE_DEMO=true pnpm catalog:import:osm

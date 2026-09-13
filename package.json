@@ -19,6 +19,7 @@
     "build:api": "pnpm --filter @tacos/api build",
     "catalog:import": "node scripts/import-catalog.mjs",
     "catalog:import:osm": "node scripts/import-osm-catalog.mjs",
+    "catalog:ensure:osm": "node scripts/ensure-osm-catalog.mjs",
     "catalog:discover:ids": "python scripts/discover-taqueria-ids.py --batch-size 60",
     "catalog:enrich:ids": "python scripts/enrich-taqueria-ids.py --batch-size 60",
     "catalog:build:osm": "node scripts/build-osm-catalog.mjs",
