@@ -119,13 +119,13 @@ export async function discover(options: { q?: string; lat?: number; lng?: number
     if (options.limit != null) params.set('limit', String(options.limit));
     const query = params.toString();
     const result = await request<{ places: Place[] }>(`/v1/discover${query ? `?${query}` : ''}`, undefined, token);
-    // A healthy API with an empty catalog must not erase the bundled snapshot
-    // for the normal browse screen. Search queries still preserve a genuine
-    // empty result.
+    // A healthy API with an empty catalog must not erase the small bundled
+    // fallback for the normal browse screen. Search queries still preserve a
+    // genuine empty result.
     return result.places.length || options.q?.trim() ? result.places : localDiscover(options);
   } catch (cause) {
-    // The catalog snapshot is part of the app, so discovery remains useful
-    // when the server is waking up or the device is temporarily offline.
+    // The small high-confidence snapshot remains useful while the server is
+    // waking up or the device is temporarily offline.
     return localDiscover(options);
   }
 }

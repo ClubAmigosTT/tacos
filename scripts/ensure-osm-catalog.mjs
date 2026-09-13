@@ -52,6 +52,10 @@ try {
     process.env.CATALOG_SOURCE_LICENSE = 'ODbL 1.0';
     process.env.CATALOG_ALLOW_PARTIAL = 'true';
     process.env.CATALOG_REPLACE_DEMO = 'true';
+    // The generated OSM feed is a complete snapshot of the selected
+    // high-confidence records. Archive older candidate rows that are no
+    // longer part of the curated feed.
+    process.env.CATALOG_RECONCILE = 'true';
 
     console.log(JSON.stringify({ sourceName, status: 'importing', inputPath }));
     await import('./import-catalog.mjs');

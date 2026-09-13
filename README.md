@@ -283,6 +283,17 @@ administradora puede aprobarlas desde `Moderación > Revisar catálogo
 comunitario`; las aprobadas se publican con calidad `community` y sin rating
 personal inventado.
 
+La cobertura regional también incluye el feed versionado de DENUE mayo de 2026
+para CDMX y Estado de México. Los ZIP originales se descargan localmente y el
+comando `pnpm catalog:build:denue` genera `catalog/denue-cdmx-edomex.json`
+seleccionando SCIAN 722514, con nombre, ubicación, dirección y teléfono cuando
+están disponibles. `pnpm catalog:build:all` genera un feed combinado opcional
+para auditoría/exportación, y Render ejecuta `catalog:ensure:denue` después de
+`catalog:ensure:osm`.
+La fuente, licencia, edición y fecha quedan guardadas en cada sucursal; la
+actualización de datos no requiere una consulta de Google ni que una persona
+abra la app.
+
 Para que CI ejecute además la validación remota del Blueprint, añade los secretos `RENDER_API_KEY` y `RENDER_WORKSPACE_ID` en GitHub. Sin ellos, el workflow mantiene la validación de sintaxis local y no intenta autenticarse.
 
 Después de aplicar la migración `009_admin_roles.sql`, puedes promover una cuenta existente desde la consola SQL de Render con `UPDATE users SET role = 'admin' WHERE email_lower = 'tu-correo@example.com';`. Para el primer registro también puedes definir `ADMIN_EMAILS` antes de crear la cuenta.

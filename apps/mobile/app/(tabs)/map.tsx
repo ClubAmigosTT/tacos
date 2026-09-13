@@ -90,8 +90,8 @@ export default function MapScreen() {
     enabled: !authLoading
   });
 
-  // The bundled catalog remains useful while the API wakes up or the device is
-  // offline. Fixtures are only a deliberate demo-mode fallback.
+  // The small bundled fallback remains useful while the API wakes up or the
+  // device is offline. Fixtures are only a deliberate demo-mode fallback.
   const discoveryPlaces = data ?? (isDemoMode() ? places : []);
   const sorted = useMemo(() => {
     if (active !== 'Barato') return discoveryPlaces;

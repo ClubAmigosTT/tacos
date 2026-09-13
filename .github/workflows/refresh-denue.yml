@@ -1,0 +1,57 @@
+name: Refresh DENUE catalog
+
+on:
+  # INEGI publishes DENUE by edition rather than daily. Running twice a month
+  # is intentionally cheap: unchanged editions produce no commit or deploy.
+  schedule:
+    - cron: '0 14 1,15 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tacos-denue-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download official DENUE bulk files
+        run: python scripts/download-denue.py --output-dir data/denue/latest
+
+      - name: Build regional catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          release="$(tr -d '[:space:]' < data/denue/latest/release.txt)"
+          python scripts/build-denue-catalog.py \
+            --input-dir data/denue/latest \
+            --release "$release" \
+            --output catalog/denue-cdmx-edomex.json
+
+      - name: Commit only when the edition changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- catalog/denue-cdmx-edomex.json; then
+            echo 'DENUE unchanged; no commit or deploy needed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add catalog/denue-cdmx-edomex.json
+          git commit -m 'chore: refresh DENUE catalog'
+          git push

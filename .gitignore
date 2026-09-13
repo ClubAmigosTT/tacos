@@ -17,4 +17,5 @@ taquerias_enriquecidas.csv
 taquerias_enriquecidas.json
 catalog/osm-boundaries.json
 !catalog/osm-cdmx-edomex.json
+data/denue/
 scripts/__pycache__/

@@ -121,18 +121,95 @@ quedan marcadas como `community` hasta que una fuente las confirme. Si una
 reimportación posterior actualiza el mismo registro desde OSM, la corrección
 debe revisarse nuevamente.
 
-## Catálogo local de la app
+## DENUE: cobertura regional sin consultas de pago
 
-La app móvil incluye una copia estática del feed OSM para poder mostrar el
-catálogo aunque la API o la conexión fallen. Se regenera al preparar cada
-versión de la app y se publica con una cadencia quincenal:
+La edición vigente descargada para este proyecto es DENUE mayo de 2026. La
+descarga masiva oficial se obtiene desde [INEGI](https://inegi.org.mx/app/descarga/?t=11).
+Para esta cobertura se necesitan los archivos de las entidades 09 (CDMX) y 15
+(Estado de México); la entidad 15 viene dividida en dos partes. Los ZIP
+originales se guardan localmente en `data/denue/202605/`, una ruta ignorada por
+git, y nunca se empaquetan en la aplicación.
+
+Después de descargar esos tres ZIP, el extractor selecciona la clase SCIAN
+`722514` (servicio de preparación de tacos y tortas) y también los nombres que
+dicen explícitamente `taco`, `taquería`, `barbacoa`, `carnitas`, `pastor`,
+`birria`, `suadero` o `canasta` dentro de otras actividades de restaurantes
+`7225`. Valida nombre y coordenadas, arma la dirección, conserva
+el teléfono cuando existe y quita duplicados exactos. Ejecuta:
+
+```bash
+pnpm catalog:download:denue
+pnpm catalog:build:denue
+```
+
+El primer comando descarga las tres partes actuales a `data/denue/latest/` y
+detecta la edición desde los metadatos del ZIP. Si se trabaja con una edición
+guardada en otra carpeta, se puede pasar `--input-dir` y `--release` al
+segundo comando.
+
+La salida es `catalog/denue-cdmx-edomex.json`. La ejecución comprobada con la
+edición 202605 produjo 34,413 sucursales: 12,537 en CDMX y 21,876 en Edomex.
+De ellas, 26,431 pertenecen a 722514 y 8,218 son negocios de otras actividades
+de restaurantes 7225 que tienen una señal explícita de tacos en el nombre.
+El DENUE aporta nombre, ubicación, actividad, dirección y, en algunos casos,
+teléfono; no aporta fotografías, menús, horarios semanales ni calificaciones de
+la comunidad.
+
+Para generar un feed combinado para auditorías, exportaciones o una migración
+manual, combina DENUE con los 584 registros OSM de alta confianza que no se
+dupliquen:
+
+```bash
+pnpm catalog:build:osm
+pnpm catalog:build:all
+```
+
+El feed combinado no sustituye las calificaciones ni las visitas: conserva los
+IDs de sucursal ya existentes de OSM y añade IDs estables `denue-*` para los
+registros de INEGI. Las coincidencias entre fuentes se mantienen una sola vez.
+En producción el API importa el feed OSM y el feed DENUE por separado; una
+coincidencia entre fuentes se trata como solapamiento normal y no oculta la
+sucursal existente.
+
+En Render, `catalog:ensure:osm` actualiza y reconcilia el subconjunto OSM de
+alta confianza, y `catalog:ensure:denue` hace lo mismo con DENUE al arrancar el
+API. Estos comandos son idempotentes y no dependen de que alguien abra la
+aplicación. El catálogo DENUE se puede regenerar cuando INEGI publique una
+nueva edición y distribuirse con la cadencia quincenal definida para el
+producto.
+
+El workflow `.github/workflows/refresh-denue.yml` repite esta descarga los días
+1 y 15 de cada mes. Si INEGI no cambió la edición, no crea commit ni deploy;
+cuando aparece una nueva edición, sólo actualiza el JSON regional y Render lo
+importa en el siguiente arranque. También se puede ejecutar manualmente desde
+GitHub Actions para comprobar una edición nueva.
+
+INEGI permite copiar, adaptar, extraer y explotar comercialmente su información,
+con la obligación de conservar metadatos, dar crédito y aclarar que cualquier
+transformación es responsabilidad de la aplicación. La ficha de cada sucursal
+conserva la fuente y la fecha de edición para que esa atribución no se pierda.
+Revisa los [Términos de Libre Uso de INEGI](https://www.inegi.org.mx/inegi/terminos.html)
+cuando cambie la edición.
+
+## Catálogo local de respaldo de la app
+
+La app móvil incluye una copia estática pequeña de los 584 registros OSM de
+alta confianza. Sirve para que Inicio y Mapa no queden vacíos mientras la API
+despierta o si el dispositivo pierde conexión, pero no es la fuente completa:
+el catálogo regional de 34,413 sucursales vive en PostgreSQL/PostGIS y el API
+devuelve como máximo 50 resultados por consulta. Empaquetar las 34,801 filas
+completas en JavaScript hace crecer el binario y puede agotar la memoria de
+Metro durante la compilación.
+
+Se regenera el respaldo al preparar cada versión de la app:
 
 ```bash
 pnpm catalog:build:mobile
 ```
 
 La salida se guarda en `apps/mobile/data/catalog.ts`. La app usa primero los
-datos de la API cuando están disponibles (para conservar calificaciones,
-visitas y actividad de usuarios) y usa esta copia local como respaldo. Cambiar
-el catálogo no llega automáticamente a teléfonos ya instalados: requiere una
-nueva versión de la app, idealmente cada 15 días.
+datos del API cuando están disponibles (para conservar calificaciones, visitas
+y actividad de usuarios) y usa la copia OSM como respaldo. Cambiar el catálogo
+DENUE llega al API en el siguiente deploy; no requiere que alguien abra la app
+ni una nueva versión de iOS. El respaldo OSM sí requiere una nueva versión,
+pero se mantiene deliberadamente pequeño.

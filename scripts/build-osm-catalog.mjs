@@ -7,6 +7,7 @@ const boundaryPath = resolve(process.env.OSM_BOUNDARIES_FILE ?? 'catalog/osm-bou
 const nominatimUrl = (process.env.NOMINATIM_URL?.trim() || 'https://nominatim.openstreetmap.org').replace(/\/$/, '');
 const userAgent = process.env.TACO_DISCOVERY_USER_AGENT?.trim() || 'TacosCatalog/1.0 (local catalog boundary preparation)';
 const refreshBoundaries = process.env.OSM_REFRESH_BOUNDARIES === 'true';
+const includeCandidates = process.env.OSM_INCLUDE_CANDIDATES === 'true';
 
 const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const dayAliases = new Map([
@@ -220,7 +221,7 @@ let duplicateRows = 0;
 
 for (const place of places) {
   const confidence = text(place.confidence);
-  if (confidence !== 'high' && confidence !== 'candidate') continue;
+  if (confidence !== 'high' && (!includeCandidates || confidence !== 'candidate')) continue;
   if (confidence === 'high') highRows += 1;
   else candidateRows += 1;
   const name = text(place.name);
@@ -309,7 +310,9 @@ await writeFile(outputPath, `${JSON.stringify({
   attribution: text(raw.attribution, '© OpenStreetMap contributors'),
   exportedAt: new Date().toISOString(),
   coverage: ['Ciudad de México', 'Estado de México'],
-  selection: 'confidence=high o candidate, nombre no vacío dentro de los límites administrativos de CDMX o Edomex',
+  selection: includeCandidates
+    ? 'confidence=high o candidate, nombre no vacío dentro de los límites administrativos de CDMX o Edomex'
+    : 'confidence=high, nombre no vacío dentro de los límites administrativos de CDMX o Edomex',
   stats: { inputRows: places.length, highRows, namedHighRows, candidateRows, namedCandidateRows, outsideRows, duplicateRows, branches: branches.length },
   branches
 }, null, 2)}\n`, 'utf8');

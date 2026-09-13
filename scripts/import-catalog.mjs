@@ -41,6 +41,7 @@ const seenKeys = new Map();
 const importedBranchIds = new Set();
 let upserted = 0;
 let duplicates = 0;
+let crossSourceDuplicates = 0;
 const requiredDays = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
 function text(value, fallback = '') { return typeof value === 'string' ? value.trim() : fallback; }
@@ -142,9 +143,17 @@ try {
       }
       seenKeys.set(key, index);
 
-      const duplicate = await client.query(`SELECT id FROM branches WHERE dedupe_key = $1 OR ($2::text IS NOT NULL AND source_name = $3 AND source_place_id = $2) LIMIT 1`, [key, sourcePlaceId, sourceName]);
+      const duplicate = await client.query(`SELECT id, source_name FROM branches WHERE dedupe_key = $1 OR ($2::text IS NOT NULL AND source_name = $3 AND source_place_id = $2) LIMIT 1`, [key, sourcePlaceId, sourceName]);
       if (duplicate.rows[0] && duplicate.rows[0].id !== id) {
         duplicates += 1;
+        // A place already supplied by another trusted catalog source is a
+        // normal cross-source overlap. Keep the existing stable branch and
+        // continue importing the rest of the feed; do not hide the existing
+        // place merely because two directories describe it.
+        if (duplicate.rows[0].source_name && duplicate.rows[0].source_name !== sourceName) {
+          crossSourceDuplicates += 1;
+          continue;
+        }
         await client.query("UPDATE branches SET catalog_status = 'needs_review', updated_at = now() WHERE id = $1", [duplicate.rows[0].id]);
         errors.push({ index, message: `conflicto con la sucursal existente ${duplicate.rows[0].id}` });
         continue;
@@ -198,11 +207,12 @@ try {
   // archiving valid places because of a bad source response.
   let archived = 0;
   let demoArchived = 0;
-  if (replaceDemo && !errors.length && duplicates === 0) {
+  const feedIsComplete = !errors.length && duplicates === crossSourceDuplicates;
+  if (replaceDemo && feedIsComplete) {
     const result = await client.query("UPDATE branches SET catalog_status = 'archived', is_active = false, updated_at = now() WHERE source_name = 'demo' AND catalog_status <> 'archived'");
     demoArchived = result.rowCount ?? 0;
   }
-  if (reconcile && !errors.length && duplicates === 0) {
+  if (reconcile && feedIsComplete) {
     const ids = [...importedBranchIds];
     const result = ids.length
       ? await client.query("UPDATE branches SET catalog_status = 'archived', is_active = false, updated_at = now() WHERE source_name = $1 AND NOT (id = ANY($2::text[])) AND catalog_status <> 'archived'", [sourceName, ids])
@@ -212,7 +222,7 @@ try {
 
   await client.query(`INSERT INTO catalog_imports (id, source_name, source_url, source_license, records_seen, records_upserted, duplicates_flagged, errors) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`, [randomUUID(), sourceName, sourceUrl, sourceLicense, rows.length, upserted, duplicates, JSON.stringify(errors)]);
   await client.query('COMMIT');
-  console.log(JSON.stringify({ sourceName, recordsSeen: rows.length, recordsUpserted: upserted, duplicatesFlagged: duplicates, demoArchived, archived, reconciliationApplied: reconcile && !errors.length && duplicates === 0, errors }, null, 2));
+  console.log(JSON.stringify({ sourceName, recordsSeen: rows.length, recordsUpserted: upserted, duplicatesFlagged: duplicates, crossSourceDuplicates, demoArchived, archived, reconciliationApplied: reconcile && feedIsComplete, errors }, null, 2));
 } catch (error) {
   await client.query('ROLLBACK');
   throw error;

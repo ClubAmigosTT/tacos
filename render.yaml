@@ -27,7 +27,7 @@ services:
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter @tacos/api build
     # Free web services do not support Render's paid-only preDeployCommand.
     # Run idempotent migrations before starting the API instead.
-    startCommand: pnpm --filter @tacos/api migrate && pnpm catalog:ensure:osm && pnpm --filter @tacos/api start
+    startCommand: pnpm --filter @tacos/api migrate && pnpm catalog:ensure:osm && pnpm catalog:ensure:denue && pnpm --filter @tacos/api start
     # GitHub-hosted Actions for this private repository share the account's
     # monthly allowance. Deploy directly from each commit so production does
     # not stop when that free allowance is exhausted.
