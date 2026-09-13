@@ -18,7 +18,9 @@ const config: ExpoConfig = {
   name: 'Tacos',
   slug: 'tacos',
   owner: 'clubamigostt',
-  version: '0.1.0',
+  // This project is distributed through the existing App Store Connect app
+  // whose current release line is 1.0.0.
+  version: '1.0.0',
   orientation: 'portrait',
   scheme: 'tacos',
   userInterfaceStyle: 'automatic',
@@ -33,7 +35,7 @@ const config: ExpoConfig = {
     // The first release is intentionally iPhone-first. Enabling iPad here
     // would advertise a layout that has not yet completed tablet QA.
     supportsTablet: false,
-    bundleIdentifier: 'com.clubamigostt.tacos',
+    bundleIdentifier: 'mx.marcelito.chop',
     config: {
       usesNonExemptEncryption: false
     },
