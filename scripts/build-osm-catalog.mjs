@@ -171,6 +171,14 @@ function regionName(coverage) {
   return coverage === 'cdmx' ? 'Ciudad de México' : 'Estado de México';
 }
 
+function slug(value) {
+  return text(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 64);
+}
+
+function dedupeKey(name, latitude, longitude) {
+  return `${slug(name)}:${Number(latitude).toFixed(4)}:${Number(longitude).toFixed(4)}`;
+}
+
 function styleFromCuisine(value) {
   const cuisine = text(value).toLowerCase();
   if (cuisine.includes('pastor')) return 'Pastor';
@@ -192,6 +200,7 @@ if (!Array.isArray(places)) throw new Error('El archivo enriquecido debe ser un 
 
 const boundaries = await loadBoundaries();
 const seenSourceIds = new Set();
+const seenDedupeKeys = new Set();
 const branches = [];
 let highRows = 0;
 let namedHighRows = 0;
@@ -220,6 +229,13 @@ for (const place of places) {
     continue;
   }
   seenSourceIds.add(sourcePlaceId);
+
+  const key = dedupeKey(name, place.latitude, place.longitude);
+  if (seenDedupeKeys.has(key)) {
+    duplicateRows += 1;
+    continue;
+  }
+  seenDedupeKeys.add(key);
 
   const id = `osm-${stableId(place)}`;
   const parsedHours = parseOpeningHours(place.opening_hours);
