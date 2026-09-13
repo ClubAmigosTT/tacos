@@ -1,21 +1,39 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, router } from 'expo-router';
-import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { lists as fixtureLists } from '@/data/fixtures';
-import { feed as feedRequest, lists as listsRequest, recommendations } from '@/lib/api';
+import { feed as feedRequest, isDemoMode, lists as listsRequest, recommendations } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { colors, radii, spacing } from '@/theme';
+import { colors, radii, shadows, spacing, typography } from '@/theme';
 import { PlaceCard } from '@/components/PlaceCard';
 import { SectionTitle } from '@/components/SectionTitle';
 import { RatingBadge } from '@/components/RatingBadge';
 import { AsyncErrorState } from '@/components/AsyncErrorState';
+import { BrandMark } from '@/components/DesignSystem';
+import { CatalogImage } from '@/components/CatalogImage';
 
 export default function HomeScreen() {
   const { token, user, loading: authLoading } = useAuth();
   const [search, setSearch] = useState('');
-  const { data = [], isError: recommendationsError, refetch: refetchRecommendations } = useQuery({ queryKey: ['recommendations', token], queryFn: () => recommendations(token), enabled: !authLoading });
+  const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number }>();
+  const demoMode = isDemoMode();
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    let active = true;
+    void (async () => {
+      try {
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (permission.status !== Location.PermissionStatus.GRANTED) return;
+        const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (active) setCoordinates({ latitude: current.coords.latitude, longitude: current.coords.longitude });
+      } catch { /* Location improves ranking but is never required to open the app. */ }
+    })();
+    return () => { active = false; };
+  }, []);
+  const { data = [], isError: recommendationsError, refetch: refetchRecommendations } = useQuery({ queryKey: ['recommendations', token, coordinates?.latitude, coordinates?.longitude], queryFn: () => recommendations(token, coordinates), enabled: !authLoading });
   const { data: feedData, isError: feedError, refetch: refetchFeed } = useQuery({ queryKey: ['feed', 'home', token], queryFn: () => feedRequest(token!), enabled: !authLoading && Boolean(token), staleTime: 60_000 });
   const { data: listData, isError: listsError, refetch: refetchLists } = useQuery({ queryKey: ['lists', 'home', token], queryFn: () => listsRequest(token), enabled: !authLoading, staleTime: 60_000 });
   const featured = data[0];
@@ -24,7 +42,7 @@ export default function HomeScreen() {
   const moment = hour >= 22 || hour < 4 ? 'DE MADRUGADA' : hour < 12 ? 'PARA DESAYUNAR' : 'AHORA';
   const activityItems = feedData?.items ?? [];
   const activityNeighborhoods = [...new Set(activityItems.map((item) => item.neighborhood).filter(Boolean))].slice(0, 2).join(' / ');
-  const homeList = listData?.lists.find((list) => list.visibility !== 'private') ?? (!token ? fixtureLists[0] : undefined);
+  const homeList = listData?.lists.find((list) => list.visibility !== 'private') ?? (!token && demoMode ? fixtureLists[0] : undefined);
   const listOwner = homeList?.owner.displayName ? `Por @${homeList.owner.displayName.toLowerCase().replace(/\s+/g, '')}` : 'Curaduría de la comunidad';
 
   function submitSearch() {
@@ -40,37 +58,37 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.kicker}>{user ? `PARA ${user.displayName.toUpperCase()} · CDMX` : `CDMX · ${moment}`}</Text>
-          <Text style={styles.logo}>tacos<Text style={styles.logoDot}>.</Text></Text>
+          <BrandMark />
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="Abrir mi perfil" style={styles.avatar} onPress={() => router.push('/(tabs)/profile')}><Text style={styles.avatarText}>{user?.displayName.slice(0, 1).toUpperCase() ?? 'M'}</Text></Pressable>
       </View>
 
       <View style={styles.search}>
-        <Ionicons name="search" size={20} color={colors.muted} />
-        <TextInput accessibilityLabel="Buscar tacos, taquerías o zonas" value={search} onChangeText={setSearch} onSubmitEditing={submitSearch} placeholder="¿Qué se te antoja?" placeholderTextColor={colors.muted} style={styles.searchInput} returnKeyType="search" />
+        <Ionicons name="search" size={20} color={colors.textSecondary} />
+        <TextInput accessibilityLabel="Buscar tacos, taquerías o zonas" value={search} onChangeText={setSearch} onSubmitEditing={submitSearch} placeholder="¿Qué se te antoja?" placeholderTextColor={colors.textSecondary} style={styles.searchInput} returnKeyType="search" />
         <Pressable accessibilityRole="button" accessibilityLabel="Ejecutar búsqueda" style={styles.searchShortcut} onPress={submitSearch}><Text style={styles.shortcutText}>↵</Text></Pressable>
       </View>
 
-      {token && recommendationsError ? <View style={styles.recommendationError}><AsyncErrorState title="No pudimos personalizar tu inicio" detail="Tus visitas siguen guardadas. Revisa la conexión para recuperar tus recomendaciones." onAction={() => void refetchRecommendations()} /></View> : featured ? (
+      {recommendationsError && !demoMode ? <View style={styles.recommendationError}><AsyncErrorState title={token ? 'No pudimos personalizar tu inicio' : 'No pudimos cargar el catálogo'} detail={token ? 'Tus visitas siguen guardadas. Revisa la conexión para recuperar tus recomendaciones.' : 'Revisa la conexión para ver recomendaciones reales.'} onAction={() => void refetchRecommendations()} /></View> : featured ? (
         <Link href={`/place/${featured.id}`} asChild>
-          <Pressable accessibilityRole="button" accessibilityLabel={`Abrir recomendación ${featured.name}, ${featuredTaco?.name ?? 'taco'} ${featuredTaco?.rating.toFixed(2) ?? featured.rating.toFixed(2)}`} style={styles.hero}>
-            <Image source={{ uri: featured.image }} style={styles.heroImage} />
+          <Pressable accessibilityRole="button" accessibilityLabel={`Abrir recomendación ${featured.name}, ${featuredTaco?.name ?? 'taco'} ${featuredTaco && featuredTaco.rating > 0 ? featuredTaco.rating.toFixed(2) : featured.rating > 0 ? featured.rating.toFixed(2) : 'sin calificación'}`} style={styles.hero}>
+            <CatalogImage uri={featured.image} accessibilityLabel={`Imagen de ${featured.name}`} style={styles.heroImage} />
             <View style={styles.heroShade} />
             <View style={styles.heroContent}>
               <View style={styles.heroPill}><Text style={styles.heroPillText}>RECOMENDADO AHORA</Text></View>
               <Text style={styles.heroTitle}>{featuredTaco?.name ?? 'Taco'} preciso{`\n`}cerca de ti.</Text>
-              <View style={styles.heroMeta}><RatingBadge rating={featuredTaco?.rating ?? featured.rating} accent /><Text style={styles.heroPlace}>{featured.name} · {featured.distance}</Text><Text style={styles.heroMatch}>{featured.match}%</Text></View>
+              <View style={styles.heroMeta}><RatingBadge rating={featuredTaco?.rating ?? featured.rating} accent /><Text style={styles.heroPlace}>{featured.name} · {featured.distance}</Text>{featured.match != null ? <Text style={styles.heroMatch}>{featured.match}%</Text> : null}</View>
               {featured.friendCount ? <Text style={styles.heroSocial}>{featured.socialMatch}% entre tus amigos · {featured.friendCount} personas</Text> : null}
             </View>
           </Pressable>
         </Link>
       ) : null}
 
-      <View style={styles.section}><SectionTitle eyebrow="tu mapa" title="Descubre cerca" action="Ver mapa →" onAction={() => router.push('/(tabs)/map')} /><ScrollView horizontal showsHorizontalScrollIndicator={false}>{data.map((place) => <PlaceCard key={place.id} place={place} />)}</ScrollView></View>
+      <View style={styles.section}><SectionTitle eyebrow="cerca de ti" title="¿Dónde comemos?" action="Ver mapa →" onAction={() => router.push('/(tabs)/map')} /><ScrollView horizontal showsHorizontalScrollIndicator={false}>{data.map((place) => <PlaceCard key={place.id} place={place} />)}</ScrollView></View>
 
-      <View style={styles.section}><SectionTitle eyebrow="actividad" title="Lo que está pasando" />{token && feedError ? <View style={styles.activityError}><View style={styles.activityErrorIcon}><Ionicons name="cloud-offline-outline" size={17} color={colors.background} /></View><View style={styles.activityCopy}><Text style={styles.activityTitle}>No pudimos cargar tu actividad</Text><Text style={styles.activityMeta}>Tus conexiones siguen intactas.</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Reintentar actividad" style={styles.activityRetry} onPress={() => void refetchFeed()}><Text style={styles.activityRetryText}>Reintentar</Text></Pressable></View> : <Pressable style={styles.activity} onPress={() => router.push('/feed')}><View style={styles.activityAvatars}>{token && activityItems.length ? activityItems.slice(0, 3).map((item, index) => <View key={`${item.user_id}-${index}`} style={[styles.miniAvatar, { backgroundColor: ['#DF7E54', '#728BC1', '#C08A54'][index] }]}><Text>{item.display_name.slice(0, 1).toUpperCase()}</Text></View>) : <><View style={[styles.miniAvatar, { backgroundColor: '#DF7E54' }]}><Text>J</Text></View><View style={[styles.miniAvatar, { backgroundColor: '#728BC1' }]}><Text>A</Text></View><View style={[styles.miniAvatar, { backgroundColor: '#C08A54' }]}><Text>R</Text></View></>}</View><View style={styles.activityCopy}><Text style={styles.activityTitle}>{token ? (activityItems.length ? 'Tu círculo está comiendo' : 'Encuentra gente con criterio') : 'Tus amigos están comiendo'}</Text><Text style={styles.activityMeta}>{token ? (activityItems.length ? `${activityItems.length} registros nuevos${activityNeighborhoods ? ` · ${activityNeighborhoods}` : ''}` : 'Sigue personas para llenar tu mapa social') : '3 registros nuevos · Roma / Narvarte'}</Text></View><Ionicons name="arrow-forward" size={17} color={colors.muted} /></Pressable>}</View>
+      <View style={styles.section}><SectionTitle eyebrow="entre amigos" title="Tus amigos andan comiendo" />{token && feedError ? <View style={styles.activityError}><View style={styles.activityErrorIcon}><Ionicons name="cloud-offline-outline" size={17} color={colors.meatDark} /></View><View style={styles.activityCopy}><Text style={styles.activityTitle}>No pudimos cargar tu actividad</Text><Text style={styles.activityMeta}>Tus conexiones siguen intactas.</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Reintentar actividad" style={styles.activityRetry} onPress={() => void refetchFeed()}><Text style={styles.activityRetryText}>Reintentar</Text></Pressable></View> : <Pressable style={styles.activity} onPress={() => router.push('/feed')}><View style={styles.activityAvatars}>{token && activityItems.length ? activityItems.slice(0, 3).map((item, index) => <View key={`${item.user_id}-${index}`} style={[styles.miniAvatar, { backgroundColor: [colors.avatarTerracotta, colors.avatarBlue, colors.avatarOchre][index] }]}><Text style={styles.miniAvatarText}>{item.display_name.slice(0, 1).toUpperCase()}</Text></View>) : demoMode ? <><View style={[styles.miniAvatar, { backgroundColor: colors.avatarTerracotta }]}><Text style={styles.miniAvatarText}>J</Text></View><View style={[styles.miniAvatar, { backgroundColor: colors.avatarBlue }]}><Text style={styles.miniAvatarText}>A</Text></View><View style={[styles.miniAvatar, { backgroundColor: colors.avatarOchre }]}><Text style={styles.miniAvatarText}>R</Text></View></> : <View style={styles.miniAvatarPlaceholder}><Ionicons name="people-outline" size={16} color={colors.textSecondary} /></View>}</View><View style={styles.activityCopy}><Text style={styles.activityTitle}>{token ? (activityItems.length ? 'Tu círculo está comiendo' : 'Encuentra gente con criterio') : demoMode ? 'Tus amigos están comiendo' : 'Construye tu círculo de tacos'}</Text><Text style={styles.activityMeta}>{token ? (activityItems.length ? `${activityItems.length} registros nuevos${activityNeighborhoods ? ` · ${activityNeighborhoods}` : ''}` : 'Sigue personas para llenar tu mapa social') : demoMode ? '3 registros nuevos · Roma / Narvarte' : 'Entra para seguir personas y ver actividad real'}</Text></View><Ionicons name="arrow-forward" size={17} color={colors.textSecondary} /></Pressable>}</View>
 
-      <View style={styles.section}><SectionTitle eyebrow="selección editorial" title="Listas para esta noche" />{token && listsError ? <View style={styles.listError}><View style={styles.listErrorIcon}><Ionicons name="cloud-offline-outline" size={17} color={colors.background} /></View><View style={styles.listCopy}><Text style={styles.listTitle}>No pudimos cargar las listas</Text><Text style={styles.listMeta}>La curaduría sigue intacta.</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Reintentar listas" style={styles.listRetry} onPress={() => void refetchLists()}><Text style={styles.listRetryText}>Reintentar</Text></Pressable></View> : <Pressable style={styles.listCard} onPress={() => router.push('/lists')}><View style={styles.listNumber}><Text style={styles.listNumberText}>{homeList ? String(homeList.itemCount).padStart(2, '0') : '—'}</Text><Text style={styles.listNumberLabel}>LUGARES</Text></View><View style={styles.listCopy}><Text style={styles.listTitle}>{homeList?.title ?? 'Descubre las listas de la comunidad'}</Text><Text style={styles.listMeta}>{homeList ? `${listOwner} · ${homeList.visitedCount}/${homeList.itemCount} visitados` : 'Crea una selección para volver a ella.'}</Text></View><Ionicons name="chevron-forward" size={19} color={colors.muted} /></Pressable>}</View>
+      <View style={styles.section}><SectionTitle eyebrow="para hoy" title="Tacos para esta noche" />{token && listsError ? <View style={styles.listError}><View style={styles.listErrorIcon}><Ionicons name="cloud-offline-outline" size={17} color={colors.meatDark} /></View><View style={styles.listCopy}><Text style={styles.listTitle}>No pudimos cargar las listas</Text><Text style={styles.listMeta}>La curaduría sigue intacta.</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Reintentar listas" style={styles.listRetry} onPress={() => void refetchLists()}><Text style={styles.listRetryText}>Reintentar</Text></Pressable></View> : <Pressable style={styles.listCard} onPress={() => router.push('/lists')}><View style={styles.listNumber}><Text style={styles.listNumberText}>{homeList ? String(homeList.itemCount).padStart(2, '0') : '—'}</Text><Text style={styles.listNumberLabel}>LUGARES</Text></View><View style={styles.listCopy}><Text style={styles.listTitle}>{homeList?.title ?? 'Descubre las listas de la comunidad'}</Text><Text style={styles.listMeta}>{homeList ? `${listOwner} · ${homeList.visitedCount}/${homeList.itemCount} visitados` : 'Crea una selección para volver a ella.'}</Text></View><Ionicons name="chevron-forward" size={19} color={colors.textSecondary} /></Pressable>}</View>
     </ScrollView>
   );
 }
@@ -78,50 +96,50 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   loading: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  loadingText: { color: colors.muted, fontSize: 13 },
+  loadingText: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular, fontSize: 13 },
   content: { paddingHorizontal: spacing.lg, paddingTop: 66, paddingBottom: 38 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
-  kicker: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, marginBottom: 4 },
-  logo: { color: colors.ink, fontSize: 34, fontWeight: '900', letterSpacing: -1.8 },
-  logoDot: { color: colors.accent },
-  avatar: { width: 38, height: 38, borderRadius: 20, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: colors.background, fontWeight: '900' },
-  search: { height: 54, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, gap: 11, marginBottom: spacing.lg },
-  searchInput: { color: colors.ink, fontSize: 15, flex: 1, paddingVertical: 0 },
-  searchShortcut: { borderWidth: 1, borderColor: colors.border, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 4 },
-  shortcutText: { color: colors.dim, fontSize: 11, fontWeight: '700' },
-  hero: { height: 330, borderRadius: radii.lg, overflow: 'hidden', marginBottom: spacing.xl, backgroundColor: colors.surfaceRaised },
+  kicker: { color: colors.textSecondary, fontFamily: typography.fontFamily.medium, fontSize: typography.size.micro, fontWeight: typography.weight.medium, letterSpacing: 1.2, marginBottom: 4 },
+  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.tortilla, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: colors.meatDark, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold },
+  search: { height: 56, borderRadius: radii.md, borderWidth: 1, borderColor: colors.borderStrong, backgroundColor: colors.surfaceElevated, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, gap: 11, marginBottom: spacing.lg },
+  searchInput: { color: colors.textPrimary, fontFamily: typography.fontFamily.regular, fontSize: 15, flex: 1, paddingVertical: 0 },
+  searchShortcut: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.xs, paddingHorizontal: 8, paddingVertical: 5 },
+  shortcutText: { color: colors.textTertiary, fontFamily: typography.fontFamily.medium, fontSize: 11, fontWeight: typography.weight.medium },
+  hero: { height: 330, borderRadius: radii.lg, overflow: 'hidden', marginBottom: spacing.xl, backgroundColor: colors.surfaceElevated, ...shadows.floating },
   heroImage: { width: '100%', height: '100%' },
-  heroShade: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(3,5,4,0.43)' },
+  heroShade: { ...StyleSheet.absoluteFill, backgroundColor: colors.overlay },
   heroContent: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.lg },
-  heroPill: { alignSelf: 'flex-start', backgroundColor: colors.accent, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 12 },
-  heroPillText: { color: colors.background, fontSize: 9, fontWeight: '900', letterSpacing: 1 },
-  heroTitle: { color: colors.ink, fontSize: 34, lineHeight: 35, fontWeight: '900', letterSpacing: -1.2, marginBottom: 15 },
+  heroPill: { alignSelf: 'flex-start', backgroundColor: colors.tortilla, borderRadius: radii.pill, paddingHorizontal: 11, paddingVertical: 7, marginBottom: 12 },
+  heroPillText: { color: colors.meatDark, fontFamily: typography.fontFamily.semibold, fontSize: typography.size.micro, fontWeight: typography.weight.semibold, letterSpacing: 1 },
+  heroTitle: { color: colors.textPrimary, fontFamily: typography.fontFamily.bold, fontSize: 34, lineHeight: 35, fontWeight: typography.weight.bold, letterSpacing: typography.tracking.display, marginBottom: 15 },
   heroMeta: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  heroPlace: { color: colors.ink, fontSize: 12, fontWeight: '700', flex: 1 },
-  heroMatch: { color: colors.accent, fontSize: 13, fontWeight: '900' },
-  heroSocial: { color: colors.ink, opacity: 0.75, fontSize: 10, fontWeight: '800', marginTop: 8 },
+  heroPlace: { color: colors.textPrimary, fontFamily: typography.fontFamily.medium, fontSize: 12, fontWeight: typography.weight.medium, flex: 1 },
+  heroMatch: { color: colors.cilantroLight, fontFamily: typography.fontFamily.bold, fontSize: 13, fontWeight: typography.weight.bold },
+  heroSocial: { color: colors.textPrimary, opacity: 0.75, fontFamily: typography.fontFamily.medium, fontSize: 10, fontWeight: typography.weight.medium, marginTop: 8 },
   recommendationError: { minHeight: 260, borderRadius: radii.lg, overflow: 'hidden', marginBottom: spacing.xl },
   section: { marginBottom: spacing.xl },
-  activity: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, gap: 12 },
+  activity: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, gap: 12, ...shadows.card },
   activityAvatars: { flexDirection: 'row', width: 66 },
   miniAvatar: { width: 30, height: 30, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface, marginRight: -7 },
+  miniAvatarPlaceholder: { width: 30, height: 30, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceRaised, borderWidth: 2, borderColor: colors.surface },
+  miniAvatarText: { color: colors.meatDark, fontFamily: typography.fontFamily.semibold, fontSize: 12, fontWeight: typography.weight.semibold },
   activityCopy: { flex: 1 },
-  activityTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
-  activityMeta: { color: colors.muted, fontSize: 11, marginTop: 4 },
-  activityError: { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: colors.surface, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
-  activityErrorIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.warm, alignItems: 'center', justifyContent: 'center' },
-  activityRetry: { borderRadius: radii.pill, backgroundColor: colors.accent, paddingHorizontal: 11, paddingVertical: 8 },
-  activityRetryText: { color: colors.background, fontSize: 10, fontWeight: '900' },
-  listCard: { flexDirection: 'row', alignItems: 'center', gap: 15, borderRadius: radii.md, backgroundColor: colors.surfaceRaised, padding: spacing.md },
-  listNumber: { alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: 13, backgroundColor: colors.accent },
-  listNumberText: { color: colors.background, fontSize: 25, fontWeight: '900', lineHeight: 26 },
-  listNumberLabel: { color: colors.background, fontSize: 7, fontWeight: '900', letterSpacing: 0.8 },
+  activityTitle: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, fontSize: 14, fontWeight: typography.weight.semibold },
+  activityMeta: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular, fontSize: 11, marginTop: 4 },
+  activityError: { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, ...shadows.card },
+  activityErrorIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.salsa, alignItems: 'center', justifyContent: 'center' },
+  activityRetry: { borderRadius: radii.pill, backgroundColor: colors.tortilla, paddingHorizontal: 11, paddingVertical: 8 },
+  activityRetryText: { color: colors.meatDark, fontFamily: typography.fontFamily.semibold, fontSize: 10, fontWeight: typography.weight.semibold },
+  listCard: { flexDirection: 'row', alignItems: 'center', gap: 15, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated, padding: spacing.md, ...shadows.card },
+  listNumber: { alignItems: 'center', justifyContent: 'center', width: 58, height: 58, borderRadius: radii.sm, backgroundColor: colors.tortilla },
+  listNumberText: { color: colors.meatDark, fontFamily: typography.fontFamily.bold, fontSize: 25, fontWeight: typography.weight.bold, lineHeight: 26 },
+  listNumberLabel: { color: colors.meatDark, fontFamily: typography.fontFamily.semibold, fontSize: 7, fontWeight: typography.weight.semibold, letterSpacing: 0.8 },
   listCopy: { flex: 1 },
-  listTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
-  listMeta: { color: colors.muted, fontSize: 11, marginTop: 5 },
-  listError: { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: colors.surface, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
-  listErrorIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.warm, alignItems: 'center', justifyContent: 'center' },
-  listRetry: { borderRadius: radii.pill, backgroundColor: colors.accent, paddingHorizontal: 11, paddingVertical: 8 },
-  listRetryText: { color: colors.background, fontSize: 10, fontWeight: '900' }
+  listTitle: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, fontSize: 15, fontWeight: typography.weight.semibold },
+  listMeta: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular, fontSize: 11, marginTop: 5 },
+  listError: { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, ...shadows.card },
+  listErrorIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.salsa, alignItems: 'center', justifyContent: 'center' },
+  listRetry: { borderRadius: radii.pill, backgroundColor: colors.tortilla, paddingHorizontal: 11, paddingVertical: 8 },
+  listRetryText: { color: colors.meatDark, fontFamily: typography.fontFamily.semibold, fontSize: 10, fontWeight: typography.weight.semibold }
 });

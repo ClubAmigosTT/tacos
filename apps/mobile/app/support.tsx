@@ -1,6 +1,6 @@
 import { Linking, Pressable, StyleSheet, Text } from 'react-native';
 import { PublicInfoPage } from '@/components/PublicInfoPage';
-import { colors, radii } from '@/theme';
+import { colors, radii, typography } from '@/theme';
 
 export default function SupportScreen() {
   return <PublicInfoPage eyebrow="AYUDA Y SOPORTE" title="¿Cómo podemos ayudarte?" intro="Resolvemos problemas de acceso, datos, contenido y funcionamiento de Tacos." sections={[
@@ -13,6 +13,6 @@ export default function SupportScreen() {
 
 const styles = StyleSheet.create({
   button: { borderRadius: radii.pill },
-  buttonText: { color: colors.accent, fontWeight: '900' }
+  buttonText: { color: colors.tortilla, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold }
 });
 

@@ -1,13 +1,20 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors } from '@/theme';
+import { colors, typography } from '@/theme';
 
-export function MapPin({ label, accent = false }: { label: string; accent?: boolean }) {
-  return <View style={[styles.pin, accent && styles.pinAccent]}><Text style={[styles.text, accent && styles.textAccent]}>{label}</Text></View>;
+export function MapPin({ label, accent = false, variant }: { label: string; accent?: boolean; variant?: 'default' | 'visited' | 'saved' | 'match' }) {
+  const tone = variant ?? (accent ? 'match' : 'default');
+  return <View style={[styles.pin, styles[`pin_${tone}`]]}><Text style={[styles.text, styles[`text_${tone}`]]}>{label}</Text></View>;
 }
 
 const styles = StyleSheet.create({
-  pin: { minWidth: 44, height: 32, borderRadius: 18, paddingHorizontal: 8, backgroundColor: colors.surface, borderWidth: 2, borderColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
-  pinAccent: { backgroundColor: colors.accent, borderColor: colors.background },
-  text: { color: colors.ink, fontSize: 12, fontWeight: '900' },
-  textAccent: { color: colors.background }
+  pin: { minWidth: 46, height: 34, borderRadius: 18, paddingHorizontal: 9, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  pin_default: { backgroundColor: colors.tortilla, borderColor: colors.meatDark },
+  pin_visited: { backgroundColor: colors.cilantro, borderColor: colors.meatDark },
+  pin_saved: { backgroundColor: colors.salsa, borderColor: colors.meatDark },
+  pin_match: { backgroundColor: colors.cilantroLight, borderColor: colors.meatDark },
+  text: { fontFamily: typography.fontFamily.bold, fontSize: 12, fontWeight: typography.weight.bold },
+  text_default: { color: colors.meatDark },
+  text_visited: { color: colors.textPrimary },
+  text_saved: { color: colors.meatDark },
+  text_match: { color: colors.meatDark }
 });

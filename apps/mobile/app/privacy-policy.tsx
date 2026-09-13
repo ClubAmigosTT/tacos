@@ -1,8 +1,8 @@
 import { Text } from 'react-native';
 import { PublicInfoPage } from '@/components/PublicInfoPage';
-import { colors } from '@/theme';
+import { colors, typography } from '@/theme';
 
-const LinkText = ({ children }: { children: string }) => <Text style={{ color: colors.accent, fontWeight: '800' }}>{children}</Text>;
+const LinkText = ({ children }: { children: string }) => <Text style={{ color: colors.tortilla, fontFamily: typography.fontFamily.semibold, fontWeight: typography.weight.semibold }}>{children}</Text>;
 
 export default function PrivacyPolicyScreen() {
   return <PublicInfoPage eyebrow="VIGENTE DESDE EL 10 DE SEPTIEMBRE DE 2026" title="Política de privacidad" intro="Tacos es una comunidad para descubrir, registrar y compartir experiencias gastronómicas. Esta política explica qué datos tratamos y qué control tienes sobre ellos." sections={[
@@ -15,4 +15,3 @@ export default function PrivacyPolicyScreen() {
     { title: 'Contacto', body: <>Para preguntas de privacidad, acceso o eliminación escribe a <LinkText>hola@clubamigostt.com</LinkText>. Respondemos desde Ciudad de México, México.</> }
   ]} />;
 }
-

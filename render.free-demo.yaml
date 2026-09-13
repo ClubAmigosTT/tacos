@@ -32,6 +32,8 @@ services:
         value: "false"
       - key: CATALOG_FILE
         value: catalog/branches.json
+      - key: CATALOG_RECONCILE
+        value: "false"
       - key: ALLOW_DEMO_CATALOG
         value: "true"
 databases:

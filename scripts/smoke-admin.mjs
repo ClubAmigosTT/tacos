@@ -24,6 +24,31 @@ const admin = await register('admin-smoke@example.com', 'Admin Smoke');
 const author = await register(`author-${suffix}@example.com`, 'Author Smoke');
 const viewer = await register(`viewer-${suffix}@example.com`, 'Viewer Smoke');
 
+const catalogProposal = await request('/v1/catalog/proposals', {
+  method: 'POST',
+  body: JSON.stringify({ kind: 'menu_item', branchId: 'vilsito', payload: { name: `Taco smoke ${suffix}`, price: 27, note: 'Propuesta de prueba' }, evidenceUrl: 'https://example.com/catalog-smoke' }),
+  token: viewer.token
+}, 201);
+await request('/v1/admin/catalog/proposals', { token: viewer.token }, 403);
+const catalogQueue = await request('/v1/admin/catalog/proposals', { token: admin.token });
+if (!catalogQueue.proposals?.some((proposal) => proposal.id === catalogProposal.id && proposal.status === 'pending')) throw new Error('Admin catalog queue did not include the pending proposal');
+const approvedCatalogProposal = await request(`/v1/admin/catalog/proposals/${catalogProposal.id}`, { method: 'PATCH', body: JSON.stringify({ action: 'approve', reviewNote: 'Datos comprobados' }), token: admin.token });
+if (approvedCatalogProposal.status !== 'approved') throw new Error('Admin catalog approval failed');
+const catalogAfterApproval = await request('/v1/branches/vilsito');
+if (!catalogAfterApproval.tacos?.some((taco) => taco.id === `community-${catalogProposal.id}`)) throw new Error('Approved catalog taco was not published');
+
+const branchProposal = await request('/v1/catalog/proposals', {
+  method: 'POST',
+  body: JSON.stringify({ kind: 'branch', payload: { name: `Tacos smoke ${suffix}`, neighborhood: 'Roma Sur', address: 'Calle de prueba 123', latitude: 19.4055, longitude: -99.1622 }, evidenceUrl: 'https://example.com/branch-smoke' }),
+  token: viewer.token
+}, 201);
+await request(`/v1/admin/catalog/proposals/${branchProposal.id}`, { method: 'PATCH', body: JSON.stringify({ action: 'approve' }), token: admin.token });
+const communityBranchId = `community-${branchProposal.id}`;
+const communityBranch = await request(`/v1/branches/${communityBranchId}`);
+if (communityBranch.rating !== 0 || communityBranch.match !== undefined) throw new Error('Approved community branch exposed an invented score');
+const communityTaqueria = await request(`/v1/taquerias/${communityBranchId}`);
+if (communityTaqueria.branchCount !== 1 || communityTaqueria.branches?.[0]?.id !== communityBranchId) throw new Error('Approved community branch was not available through its taqueria');
+
 await request('/v1/events', { method: 'POST', body: JSON.stringify({ eventName: 'app_open', properties: { source: 'admin-smoke' } }), token: viewer.token }, 202);
 await request('/v1/admin/analytics', { token: viewer.token }, 403);
 const analytics = await request('/v1/admin/analytics', { token: admin.token });

@@ -11,16 +11,18 @@ export type ApiTaqueria = { id: string; name: string; slug: string; description:
 export type FeedItem = { id: string; visited_at: string; rating: number; note?: string; user_id: string; display_name: string; place_id: string; place_name: string; neighborhood: string; image_url: string; tacos: string; comment_count?: number };
 export type BranchReview = { id: string; visitedAt: string; rating: number; note: string; photoUrl?: string | null; tacos: string; user: { id: string; displayName: string } };
 export type VisitComment = { id: string; body: string; createdAt: string; author: { id: string; displayName: string }; own: boolean };
-export type TasteProfile = { title: string; description: string; tags: string[]; profile: { intensity: number; spicy: number; traditional: number; texture: number; value: number } };
+export type TasteProfile = { title: string; description: string; tags: string[]; profile: { intensity: number; spicy: number; traditional: number; texture: number; value: number }; hasData?: boolean };
 export type PassportZone = { name: string; note: string; branchCount: number; visitCount: number; unlocked: boolean };
 export type PassportData = { zones: PassportZone[]; totalZones: number; visitedZones: number };
 export type AdminReport = { id: string; visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details: string; status: 'open' | 'reviewed' | 'dismissed'; createdAt: string; reporter: { id: string; displayName: string }; author: { id: string; displayName: string }; place: { id: string; name: string }; rating: number; visitedAt: string };
 export type AdminComment = { id: string; visitId: string; body: string; visibility: 'visible' | 'hidden'; createdAt: string; author: { id: string; displayName: string }; place: { id: string; name: string } };
 export type AdminAnalytics = { days: number; totalEvents: number; uniqueAudiences: number; byEvent: Array<{ eventName: string; count: number }> };
 export type UserProfile = { user: { id: string; displayName: string; following?: boolean }; stats: { visits: number; averageRating: number | null; listCount: number }; taste: TasteProfile; lists: ApiList[] };
+export type CatalogProposal = { id: string; kind: 'branch' | 'menu_item' | 'correction'; branchId?: string; payload: Record<string, unknown>; evidenceUrl?: string; status: 'pending' | 'approved' | 'rejected'; reviewNote: string; createdAt: string; updatedAt: string; proposer?: { id: string; displayName: string }; reviewer?: { id: string; displayName: string } };
 
 const configuredUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
 const API_URL = configuredUrl?.replace(/\/$/, '');
+const DEMO_MODE = Constants.expoConfig?.extra?.demoMode === true;
 const REQUEST_TIMEOUT_MS = 15_000;
 const ANONYMOUS_ID_KEY = 'tacos.analytics.anonymous_id';
 let anonymousIdPromise: Promise<string> | undefined;
@@ -29,6 +31,10 @@ export class ApiError extends Error {
     super(`API ${status}`);
     this.name = 'ApiError';
   }
+}
+
+export function isDemoMode() {
+  return DEMO_MODE;
 }
 
 export type ProductEventProperty = string | number | boolean | null;
@@ -108,12 +114,15 @@ export async function adminAnalytics(token: string, days = 14) {
   return request<{ analytics: AdminAnalytics }>(`/v1/admin/analytics?days=${days}`, undefined, token);
 }
 
-export async function discover(options: { q?: string; lat?: number; lng?: number; limit?: number } = {}, token?: string): Promise<Place[]> {
+export async function discover(options: { q?: string; lat?: number; lng?: number; radiusKm?: number; offset?: number; openNow?: boolean; limit?: number } = {}, token?: string): Promise<Place[]> {
   try {
     const params = new URLSearchParams();
     if (options.q?.trim()) params.set('q', options.q.trim());
     if (options.lat != null) params.set('lat', String(options.lat));
     if (options.lng != null) params.set('lng', String(options.lng));
+    if (options.radiusKm != null) params.set('radiusKm', String(options.radiusKm));
+    if (options.offset != null) params.set('offset', String(options.offset));
+    if (options.openNow != null) params.set('openNow', String(options.openNow));
     if (options.limit != null) params.set('limit', String(options.limit));
     const query = params.toString();
     const result = await request<{ places: Place[] }>(`/v1/discover${query ? `?${query}` : ''}`, undefined, token);
@@ -122,7 +131,7 @@ export async function discover(options: { q?: string; lat?: number; lng?: number
     // Anonymous discovery can keep using the local catalog for design/offline
     // review. Once a session exists, never present demo branches as if they
     // were the current server-backed result set.
-    if (token) throw cause;
+    if (token || !DEMO_MODE) throw cause;
     const terms = options.q?.trim() ? searchTerms(options.q.trim()) : [];
     const filtered = options.q?.trim()
       ? places.filter((place) => {
@@ -137,15 +146,16 @@ export async function discover(options: { q?: string; lat?: number; lng?: number
   }
 }
 
-export async function recommendations(token?: string): Promise<Place[]> {
+export async function recommendations(token?: string, location?: { latitude: number; longitude: number }): Promise<Place[]> {
   try {
-    const result = await request<{ places: Place[] }>('/v1/recommendations', undefined, token);
+    const params = location ? `?lat=${encodeURIComponent(String(location.latitude))}&lng=${encodeURIComponent(String(location.longitude))}` : '';
+    const result = await request<{ places: Place[] }>(`/v1/recommendations${params}`, undefined, token);
     return result.places;
   } catch (cause) {
     // Anonymous discovery can keep using the local catalog for design/offline
     // review. Once a session exists, surface the failure so private affinity
     // signals are never replaced silently by demo recommendations.
-    if (token) throw cause;
+    if (token || !DEMO_MODE) throw cause;
     return places;
   }
 }
@@ -166,7 +176,7 @@ export async function getPlace(id: string, token?: string): Promise<Place> {
     // resurrect a stale local fixture in its place; the route can then show
     // the proper unavailable state. Network/5xx failures may still use the
     // catalog fallback while the API recovers.
-    if (cause instanceof ApiError && cause.status < 500) throw cause;
+    if (!DEMO_MODE || cause instanceof ApiError && cause.status < 500) throw cause;
     const fallback = places.find((place) => place.id === id);
     if (!fallback) throw new Error('Taquería no encontrada');
     return fallback;
@@ -193,7 +203,7 @@ export async function getTaqueria(id: string) {
   try {
     return await request<ApiTaqueria>(`/v1/taquerias/${id}`);
   } catch (cause) {
-    if (cause instanceof ApiError && cause.status < 500) throw cause;
+    if (!DEMO_MODE || cause instanceof ApiError && cause.status < 500) throw cause;
     const branches = places.filter((place) => (place.taqueriaId ?? place.id) === id);
     if (!branches.length) throw new Error('Taquería no encontrada');
     const first = branches[0];
@@ -368,4 +378,16 @@ export async function adminComments(token: string, visibility: 'visible' | 'hidd
 
 export async function reviewComment(commentId: string, action: 'hide' | 'restore', token: string) {
   return request<{ status: string; commentId: string }>(`/v1/admin/comments/${encodeURIComponent(commentId)}`, { method: 'PATCH', body: JSON.stringify({ action }) }, token);
+}
+
+export async function createCatalogProposal(input: { kind: CatalogProposal['kind']; branchId?: string; payload: Record<string, unknown>; evidenceUrl?: string }, token: string) {
+  return request<CatalogProposal>('/v1/catalog/proposals', { method: 'POST', body: JSON.stringify(input) }, token);
+}
+
+export async function adminCatalogProposals(token: string, status: CatalogProposal['status'] | 'all' = 'pending') {
+  return request<{ proposals: CatalogProposal[] }>(`/v1/admin/catalog/proposals?status=${status}`, undefined, token);
+}
+
+export async function reviewCatalogProposal(id: string, action: 'approve' | 'reject', token: string, reviewNote = '') {
+  return request<{ status: string; proposalId: string }>(`/v1/admin/catalog/proposals/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ action, reviewNote }) }, token);
 }

@@ -12,6 +12,8 @@ services:
           name: tacos-api
           type: web
           envVarKey: RENDER_EXTERNAL_URL
+      - key: EXPO_PUBLIC_DEMO_MODE
+        value: "false"
     routes:
       - type: rewrite
         source: /*
@@ -84,14 +86,18 @@ services:
       - key: STORAGE_REQUIRED
         value: "false"
       - key: CATALOG_FILE
-        value: catalog/branches.json
+        value: catalog/osm-cdmx-edomex.json
       - key: CATALOG_FEED_URL
         sync: false
       - key: CATALOG_SOURCE_NAME
-        sync: false
+        value: osm-cdmx-edomex
       - key: CATALOG_SOURCE_URL
-        sync: false
+        value: https://www.openstreetmap.org
       - key: CATALOG_SOURCE_LICENSE
-        sync: false
+        value: ODbL 1.0
+      - key: CATALOG_ALLOW_PARTIAL
+        value: "true"
+      - key: CATALOG_RECONCILE
+        value: "false"
       - key: ALLOW_DEMO_CATALOG
         value: "false"

@@ -1,6 +1,7 @@
 export type ApiTaco = { id: string; name: string; rating: number; price: number; note: string };
+export type ApiPhoto = { url: string; sourceUrl?: string; license: string; attribution: string };
 export type FlavorProfile = { intensity: number; spicy: number; traditional: number; texture: number; value: number };
-export type TasteProfile = { title: string; description: string; tags: string[]; profile: FlavorProfile };
+export type TasteProfile = { title: string; description: string; tags: string[]; profile: FlavorProfile; hasData: boolean };
 export type ApiPlace = {
   id: string;
   taqueriaId?: string;
@@ -10,6 +11,8 @@ export type ApiPlace = {
   address?: string;
   phone?: string;
   weeklyHours?: Record<string, Array<{ open: string; close: string }>>;
+  /** False means the source explicitly has no reliable weekly schedule. */
+  hoursKnown?: boolean;
   priceMin?: number;
   priceMax?: number;
   source?: { name?: string; url?: string; license?: string; attribution?: string; updatedAt?: string };
@@ -18,12 +21,13 @@ export type ApiPlace = {
   rating: number;
   /** Number of visible reviews contributing to the reputation score. */
   reviewCount?: number;
-  match: number;
+  match?: number;
   style: string;
   coordinates: { latitude: number; longitude: number };
   image: string;
   description: string;
   tacos: ApiTaco[];
+  photos?: ApiPhoto[];
   tags: string[];
   flavorProfile: FlavorProfile;
   tasteMatch?: number;

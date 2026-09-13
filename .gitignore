@@ -8,3 +8,13 @@ build/
 *.log
 coverage/
 catalog/branches.json
+taqueria_ids.sqlite
+taqueria_ids.sqlite-shm
+taqueria_ids.sqlite-wal
+taqueria_ids.txt
+taqueria_ids.csv
+taquerias_enriquecidas.csv
+taquerias_enriquecidas.json
+catalog/osm-boundaries.json
+!catalog/osm-cdmx-edomex.json
+scripts/__pycache__/

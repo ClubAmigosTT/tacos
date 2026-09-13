@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, radii, spacing } from '@/theme';
+import { colors, radii, spacing, typography } from '@/theme';
 
 export function AsyncErrorState({
   title,
@@ -28,9 +28,9 @@ export function AsyncErrorState({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  icon: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.warm, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg },
-  title: { color: colors.ink, fontSize: 20, fontWeight: '900', textAlign: 'center' },
-  detail: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: spacing.sm, maxWidth: 300 },
-  button: { backgroundColor: colors.accent, borderRadius: radii.md, minHeight: 48, paddingHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: spacing.lg },
-  buttonText: { color: colors.background, fontSize: 13, fontWeight: '900' }
+  icon: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.salsa, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg },
+  title: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, fontSize: 20, fontWeight: typography.weight.semibold, textAlign: 'center' },
+  detail: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: spacing.sm, maxWidth: 300 },
+  button: { backgroundColor: colors.tortilla, borderRadius: radii.md, minHeight: 48, paddingHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: spacing.lg },
+  buttonText: { color: colors.meatDark, fontFamily: typography.fontFamily.semibold, fontSize: 13, fontWeight: typography.weight.semibold }
 });

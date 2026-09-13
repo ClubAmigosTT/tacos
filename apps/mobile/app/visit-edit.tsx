@@ -5,7 +5,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { Ionicons } from '@expo/vector-icons';
 import { deleteVisit, diary, trackEvent, updateVisit } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { colors, radii, spacing } from '@/theme';
+import { colors, radii, spacing, typography } from '@/theme';
 import { parseOptionalPrice } from '@/lib/validation';
 import { AsyncErrorState } from '@/components/AsyncErrorState';
 
@@ -58,7 +58,7 @@ export default function VisitEditScreen() {
     mutation.mutate(parsedPrice);
   }
 
-  return <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"><View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable><View><Text style={styles.eyebrow}>TU HISTORIA</Text><Text style={styles.headerTitle}>Editar registro</Text></View><Ionicons name="create-outline" size={21} color={colors.accent} /></View><View style={styles.placeCard}><Text style={styles.place}>{entry.place_name}</Text><Text style={styles.tacos}>{entry.tacos || 'Visita registrada'}</Text><Text style={styles.date}>{new Date(entry.visited_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}</Text></View><Text style={styles.label}>¿QUÉ TAL ESTUVO?</Text><View style={styles.ratingRow}>{[1, 2, 3, 4, 5].map((value) => <Pressable key={value} onPress={() => setRating(value)} style={[styles.rating, value <= rating && styles.ratingActive]}><Text style={[styles.ratingValue, value <= rating && styles.ratingValueActive]}>{value}</Text></Pressable>)}</View><Text style={styles.ratingHint}>{rating === 5 ? 'Lo defenderías contra tus amigos.' : rating >= 4 ? 'Volverías por otro.' : 'Buena información para tu futuro yo.'}</Text><Text style={styles.label}>PRECIO TOTAL</Text><View style={styles.contextRow}><TextInput value={price} onChangeText={(value) => { setPrice(value); setInputError(''); }} placeholder="Precio total (opcional)" placeholderTextColor={colors.dim} keyboardType="decimal-pad" style={styles.input} /><Text style={styles.currency}>MXN</Text></View><Text style={styles.label}>NOTA</Text><TextInput value={note} onChangeText={setNote} placeholder="Una nota para tu futuro yo" placeholderTextColor={colors.dim} multiline maxLength={500} style={[styles.input, styles.noteInput]} />{inputError ? <Text style={styles.error}>{inputError}</Text> : mutation.isError ? <Text style={styles.error}>No pudimos actualizar la visita. Revisa el precio e inténtalo de nuevo.</Text> : deleteMutation.isError ? <Text style={styles.error}>No pudimos eliminar la visita. Inténtalo de nuevo.</Text> : null}<Pressable style={[styles.primary, mutation.isPending && styles.disabled]} disabled={mutation.isPending} onPress={save}><Text style={styles.primaryText}>{mutation.isPending ? 'Guardando…' : 'Guardar cambios'}</Text><Ionicons name="checkmark" size={18} color={colors.background} /></Pressable><Pressable style={[styles.deleteButton, deleteMutation.isPending && styles.disabled]} disabled={deleteMutation.isPending} onPress={confirmDelete}><Ionicons name="trash-outline" size={16} color={colors.warm} /><Text style={styles.deleteText}>{deleteMutation.isPending ? 'Eliminando…' : 'Eliminar visita'}</Text></Pressable></ScrollView>;
+  return <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"><View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.textPrimary} /></Pressable><View><Text style={styles.eyebrow}>TU HISTORIA</Text><Text style={styles.headerTitle}>Editar registro</Text></View><Ionicons name="create-outline" size={21} color={colors.tortilla} /></View><View style={styles.placeCard}><Text style={styles.place}>{entry.place_name}</Text><Text style={styles.tacos}>{entry.tacos || 'Visita registrada'}</Text><Text style={styles.date}>{new Date(entry.visited_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}</Text></View><Text style={styles.label}>¿QUÉ TAL ESTUVO?</Text><View style={styles.ratingRow}>{[1, 2, 3, 4, 5].map((value) => <Pressable key={value} onPress={() => setRating(value)} style={[styles.rating, value <= rating && styles.ratingActive]}><Text style={[styles.ratingValue, value <= rating && styles.ratingValueActive]}>{value}</Text></Pressable>)}</View><Text style={styles.ratingHint}>{rating === 5 ? 'Lo defenderías contra tus amigos.' : rating >= 4 ? 'Volverías por otro.' : 'Buena información para tu futuro yo.'}</Text><Text style={styles.label}>PRECIO TOTAL</Text><View style={styles.contextRow}><TextInput value={price} onChangeText={(value) => { setPrice(value); setInputError(''); }} placeholder="Precio total (opcional)" placeholderTextColor={colors.textTertiary} keyboardType="decimal-pad" style={styles.input} /><Text style={styles.currency}>MXN</Text></View><Text style={styles.label}>NOTA</Text><TextInput value={note} onChangeText={setNote} placeholder="Una nota para tu futuro yo" placeholderTextColor={colors.textTertiary} multiline maxLength={500} style={[styles.input, styles.noteInput]} />{inputError ? <Text style={styles.error}>{inputError}</Text> : mutation.isError ? <Text style={styles.error}>No pudimos actualizar la visita. Revisa el precio e inténtalo de nuevo.</Text> : deleteMutation.isError ? <Text style={styles.error}>No pudimos eliminar la visita. Inténtalo de nuevo.</Text> : null}<Pressable style={[styles.primary, mutation.isPending && styles.disabled]} disabled={mutation.isPending} onPress={save}><Text style={styles.primaryText}>{mutation.isPending ? 'Guardando…' : 'Guardar cambios'}</Text><Ionicons name="checkmark" size={18} color={colors.background} /></Pressable><Pressable style={[styles.deleteButton, deleteMutation.isPending && styles.disabled]} disabled={deleteMutation.isPending} onPress={confirmDelete}><Ionicons name="trash-outline" size={16} color={colors.salsa} /><Text style={styles.deleteText}>{deleteMutation.isPending ? 'Eliminando…' : 'Eliminar visita'}</Text></Pressable></ScrollView>;
 }
 
 const styles = StyleSheet.create({
@@ -67,31 +67,31 @@ const styles = StyleSheet.create({
   center: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xl },
   back: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  eyebrow: { color: colors.accent, fontSize: 9, fontWeight: '900', letterSpacing: 1.5 },
-  headerTitle: { color: colors.ink, fontSize: 27, fontWeight: '900', marginTop: 3 },
+  eyebrow: { color: colors.tortilla, fontSize: 9, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold, letterSpacing: 1.5 },
+  headerTitle: { color: colors.textPrimary, fontSize: 27, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold, marginTop: 3 },
   placeCard: { backgroundColor: colors.surface, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginBottom: spacing.xl },
-  place: { color: colors.ink, fontSize: 20, fontWeight: '900' },
-  tacos: { color: colors.warm, fontSize: 13, fontWeight: '800', marginTop: 5 },
-  date: { color: colors.dim, fontSize: 11, marginTop: 12 },
-  label: { color: colors.dim, fontSize: 9, fontWeight: '900', letterSpacing: 1.2, marginTop: spacing.md, marginBottom: 8 },
+  place: { color: colors.textPrimary, fontSize: 20, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold },
+  tacos: { color: colors.salsa, fontSize: 13, fontFamily: typography.fontFamily.semibold, fontWeight: typography.weight.semibold, marginTop: 5 },
+  date: { color: colors.textTertiary, fontSize: 11, fontFamily: typography.fontFamily.regular, marginTop: 12 },
+  label: { color: colors.textTertiary, fontSize: 9, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold, letterSpacing: 1.2, marginTop: spacing.md, marginBottom: 8 },
   ratingRow: { flexDirection: 'row', gap: 8 },
   rating: { width: 49, height: 49, borderRadius: 25, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  ratingActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  ratingValue: { color: colors.muted, fontSize: 17, fontWeight: '900' },
+  ratingActive: { backgroundColor: colors.tortilla, borderColor: colors.tortilla },
+  ratingValue: { color: colors.textSecondary, fontSize: 17, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold },
   ratingValueActive: { color: colors.background },
-  ratingHint: { color: colors.muted, fontSize: 12, marginTop: 10 },
+  ratingHint: { color: colors.textSecondary, fontSize: 12, fontFamily: typography.fontFamily.regular, marginTop: 10 },
   contextRow: { flexDirection: 'row', alignItems: 'center' },
-  input: { flex: 1, minHeight: 50, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, color: colors.ink, paddingHorizontal: 13, paddingVertical: 12, fontSize: 14 },
-  currency: { color: colors.muted, fontSize: 11, fontWeight: '800', marginLeft: 9 },
+  input: { flex: 1, minHeight: 50, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, color: colors.textPrimary, paddingHorizontal: 13, paddingVertical: 12, fontSize: 14 },
+  currency: { color: colors.textSecondary, fontSize: 11, fontFamily: typography.fontFamily.semibold, fontWeight: typography.weight.semibold, marginLeft: 9 },
   noteInput: { minHeight: 115, textAlignVertical: 'top' },
-  error: { color: colors.danger, fontSize: 12, lineHeight: 17, marginTop: spacing.md },
-  primary: { backgroundColor: colors.accent, minHeight: 53, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginTop: spacing.xl },
-  primaryText: { color: colors.background, fontSize: 14, fontWeight: '900' },
-  deleteButton: { minHeight: 46, borderWidth: 1, borderColor: 'rgba(221,126,84,0.42)', borderRadius: radii.md, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, marginTop: spacing.md },
-  deleteText: { color: colors.warm, fontSize: 13, fontWeight: '900' },
+  error: { color: colors.danger, fontSize: 12, fontFamily: typography.fontFamily.regular, lineHeight: 17, marginTop: spacing.md },
+  primary: { backgroundColor: colors.tortilla, minHeight: 53, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginTop: spacing.xl },
+  primaryText: { color: colors.background, fontSize: 14, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold },
+  deleteButton: { minHeight: 46, borderWidth: 1, borderColor: colors.salsaBorder, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, marginTop: spacing.md },
+  deleteText: { color: colors.salsa, fontSize: 13, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold },
   disabled: { opacity: 0.4 },
-  title: { color: colors.ink, fontSize: 25, fontWeight: '900', textAlign: 'center' },
-  muted: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 8 },
+  title: { color: colors.textPrimary, fontSize: 25, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold, textAlign: 'center' },
+  muted: { color: colors.textSecondary, fontSize: 13, fontFamily: typography.fontFamily.regular, lineHeight: 19, textAlign: 'center', marginTop: 8 },
   secondary: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.pill, paddingHorizontal: 18, paddingVertical: 10, marginTop: spacing.lg },
-  secondaryText: { color: colors.accent, fontSize: 12, fontWeight: '900' }
+  secondaryText: { color: colors.tortilla, fontSize: 12, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold }
 });

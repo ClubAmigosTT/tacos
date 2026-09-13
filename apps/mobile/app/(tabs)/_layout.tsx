@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '@/theme';
+import { colors, radii, typography } from '@/theme';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -11,16 +11,17 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.muted,
+        tabBarActiveTintColor: colors.tortilla,
+        tabBarInactiveTintColor: colors.textTertiary,
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
-          height: 56 + bottomInset,
-          paddingTop: 8,
+          height: 64 + bottomInset,
+          paddingTop: 10,
           paddingBottom: bottomInset
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' }
+        tabBarLabelStyle: { fontFamily: typography.fontFamily.semibold, fontSize: typography.size.micro, fontWeight: typography.weight.semibold, letterSpacing: 0.2 },
+        tabBarItemStyle: { borderRadius: radii.sm, marginHorizontal: 4, marginVertical: 5 }
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Inicio', tabBarIcon: ({ color, size }) => <Ionicons name="sparkles-outline" color={color} size={size} /> }} />

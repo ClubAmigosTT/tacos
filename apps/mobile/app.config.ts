@@ -1,6 +1,7 @@
 import type { ExpoConfig } from 'expo/config';
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL?.trim() || 'http://localhost:4000';
+const demoMode = process.env.EXPO_PUBLIC_DEMO_MODE?.trim().toLowerCase() === 'true';
 const mapsApiKey = process.env.GOOGLE_MAPS_API_KEY?.trim() || '';
 const easProfile = process.env.EAS_BUILD_PROFILE?.trim();
 const easPlatform = process.env.EAS_BUILD_PLATFORM?.trim();
@@ -21,6 +22,7 @@ const config: ExpoConfig = {
   orientation: 'portrait',
   scheme: 'tacos',
   userInterfaceStyle: 'automatic',
+  icon: './assets/icon.png',
   updates: {
     url: 'https://u.expo.dev/155a5800-f93e-4680-9cc4-02450eb830b6'
   },
@@ -47,7 +49,8 @@ const config: ExpoConfig = {
   android: {
     package: 'com.tacos.app',
     adaptiveIcon: {
-      backgroundColor: '#0B0D0C'
+      foregroundImage: './assets/taco-logo.png',
+      backgroundColor: '#F2D99B'
     },
     // The app never records audio; keep Expo's broad development permissions
     // from leaking into native production builds.
@@ -78,6 +81,7 @@ const config: ExpoConfig = {
   ],
   extra: {
     apiUrl,
+    demoMode,
     eas: {
       projectId: '155a5800-f93e-4680-9cc4-02450eb830b6'
     }

@@ -249,15 +249,24 @@ contraseña, exportación JSON y eliminación. Las rutas de soporte son
 
 ### Catálogo real
 
-La migración `022_catalog_sources.sql` añade horarios semanales, teléfono,
-rango de precios, procedencia y licencia de cada foto. Copia
+Las migraciones `022_catalog_sources.sql` y `023_catalog_operations.sql`
+añaden horarios semanales, teléfono, rango de precios, procedencia, licencia
+de cada foto y la cola de propuestas comunitarias. Copia
 `catalog/branches.json.example` a `catalog/branches.json` y ejecuta
 `pnpm catalog:import` con `DATABASE_URL` y las variables `CATALOG_SOURCE_*`.
 El importador hace upsert por el ID de la fuente, marca duplicados como
 `needs_review`, archiva las tres filas demo sólo con
 `CATALOG_REPLACE_DEMO=true` y registra cada corrida en `catalog_imports`.
-En Render `ALLOW_DEMO_CATALOG=false` evita que una publicación nueva vuelva a
-mostrar las filas demo si todavía no se ha importado el feed real.
+`CATALOG_RECONCILE=true` archiva únicamente ausencias de un snapshot completo
+sin errores. En Render `ALLOW_DEMO_CATALOG=false` evita que una publicación
+nueva vuelva a mostrar las filas demo si todavía no se ha importado el feed
+real; `EXPO_PUBLIC_DEMO_MODE` debe permanecer en `false` en builds reales.
+
+La app también permite proponer una taquería, un taco o una corrección desde
+la ficha. Las propuestas pasan a `catalog_proposals` y sólo una cuenta
+administradora puede aprobarlas desde `Moderación > Revisar catálogo
+comunitario`; las aprobadas se publican con calidad `community` y sin rating
+personal inventado.
 
 Para que CI ejecute además la validación remota del Blueprint, añade los secretos `RENDER_API_KEY` y `RENDER_WORKSPACE_ID` en GitHub. Sin ellos, el workflow mantiene la validación de sintaxis local y no intenta autenticarse.
 

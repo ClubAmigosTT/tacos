@@ -1,10 +1,13 @@
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts, Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold } from '@expo-google-fonts/manrope';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StyleSheet, Text, View } from 'react-native';
 import { AuthProvider } from '@/lib/auth';
 import { ApiError, trackEvent } from '@/lib/api';
+import { colors, typography } from '@/theme';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,7 +21,9 @@ const queryClient = new QueryClient({
 });
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({ Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold });
   useEffect(() => { void trackEvent('app_open'); }, []);
+  if (!fontsLoaded) return <View style={styles.loading}><StatusBar style="light" /><Text style={styles.loadingText}>Preparando tu mesa…</Text></View>;
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
@@ -35,3 +40,8 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  loading: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
+  loadingText: { color: colors.textSecondary, fontFamily: typography.fontFamily.medium, fontSize: 13 }
+});

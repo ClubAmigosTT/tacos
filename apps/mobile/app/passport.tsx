@@ -2,7 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { colors, radii, spacing } from '@/theme';
+import { colors, radii, spacing, typography } from '@/theme';
 import { useAuth } from '@/lib/auth';
 import { passport as passportRequest, type PassportZone } from '@/lib/api';
 import { AsyncErrorState } from '@/components/AsyncErrorState';
@@ -36,7 +36,7 @@ export default function PassportScreen() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="arrow-back" size={20} color={colors.ink} /></Pressable>
+        <Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="arrow-back" size={20} color={colors.textPrimary} /></Pressable>
         <View><Text style={styles.eyebrow}>EXPLORACIÓN</Text><Text style={styles.title}>Taco Passport</Text></View>
       </View>
 
@@ -51,7 +51,7 @@ export default function PassportScreen() {
       <View style={styles.grid}>
         {displayZones.map((zone) => {
           const unlocked = zone.unlocked;
-          return <View key={zone.name} style={[styles.zone, unlocked && styles.zoneUnlocked]}><View style={[styles.zoneIcon, unlocked && styles.zoneIconUnlocked]}><Ionicons name={unlocked ? 'checkmark' : 'lock-closed-outline'} size={17} color={unlocked ? colors.background : colors.dim} /></View><Text style={styles.zoneName}>{zone.name}</Text><Text style={styles.zoneNote}>{unlocked ? `${zone.visitCount} visita${zone.visitCount === 1 ? '' : 's'}` : zone.note}</Text>{unlocked && <View style={styles.badge}><Text style={styles.badgeText}>LISTA</Text></View>}</View>;
+          return <View key={zone.name} style={[styles.zone, unlocked && styles.zoneUnlocked]}><View style={[styles.zoneIcon, unlocked && styles.zoneIconUnlocked]}><Ionicons name={unlocked ? 'checkmark' : 'lock-closed-outline'} size={17} color={unlocked ? colors.background : colors.textTertiary} /></View><Text style={styles.zoneName}>{zone.name}</Text><Text style={styles.zoneNote}>{unlocked ? `${zone.visitCount} visita${zone.visitCount === 1 ? '' : 's'}` : zone.note}</Text>{unlocked && <View style={styles.badge}><Text style={styles.badgeText}>LISTA</Text></View>}</View>;
         })}
       </View>
 
@@ -64,35 +64,35 @@ export default function PassportScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  muted: { color: colors.muted, fontSize: 13 },
+  muted: { color: colors.textSecondary, fontSize: 13 },
   content: { padding: spacing.lg, paddingTop: 58, paddingBottom: 110 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 13, marginBottom: spacing.xl },
   back: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
-  eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1.6 },
-  title: { color: colors.ink, fontSize: 28, fontWeight: '900', letterSpacing: -0.8, marginTop: 3 },
+  eyebrow: { color: colors.tortilla, fontSize: 10, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold, letterSpacing: 1.6 },
+  title: { color: colors.textPrimary, fontSize: 28, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold, letterSpacing: -0.8, marginTop: 3 },
   hero: { backgroundColor: colors.surfaceRaised, borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.xl, borderWidth: 1, borderColor: colors.border },
   heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  heroEyebrow: { color: colors.muted, fontSize: 10, fontWeight: '900', letterSpacing: 1.4 },
-  heroTitle: { color: colors.ink, fontSize: 31, fontWeight: '900', letterSpacing: -1.1, marginTop: 9 },
-  stamp: { width: 62, height: 62, borderRadius: 31, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '-8deg' }] },
-  stampText: { color: colors.background, fontSize: 9, fontWeight: '900', marginTop: 1, letterSpacing: 0.8 },
-  heroCopy: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 17, maxWidth: 285 },
+  heroEyebrow: { color: colors.textSecondary, fontSize: 10, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold, letterSpacing: 1.4 },
+  heroTitle: { color: colors.textPrimary, fontSize: 31, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold, letterSpacing: -1.1, marginTop: 9 },
+  stamp: { width: 62, height: 62, borderRadius: 31, backgroundColor: colors.tortilla, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '-8deg' }] },
+  stampText: { color: colors.background, fontSize: 9, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold, marginTop: 1, letterSpacing: 0.8 },
+  heroCopy: { color: colors.textSecondary, fontSize: 13, fontFamily: typography.fontFamily.regular, lineHeight: 19, marginTop: 17, maxWidth: 285 },
   progressTrack: { height: 7, borderRadius: 4, backgroundColor: colors.surface, overflow: 'hidden', marginTop: 20 },
-  progress: { height: '100%', borderRadius: 4, backgroundColor: colors.accent },
-  progressLabel: { color: colors.accent, fontSize: 10, fontWeight: '900', marginTop: 8, textTransform: 'uppercase', letterSpacing: 0.7 },
+  progress: { height: '100%', borderRadius: 4, backgroundColor: colors.tortilla },
+  progressLabel: { color: colors.tortilla, fontSize: 10, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold, marginTop: 8, textTransform: 'uppercase', letterSpacing: 0.7 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: spacing.md },
-  sectionTitle: { color: colors.ink, fontSize: 20, fontWeight: '900', letterSpacing: -0.4 },
-  sectionMeta: { color: colors.muted, fontSize: 11, fontWeight: '800' },
+  sectionTitle: { color: colors.textPrimary, fontSize: 20, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold, letterSpacing: -0.4 },
+  sectionMeta: { color: colors.textSecondary, fontSize: 11, fontFamily: typography.fontFamily.semibold, fontWeight: typography.weight.semibold },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   zone: { width: '48%', minHeight: 132, backgroundColor: colors.surface, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
-  zoneUnlocked: { borderColor: colors.accent, backgroundColor: colors.surfaceRaised },
+  zoneUnlocked: { borderColor: colors.tortilla, backgroundColor: colors.surfaceRaised },
   zoneIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.surfaceRaised, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  zoneIconUnlocked: { backgroundColor: colors.accent },
-  zoneName: { color: colors.ink, fontSize: 15, fontWeight: '900' },
-  zoneNote: { color: colors.muted, fontSize: 10, marginTop: 4, lineHeight: 15 },
-  badge: { position: 'absolute', right: 10, top: 10, borderRadius: radii.pill, backgroundColor: colors.accent, paddingHorizontal: 6, paddingVertical: 3 },
-  badgeText: { color: colors.background, fontSize: 7, fontWeight: '900', letterSpacing: 0.7 },
-  cta: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.accent, borderRadius: radii.md, padding: spacing.lg, marginTop: spacing.xl },
-  ctaTitle: { color: colors.background, fontSize: 15, fontWeight: '900' },
-  ctaCopy: { color: colors.background, opacity: 0.72, fontSize: 11, marginTop: 4 },
+  zoneIconUnlocked: { backgroundColor: colors.tortilla },
+  zoneName: { color: colors.textPrimary, fontSize: 15, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold },
+  zoneNote: { color: colors.textSecondary, fontSize: 10, fontFamily: typography.fontFamily.regular, marginTop: 4, lineHeight: 15 },
+  badge: { position: 'absolute', right: 10, top: 10, borderRadius: radii.pill, backgroundColor: colors.tortilla, paddingHorizontal: 6, paddingVertical: 3 },
+  badgeText: { color: colors.background, fontSize: 7, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold, letterSpacing: 0.7 },
+  cta: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.tortilla, borderRadius: radii.md, padding: spacing.lg, marginTop: spacing.xl },
+  ctaTitle: { color: colors.background, fontSize: 15, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold },
+  ctaCopy: { color: colors.background, opacity: 0.72, fontSize: 11, fontFamily: typography.fontFamily.regular, marginTop: 4 },
 });

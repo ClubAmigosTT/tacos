@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, spacing } from '@/theme';
+import { colors, spacing, typography } from '@/theme';
 
 export type TasteSignatureProfile = {
   intensity: number;
@@ -10,22 +10,21 @@ export type TasteSignatureProfile = {
 };
 
 const dimensions = [
-  { key: 'intensity', label: 'Intensidad' },
-  { key: 'spicy', label: 'Picante' },
-  { key: 'traditional', label: 'Tradición' },
-  { key: 'texture', label: 'Textura' },
-  { key: 'value', label: 'Valor' }
+  { key: 'intensity', label: 'Intensidad', color: colors.tortilla },
+  { key: 'spicy', label: 'Picante', color: colors.salsa },
+  { key: 'traditional', label: 'Tradición', color: colors.cilantroLight },
+  { key: 'texture', label: 'Textura', color: colors.tortilla },
+  { key: 'value', label: 'Valor', color: colors.tortilla }
 ] as const;
 
 export function TasteSignature({ profile }: { profile?: TasteSignatureProfile }) {
-  const values = profile ?? { intensity: 86, spicy: 72, traditional: 94, texture: 88, value: 78 };
   return <View accessibilityLabel="Firma de sabor" style={styles.signature}>
     {dimensions.map(({ key, label }) => {
-      const value = Math.max(0, Math.min(100, Math.round(values[key] ?? 0)));
+      const value = profile ? Math.max(0, Math.min(100, Math.round(profile[key] ?? 0))) : undefined;
       return <View key={key} style={styles.dimension}>
         <Text style={styles.label}>{label}</Text>
-        <View style={styles.track}><View style={[styles.fill, { width: `${value}%` as any }]} /></View>
-        <Text style={styles.value}>{value}</Text>
+        <View style={styles.track}><View style={[styles.fill, { width: `${value ?? 0}%` as any, backgroundColor: dimensions.find((dimension) => dimension.key === key)?.color }]} /></View>
+        <Text style={styles.value}>{value == null ? '—' : value}</Text>
       </View>;
     })}
   </View>;
@@ -34,8 +33,8 @@ export function TasteSignature({ profile }: { profile?: TasteSignatureProfile })
 const styles = StyleSheet.create({
   signature: { marginTop: spacing.lg, gap: 9 },
   dimension: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  label: { color: colors.muted, fontSize: 9, fontWeight: '800', width: 68 },
-  track: { flex: 1, height: 6, backgroundColor: colors.surface, borderRadius: 4, overflow: 'hidden' },
-  fill: { height: '100%', backgroundColor: colors.accent, borderRadius: 4 },
-  value: { color: colors.ink, width: 24, textAlign: 'right', fontSize: 10, fontWeight: '900' }
+  label: { color: colors.textSecondary, fontFamily: typography.fontFamily.medium, fontSize: typography.size.micro, fontWeight: typography.weight.medium, width: 68 },
+  track: { flex: 1, height: 7, backgroundColor: colors.surface, borderRadius: 4, overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: 4 },
+  value: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, width: 28, textAlign: 'right', fontSize: typography.size.micro, fontWeight: typography.weight.semibold }
 });

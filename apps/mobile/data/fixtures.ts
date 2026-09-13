@@ -6,6 +6,8 @@ export type Taco = {
   note: string;
 };
 
+export type Photo = { url: string; sourceUrl?: string; license: string; attribution: string };
+
 export type Place = {
   id: string;
   taqueriaId?: string;
@@ -16,12 +18,21 @@ export type Place = {
   openUntil: string;
   rating: number;
   reviewCount?: number;
-  match: number;
+  match?: number;
   style: string;
   coordinates: { latitude: number; longitude: number };
+  address?: string;
+  phone?: string;
+  weeklyHours?: Record<string, Array<{ open: string; close: string }>>;
+  /** False means the source explicitly has no reliable weekly schedule. */
+  hoursKnown?: boolean;
+  priceMin?: number;
+  priceMax?: number;
+  source?: { name?: string; url?: string; license?: string; attribution?: string; updatedAt?: string };
   image: string;
   description: string;
   tacos: Taco[];
+  photos?: Photo[];
   tags: string[];
   flavorProfile: { intensity: number; spicy: number; traditional: number; texture: number; value: number };
   tasteMatch?: number;

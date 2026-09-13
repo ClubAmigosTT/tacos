@@ -7,9 +7,11 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { branchReviews, getPlace, savePlace, savedPlaces, trackEvent, unsavePlace, type BranchReview } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { colors, radii, spacing } from '@/theme';
+import { colors, radii, shadows, spacing, typography } from '@/theme';
 import { RatingBadge } from '@/components/RatingBadge';
 import { isOpenNow } from '@/lib/hours';
+import type { Place } from '@/data/fixtures';
+import { CatalogImage } from '@/components/CatalogImage';
 
 const flavorLabels = [
   { key: 'intensity', label: 'Intensidad' },
@@ -32,19 +34,45 @@ export default function PlaceScreen() {
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['saved-places', token] }); }
   });
   if (authLoading || isLoading) return <View style={styles.loading}><Text style={styles.loadingText}>{authLoading ? 'Preparando la ficha…' : 'Cargando lugar…'}</Text></View>;
-  if (isError || !place) return <View style={styles.notFound}><Ionicons name="location-outline" size={28} color={colors.accent} /><Text style={styles.notFoundTitle}>Taquería no disponible</Text><Text style={styles.notFoundCopy}>El enlace puede haber cambiado o la sucursal ya no existe.</Text><Pressable style={styles.notFoundButton} onPress={() => router.replace('/(tabs)/map')}><Text style={styles.notFoundButtonText}>Volver al mapa</Text></Pressable></View>;
+  if (isError || !place) return <View style={styles.notFound}><Ionicons name="location-outline" size={28} color={colors.tortilla} /><Text style={styles.notFoundTitle}>Taquería no disponible</Text><Text style={styles.notFoundCopy}>El enlace puede haber cambiado o la sucursal ya no existe.</Text><Pressable style={styles.notFoundButton} onPress={() => router.replace('/(tabs)/map')}><Text style={styles.notFoundButtonText}>Volver al mapa</Text></Pressable></View>;
   const currentPlace = place;
   const averagePrice = place.tacos.length ? Math.round(place.tacos.reduce((sum, taco) => sum + taco.price, 0) / place.tacos.length) : undefined;
-  const openNow = isOpenNow(place.openUntil);
+  const priceLabel = place.priceMin != null || place.priceMax != null
+    ? place.priceMin != null && place.priceMax != null && place.priceMin !== place.priceMax ? `$${place.priceMin}–$${place.priceMax}` : `$${place.priceMin ?? place.priceMax}`
+    : averagePrice ? `$${averagePrice}` : '—';
+  const ratingDisplay = place.rating > 0 ? place.rating.toFixed(2) : '—';
+  const matchDisplay = place.match != null ? `${place.match}%` : '—';
+  const coverImage = place.image || place.photos?.[0]?.url || '';
+  const openNow = isOpenNow(place.openUntil, new Date(), place.weeklyHours, place.hoursKnown);
   const isSaved = Boolean(id && savedData?.placeIds.includes(id));
   function toggleSaved() {
     if (!token) { router.push({ pathname: '/auth', params: { returnTo: `/place/${id}` } }); return; }
     savedMutation.mutate();
   }
   async function sharePlace() {
-    try { await Share.share({ message: `${currentPlace.name} · ${currentPlace.rating.toFixed(2)} en Tacos\n${Linking.createURL(`/place/${currentPlace.id}`)}` }); } catch { /* Compartir es opcional en plataformas sin hoja nativa. */ }
+    try { await Share.share({ message: `${currentPlace.name} · ${ratingDisplay} en Tacos\n${Linking.createURL(`/place/${currentPlace.id}`)}` }); } catch { /* Compartir es opcional en plataformas sin hoja nativa. */ }
   }
-  return <><Stack.Screen options={{ headerShown: false }} /><ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><View style={styles.cover}><Image source={{ uri: place.image }} style={styles.coverImage} /><View style={styles.coverShade} /><Pressable accessibilityRole="button" accessibilityLabel="Volver" style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={23} color={colors.ink} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Compartir ficha de ${place.name}`} style={[styles.save, styles.shareButton]} onPress={() => void sharePlace()}><Ionicons name="share-outline" size={19} color={colors.ink} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Guardar ${place.name} en una lista`} style={styles.save} onPress={() => router.push({ pathname: '/lists', params: { placeId: place.id } })}><Ionicons name="bookmark-outline" size={20} color={colors.ink} /></Pressable><View style={styles.coverCopy}><View style={styles.pill}><Text style={styles.pillText}>{place.style.toUpperCase()}</Text></View><Text style={styles.name}>{place.name}</Text><Text style={styles.location}>{place.neighborhood} · {openNow ? 'Abierto ahora' : `Cierra a las ${place.openUntil}`}</Text></View></View><View style={styles.body}><View style={styles.stats}><View><Text style={styles.rating}>{place.rating.toFixed(2)}</Text><Text style={styles.statLabel}>GLOBAL</Text></View><View><Text style={styles.ratingAccent}>{place.match}%</Text><Text style={styles.statLabel}>PARA TI</Text></View><View><Text style={styles.rating}>{averagePrice ? `$${averagePrice}` : '—'}</Text><Text style={styles.statLabel}>PRECIO PROM.</Text></View><View><Text style={styles.rating}>{place.distance}</Text><Text style={styles.statLabel}>DISTANCIA</Text></View></View><Text style={styles.ratingContext}>{place.reviewCount ? `${place.reviewCount} reseñas ponderadas` : 'Reputación de catálogo'}</Text>{place.tasteMatch != null || place.socialMatch != null ? <View accessibilityLabel="Señales de afinidad" style={styles.signalCard}><View style={styles.signalColumn}><Text style={styles.signalValue}>{place.tasteMatch ?? place.match}%</Text><Text style={styles.signalLabel}>GUSTOS SIMILARES</Text></View>{place.socialMatch != null ? <View style={styles.signalColumn}><Text style={styles.signalValue}>{place.socialMatch}%</Text><Text style={styles.signalLabel}>TU CÍRCULO</Text></View> : null}</View> : null}<Text style={styles.description}>{place.description}</Text>{place.taqueriaId ? <Pressable style={styles.parentLink} onPress={() => router.push(`/taqueria/${place.taqueriaId}`)}><Text style={styles.parentLinkText}>Ver {place.taqueriaName ?? 'taquería'} y sus sucursales →</Text></Pressable> : null}<View style={styles.actionRow}><Pressable accessibilityRole="button" accessibilityLabel="Registrar visita" style={styles.primary} onPress={() => router.push({ pathname: '/register', params: { placeId: place.id } })}><Ionicons name="add" size={18} color={colors.background} /><Text style={styles.primaryText}>Registrar visita</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={isSaved ? `Quitar ${place.name} de Quiero ir` : `Guardar ${place.name} en Quiero ir`} style={styles.secondary} disabled={savedMutation.isPending} onPress={toggleSaved}><Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={18} color={isSaved ? colors.accent : colors.ink} /><Text style={styles.secondaryText}>{savedMutation.isPending ? 'Actualizando…' : isSaved ? 'En mi radar' : 'Quiero ir'}</Text></Pressable></View>{savedMutation.isError ? <Text accessibilityLiveRegion="polite" style={styles.mutationError}>No pudimos actualizar tu radar. Inténtalo de nuevo.</Text> : null}<Pressable accessibilityRole="button" accessibilityLabel={`Guardar ${place.name} en una lista`} style={styles.listLink} onPress={() => router.push({ pathname: '/lists', params: { placeId: place.id } })}><Ionicons name="albums-outline" size={16} color={colors.accent} /><Text style={styles.listLinkText}>Guardar en una lista</Text></Pressable><View style={styles.section}><Text style={styles.sectionEyebrow}>QUÉ PEDIR AQUÍ</Text><Text style={styles.sectionTitle}>Cada taco cuenta.</Text>{place.tacos.map((taco) => <View key={taco.id} style={styles.taco}><View style={styles.tacoInfo}><Text style={styles.tacoName}>{taco.name}</Text><Text style={styles.tacoNote}>{taco.note}</Text></View><View style={styles.tacoScore}><RatingBadge rating={taco.rating} accent /><Text style={styles.price}>${taco.price}</Text></View></View>)}</View><View style={styles.profile}><Text style={styles.sectionEyebrow}>PERFIL DE SABOR</Text>{flavorLabels.map(({ key, label }) => <View key={key} style={styles.profileRow}><Text style={styles.profileLabel}>{label}</Text><View style={styles.bar}><View style={[styles.fill, { width: (place.flavorProfile[key] + '%') as any }]} /></View><Text style={styles.profileValue}>{place.flavorProfile[key]}</Text></View>)}</View><BranchReviewsSection reviews={reviewData?.reviews ?? []} isLoading={reviewsLoading} isError={reviewsError} onRetry={() => void refetchReviews()} /></View></ScrollView></>;
+  return <><Stack.Screen options={{ headerShown: false }} /><ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><View style={styles.cover}><CatalogImage uri={coverImage} accessibilityLabel={`Imagen de ${place.name}`} style={styles.coverImage} /><View style={styles.coverShade} /><Pressable accessibilityRole="button" accessibilityLabel="Volver" style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={23} color={colors.textPrimary} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Compartir ficha de ${place.name}`} style={[styles.save, styles.shareButton]} onPress={() => void sharePlace()}><Ionicons name="share-outline" size={19} color={colors.textPrimary} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Guardar ${place.name} en una lista`} style={styles.save} onPress={() => router.push({ pathname: '/lists', params: { placeId: place.id } })}><Ionicons name="bookmark-outline" size={20} color={colors.textPrimary} /></Pressable><View style={styles.coverCopy}><View style={styles.pill}><Text style={styles.pillText}>{place.style.toUpperCase()}</Text></View><Text style={styles.name}>{place.name}</Text><Text style={styles.location}>{place.neighborhood} · {openNow ? 'Abierto ahora' : `Cierra a las ${place.openUntil}`}</Text></View></View><View style={styles.body}><View style={styles.stats}><View><Text style={styles.rating}>{ratingDisplay}</Text><Text style={styles.statLabel}>GLOBAL</Text></View><View><Text style={styles.ratingAccent}>{matchDisplay}</Text><Text style={styles.statLabel}>PARA TI</Text></View><View><Text style={styles.rating}>{priceLabel}</Text><Text style={styles.statLabel}>PRECIO</Text></View><View><Text style={styles.rating}>{place.distance}</Text><Text style={styles.statLabel}>DISTANCIA</Text></View></View><Text style={styles.ratingContext}>{place.reviewCount ? `${place.reviewCount} reseñas de la comunidad` : place.rating > 0 ? 'Calificación de catálogo; aún sin reseñas públicas' : 'Aún no hay calificaciones suficientes'}</Text>{place.tasteMatch != null || place.socialMatch != null ? <View accessibilityLabel="Señales de afinidad" style={styles.signalCard}><View style={styles.signalColumn}><Text style={styles.signalValue}>{place.tasteMatch ?? place.match ?? '—'}{place.tasteMatch != null || place.match != null ? '%' : ''}</Text><Text style={styles.signalLabel}>GUSTOS SIMILARES</Text></View>{place.socialMatch != null ? <View style={styles.signalColumn}><Text style={styles.signalValue}>{place.socialMatch}%</Text><Text style={styles.signalLabel}>TU CÍRCULO</Text></View> : null}</View> : null}<Text style={styles.description}>{place.description}</Text><PlaceInfo place={place} />{place.photos?.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoStrip}>{place.photos.map((photo) => <View key={photo.url} style={styles.photoItem}><Image source={{ uri: photo.url }} style={styles.catalogPhoto} /><Text style={styles.photoAttribution} numberOfLines={2}>{photo.attribution}</Text></View>)}</ScrollView> : null}{place.taqueriaId ? <Pressable style={styles.parentLink} onPress={() => router.push(`/taqueria/${place.taqueriaId}`)}><Text style={styles.parentLinkText}>Ver {place.taqueriaName ?? 'taquería'} y sus sucursales →</Text></Pressable> : null}<View style={styles.actionRow}><Pressable accessibilityRole="button" accessibilityLabel="Registrar visita" style={styles.primary} onPress={() => router.push({ pathname: '/register', params: { placeId: place.id } })}><Ionicons name="add" size={18} color={colors.background} /><Text style={styles.primaryText}>Registrar visita</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={isSaved ? `Quitar ${place.name} de Quiero ir` : `Guardar ${place.name} en Quiero ir`} style={styles.secondary} disabled={savedMutation.isPending} onPress={toggleSaved}><Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={18} color={isSaved ? colors.tortilla : colors.textPrimary} /><Text style={styles.secondaryText}>{savedMutation.isPending ? 'Actualizando…' : isSaved ? 'En mi radar' : 'Quiero ir'}</Text></Pressable></View>{savedMutation.isError ? <Text accessibilityLiveRegion="polite" style={styles.mutationError}>No pudimos actualizar tu radar. Inténtalo de nuevo.</Text> : null}<View style={styles.catalogActions}><Pressable accessibilityRole="button" style={styles.catalogAction} onPress={() => router.push({ pathname: '/catalog-proposal', params: { branchId: place.id, kind: 'correction' } })}><Ionicons name="create-outline" size={16} color={colors.tortilla} /><Text style={styles.catalogActionText}>Corregir información</Text></Pressable><Pressable accessibilityRole="button" style={styles.catalogAction} onPress={() => router.push({ pathname: '/catalog-proposal', params: { branchId: place.id, kind: 'menu_item' } })}><Ionicons name="restaurant-outline" size={16} color={colors.tortilla} /><Text style={styles.catalogActionText}>Proponer un taco</Text></Pressable></View><Pressable accessibilityRole="button" accessibilityLabel={`Guardar ${place.name} en una lista`} style={styles.listLink} onPress={() => router.push({ pathname: '/lists', params: { placeId: place.id } })}><Ionicons name="albums-outline" size={16} color={colors.tortilla} /><Text style={styles.listLinkText}>Guardar en una lista</Text></Pressable><View style={styles.section}><Text style={styles.sectionEyebrow}>QUÉ PEDIR AQUÍ</Text><Text style={styles.sectionTitle}>Cada taco cuenta.</Text>{place.tacos.length ? place.tacos.map((taco) => <View key={taco.id} style={styles.taco}><View style={styles.tacoInfo}><Text style={styles.tacoName}>{taco.name}</Text><Text style={styles.tacoNote}>{taco.note}</Text></View><View style={styles.tacoScore}><RatingBadge rating={taco.rating} accent /><Text style={styles.price}>${taco.price}</Text></View></View>) : <Text style={styles.muted}>Menú pendiente de completar por la comunidad.</Text>}</View><View style={styles.profile}><Text style={styles.sectionEyebrow}>PERFIL DE SABOR</Text>{flavorLabels.map(({ key, label }) => <View key={key} style={styles.profileRow}><Text style={styles.profileLabel}>{label}</Text><View style={styles.bar}><View style={[styles.fill, { width: (place.flavorProfile[key] + '%') as any }]} /></View><Text style={styles.profileValue}>{place.flavorProfile[key]}</Text></View>)}</View><BranchReviewsSection reviews={reviewData?.reviews ?? []} isLoading={reviewsLoading} isError={reviewsError} onRetry={() => void refetchReviews()} /></View></ScrollView></>;
+}
+
+const scheduleDays = [
+  ['mon', 'Lun'], ['tue', 'Mar'], ['wed', 'Mié'], ['thu', 'Jue'], ['fri', 'Vie'], ['sat', 'Sáb'], ['sun', 'Dom']
+] as const;
+
+function PlaceInfo({ place }: { place: Place }) {
+  function openMaps() {
+    const { latitude, longitude } = place.coordinates;
+    void Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${latitude},${longitude}`)}`);
+  }
+  function callPlace() {
+    if (place.phone) void Linking.openURL(`tel:${place.phone.replace(/[^+\d]/g, '')}`);
+  }
+  return <View style={styles.infoBlock}>
+    {place.address ? <Pressable accessibilityRole="button" accessibilityLabel="Abrir dirección en mapas" style={styles.infoRow} onPress={openMaps}><Ionicons name="navigate-outline" size={17} color={colors.tortilla} /><Text style={styles.infoText}>{place.address}</Text><Ionicons name="open-outline" size={15} color={colors.textTertiary} /></Pressable> : null}
+    {place.phone ? <Pressable accessibilityRole="button" accessibilityLabel="Llamar a la taquería" style={styles.infoRow} onPress={callPlace}><Ionicons name="call-outline" size={17} color={colors.tortilla} /><Text style={styles.infoText}>{place.phone}</Text><Ionicons name="call-outline" size={15} color={colors.textTertiary} /></Pressable> : null}
+    <View style={styles.hoursBlock}><View style={styles.hoursHeading}><Ionicons name="time-outline" size={17} color={colors.tortilla} /><Text style={styles.infoHeading}>HORARIO SEMANAL</Text></View>{place.weeklyHours ? scheduleDays.map(([key, label]) => <View key={key} style={styles.hoursRow}><Text style={styles.dayLabel}>{label}</Text><Text style={styles.hoursText}>{place.weeklyHours?.[key]?.length ? place.weeklyHours[key].map((interval) => `${interval.open}–${interval.close}`).join(', ') : 'Cerrado'}</Text></View>) : <Text style={styles.unverified}>{place.hoursKnown === false ? 'Horario no disponible en la fuente. Puedes proponer una actualización.' : `Horario semanal aún no verificado. Referencia: cierre a las ${place.openUntil}.`}</Text>}</View>
+    {place.source?.attribution || place.source?.name ? <Text style={styles.sourceText}>Fuente: {place.source.attribution ?? place.source.name}{place.source.updatedAt ? ` · actualizado ${new Date(place.source.updatedAt).toLocaleDateString('es-MX')}` : ''}</Text> : null}
+  </View>;
 }
 
 function BranchReviewsSection({ reviews, isLoading, isError, onRetry }: { reviews: BranchReview[]; isLoading: boolean; isError: boolean; onRetry: () => void }) {
@@ -55,77 +83,95 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { paddingBottom: 45 },
   loading: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
-  loadingText: { color: colors.muted },
+  loadingText: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular },
   notFound: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  notFoundTitle: { color: colors.ink, fontSize: 25, fontWeight: '900', textAlign: 'center', marginTop: spacing.md },
-  notFoundCopy: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: 'center', maxWidth: 320, marginTop: 7 },
-  notFoundButton: { backgroundColor: colors.accent, borderRadius: radii.pill, paddingHorizontal: 18, paddingVertical: 11, marginTop: spacing.lg },
-  notFoundButtonText: { color: colors.background, fontSize: 12, fontWeight: '900' },
+  notFoundTitle: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, fontSize: 25, fontWeight: typography.weight.semibold, textAlign: 'center', marginTop: spacing.md },
+  notFoundCopy: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular, fontSize: 13, lineHeight: 19, textAlign: 'center', maxWidth: 320, marginTop: 7 },
+  notFoundButton: { backgroundColor: colors.tortilla, borderRadius: radii.pill, paddingHorizontal: 18, paddingVertical: 11, marginTop: spacing.lg },
+  notFoundButtonText: { color: colors.meatDark, fontFamily: typography.fontFamily.semibold, fontSize: 12, fontWeight: typography.weight.semibold },
   cover: { height: 410, backgroundColor: colors.surfaceRaised },
   coverImage: { width: '100%', height: '100%' },
-  coverShade: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(3,5,4,0.42)' },
-  back: { position: 'absolute', top: 57, left: spacing.lg, width: 42, height: 42, borderRadius: 22, backgroundColor: 'rgba(11,13,12,0.82)', alignItems: 'center', justifyContent: 'center' },
-  save: { position: 'absolute', top: 57, right: spacing.lg, width: 42, height: 42, borderRadius: 22, backgroundColor: 'rgba(11,13,12,0.82)', alignItems: 'center', justifyContent: 'center' },
+  coverShade: { ...StyleSheet.absoluteFill, backgroundColor: colors.overlay },
+  back: { position: 'absolute', top: 57, left: spacing.lg, width: 44, height: 44, borderRadius: radii.md, backgroundColor: colors.overlayStrong, alignItems: 'center', justifyContent: 'center', ...shadows.floating },
+  save: { position: 'absolute', top: 57, right: spacing.lg, width: 44, height: 44, borderRadius: radii.md, backgroundColor: colors.overlayStrong, alignItems: 'center', justifyContent: 'center', ...shadows.floating },
   shareButton: { right: spacing.lg + 50 },
   coverCopy: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.lg },
-  pill: { alignSelf: 'flex-start', backgroundColor: colors.accent, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 12 },
-  pillText: { color: colors.background, fontSize: 9, fontWeight: '900', letterSpacing: 1 },
-  name: { color: colors.ink, fontSize: 37, fontWeight: '900', letterSpacing: -1.2 },
-  location: { color: colors.ink, opacity: 0.86, fontSize: 12, fontWeight: '700', marginTop: 6 },
+  pill: { alignSelf: 'flex-start', backgroundColor: colors.tortilla, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 12 },
+  pillText: { color: colors.meatDark, fontFamily: typography.fontFamily.semibold, fontSize: typography.size.micro, fontWeight: typography.weight.semibold, letterSpacing: 1 },
+  name: { color: colors.textPrimary, fontFamily: typography.fontFamily.bold, fontSize: 37, fontWeight: typography.weight.bold, letterSpacing: typography.tracking.display },
+  location: { color: colors.textPrimary, opacity: 0.86, fontFamily: typography.fontFamily.medium, fontSize: 12, fontWeight: typography.weight.medium, marginTop: 6 },
   body: { padding: spacing.lg },
   stats: { flexDirection: 'row', justifyContent: 'space-between', paddingBottom: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  rating: { color: colors.ink, fontSize: 24, fontWeight: '900' },
-  ratingAccent: { color: colors.accent, fontSize: 24, fontWeight: '900' },
-  ratingContext: { color: colors.muted, fontSize: 10, marginTop: -10, marginBottom: spacing.md },
-  signalCard: { flexDirection: 'row', gap: spacing.xl, backgroundColor: colors.surfaceRaised, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, marginBottom: spacing.sm },
+  rating: { color: colors.textPrimary, fontFamily: typography.fontFamily.bold, fontSize: 24, fontWeight: typography.weight.bold },
+  ratingAccent: { color: colors.cilantroLight, fontFamily: typography.fontFamily.bold, fontSize: 24, fontWeight: typography.weight.bold },
+  ratingContext: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular, fontSize: 10, marginTop: -10, marginBottom: spacing.md },
+  signalCard: { flexDirection: 'row', gap: spacing.xl, backgroundColor: colors.surfaceElevated, borderRadius: radii.lg, padding: spacing.md, marginBottom: spacing.sm, ...shadows.card },
   signalColumn: { flex: 1 },
-  signalValue: { color: colors.accent, fontSize: 20, fontWeight: '900' },
-  signalLabel: { color: colors.muted, fontSize: 8, fontWeight: '900', letterSpacing: 0.9, marginTop: 3 },
-  statLabel: { color: colors.muted, fontSize: 9, fontWeight: '900', letterSpacing: 1, marginTop: 4 },
-  description: { color: colors.muted, fontSize: 15, lineHeight: 22, marginTop: spacing.lg },
+  signalValue: { color: colors.tortilla, fontFamily: typography.fontFamily.bold, fontSize: 20, fontWeight: typography.weight.bold },
+  signalLabel: { color: colors.textSecondary, fontFamily: typography.fontFamily.semibold, fontSize: typography.size.micro, fontWeight: typography.weight.semibold, letterSpacing: 0.9, marginTop: 3 },
+  statLabel: { color: colors.textSecondary, fontFamily: typography.fontFamily.semibold, fontSize: typography.size.micro, fontWeight: typography.weight.semibold, letterSpacing: 1, marginTop: 4 },
+  description: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular, fontSize: 15, lineHeight: 22, marginTop: spacing.lg },
+  infoBlock: { marginTop: spacing.lg, backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, ...shadows.card },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 9, minHeight: 34, borderBottomWidth: 1, borderBottomColor: colors.border },
+  infoText: { color: colors.textPrimary, fontFamily: typography.fontFamily.regular, fontSize: 12, flex: 1, lineHeight: 18 },
+  hoursBlock: { paddingTop: spacing.sm },
+  hoursHeading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 },
+  infoHeading: { color: colors.tortilla, fontFamily: typography.fontFamily.semibold, fontSize: typography.size.micro, fontWeight: typography.weight.semibold, letterSpacing: 1 },
+  hoursRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 3 },
+  dayLabel: { color: colors.textSecondary, fontFamily: typography.fontFamily.medium, fontSize: 11, width: 32 },
+  hoursText: { color: colors.textPrimary, fontFamily: typography.fontFamily.regular, fontSize: 11, flex: 1 },
+  unverified: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular, fontSize: 11, lineHeight: 17 },
+  sourceText: { color: colors.textTertiary, fontFamily: typography.fontFamily.regular, fontSize: 10, lineHeight: 15, marginTop: spacing.sm },
+  photoStrip: { gap: spacing.sm, paddingTop: spacing.md },
+  photoItem: { width: 132 },
+  catalogPhoto: { width: 132, height: 96, borderRadius: radii.md, backgroundColor: colors.surfaceRaised },
+  photoAttribution: { color: colors.textTertiary, fontFamily: typography.fontFamily.regular, fontSize: 9, lineHeight: 12, marginTop: 4 },
   parentLink: { marginTop: spacing.md, paddingVertical: 8 },
-  parentLinkText: { color: colors.accent, fontSize: 12, fontWeight: '900' },
+  parentLinkText: { color: colors.tortilla, fontFamily: typography.fontFamily.semibold, fontSize: 12, fontWeight: typography.weight.semibold },
   actionRow: { flexDirection: 'row', gap: 8, marginTop: spacing.lg },
-  primary: { flex: 1, backgroundColor: colors.accent, borderRadius: radii.md, height: 50, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 },
-  primaryText: { color: colors.background, fontSize: 13, fontWeight: '900' },
-  secondary: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, height: 50, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 },
-  secondaryText: { color: colors.ink, fontSize: 13, fontWeight: '900' },
-  mutationError: { color: colors.danger, fontSize: 12, lineHeight: 17, marginTop: spacing.sm },
+  primary: { flex: 1, backgroundColor: colors.tortilla, borderRadius: radii.md, height: 50, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 },
+  primaryText: { color: colors.meatDark, fontFamily: typography.fontFamily.semibold, fontSize: 13, fontWeight: typography.weight.semibold },
+  secondary: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radii.md, height: 50, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 },
+  secondaryText: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, fontSize: 13, fontWeight: typography.weight.semibold },
+  mutationError: { color: colors.danger, fontFamily: typography.fontFamily.medium, fontSize: 12, lineHeight: 17, marginTop: spacing.sm },
+  catalogActions: { flexDirection: 'row', gap: 8, marginTop: spacing.sm },
+  catalogAction: { flex: 1, minHeight: 42, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, paddingHorizontal: 8 },
+  catalogActionText: { color: colors.tortilla, fontFamily: typography.fontFamily.semibold, fontSize: 10, fontWeight: typography.weight.semibold, textAlign: 'center' },
   listLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12 },
-  listLinkText: { color: colors.accent, fontSize: 12, fontWeight: '900' },
+  listLinkText: { color: colors.tortilla, fontFamily: typography.fontFamily.semibold, fontSize: 12, fontWeight: typography.weight.semibold },
   section: { marginTop: spacing.xxl },
-  sectionEyebrow: { color: colors.accent, fontSize: 9, fontWeight: '900', letterSpacing: 1.5 },
-  sectionTitle: { color: colors.ink, fontSize: 25, fontWeight: '900', marginTop: 5, marginBottom: spacing.md },
+  sectionEyebrow: { color: colors.tortilla, fontFamily: typography.fontFamily.semibold, fontSize: typography.size.micro, fontWeight: typography.weight.semibold, letterSpacing: typography.tracking.loose },
+  sectionTitle: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, fontSize: 25, fontWeight: typography.weight.semibold, marginTop: 5, marginBottom: spacing.md },
   taco: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: spacing.md },
   tacoInfo: { flex: 1, paddingRight: spacing.md },
-  tacoName: { color: colors.ink, fontSize: 16, fontWeight: '900' },
-  tacoNote: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 4 },
+  tacoName: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, fontSize: 16, fontWeight: typography.weight.semibold },
+  tacoNote: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular, fontSize: 11, lineHeight: 16, marginTop: 4 },
   tacoScore: { alignItems: 'flex-end', gap: 5 },
-  price: { color: colors.warm, fontSize: 11, fontWeight: '800' },
-  profile: { marginTop: spacing.xxl, backgroundColor: colors.surface, borderRadius: radii.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
+  price: { color: colors.salsa, fontFamily: typography.fontFamily.medium, fontSize: 11, fontWeight: typography.weight.medium },
+  profile: { marginTop: spacing.xxl, backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, ...shadows.card },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: spacing.md },
-  profileLabel: { color: colors.muted, width: 72, fontSize: 11 },
+  profileLabel: { color: colors.textSecondary, fontFamily: typography.fontFamily.medium, width: 72, fontSize: 11 },
   bar: { flex: 1, height: 6, backgroundColor: colors.surfaceRaised, borderRadius: 4, overflow: 'hidden' },
-  fill: { height: '100%', backgroundColor: colors.accent, borderRadius: 4 },
-  profileValue: { color: colors.ink, width: 23, textAlign: 'right', fontSize: 11, fontWeight: '900' },
+  fill: { height: '100%', backgroundColor: colors.tortilla, borderRadius: 4 },
+  profileValue: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, width: 23, textAlign: 'right', fontSize: 11, fontWeight: typography.weight.semibold },
   reviewsSection: { marginTop: spacing.xxl },
   reviewsHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: spacing.md },
-  reviewsCount: { color: colors.muted, fontSize: 12, fontWeight: '900' },
-  reviewCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, overflow: 'hidden', marginBottom: spacing.sm },
+  reviewsCount: { color: colors.textSecondary, fontFamily: typography.fontFamily.semibold, fontSize: 12, fontWeight: typography.weight.semibold },
+  reviewCard: { backgroundColor: colors.surface, borderRadius: radii.lg, overflow: 'hidden', marginBottom: spacing.sm, ...shadows.card },
   reviewPhoto: { width: '100%', height: 170, backgroundColor: colors.surfaceRaised },
   reviewBody: { padding: spacing.md },
   reviewTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   reviewAuthor: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  reviewAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.warm, alignItems: 'center', justifyContent: 'center' },
-  reviewAvatarText: { color: colors.background, fontSize: 12, fontWeight: '900' },
-  reviewName: { color: colors.ink, fontSize: 12, fontWeight: '900' },
-  reviewTacos: { color: colors.warm, fontSize: 11, fontWeight: '800', marginTop: 10 },
-  reviewNote: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 7 },
-  reviewNoteMuted: { color: colors.dim, fontSize: 11, fontStyle: 'italic', marginTop: 7 },
-  reviewDate: { color: colors.dim, fontSize: 9, fontWeight: '800', marginTop: 10 },
-  reviewError: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md },
-  reviewErrorText: { color: colors.muted, fontSize: 11, flex: 1 },
-  reviewRetry: { backgroundColor: colors.accent, borderRadius: radii.pill, paddingHorizontal: 11, paddingVertical: 7 },
-  reviewRetryText: { color: colors.background, fontSize: 10, fontWeight: '900' },
-  muted: { color: colors.muted, fontSize: 12, lineHeight: 18 }
+  reviewAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.salsa, alignItems: 'center', justifyContent: 'center' },
+  reviewAvatarText: { color: colors.meatDark, fontFamily: typography.fontFamily.semibold, fontSize: 12, fontWeight: typography.weight.semibold },
+  reviewName: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, fontSize: 12, fontWeight: typography.weight.semibold },
+  reviewTacos: { color: colors.salsa, fontFamily: typography.fontFamily.medium, fontSize: 11, fontWeight: typography.weight.medium, marginTop: 10 },
+  reviewNote: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular, fontSize: 13, lineHeight: 19, marginTop: 7 },
+  reviewNoteMuted: { color: colors.textTertiary, fontFamily: typography.fontFamily.regular, fontSize: 11, fontStyle: 'italic', marginTop: 7 },
+  reviewDate: { color: colors.textTertiary, fontFamily: typography.fontFamily.medium, fontSize: typography.size.micro, fontWeight: typography.weight.medium, marginTop: 10 },
+  reviewError: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, ...shadows.card },
+  reviewErrorText: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular, fontSize: 11, flex: 1 },
+  reviewRetry: { backgroundColor: colors.tortilla, borderRadius: radii.pill, paddingHorizontal: 11, paddingVertical: 7 },
+  reviewRetryText: { color: colors.meatDark, fontFamily: typography.fontFamily.semibold, fontSize: 10, fontWeight: typography.weight.semibold },
+  muted: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular, fontSize: 12, lineHeight: 18 }
 });

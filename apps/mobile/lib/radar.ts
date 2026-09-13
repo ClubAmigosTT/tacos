@@ -76,12 +76,12 @@ export function applyRadar({ places, active, contextualTaco, distance, price, mo
   };
 
   if (active === 'Barato') return moodFiltered.sort((a, b) => (lowestPrice(a) - lowestPrice(b)) || contextualSort(a, b));
-  if (active === '92% para mí') return moodFiltered.sort((a, b) => (b.match - a.match) || contextualSort(a, b));
+  if (active === '92% para mí') return moodFiltered.sort((a, b) => ((b.match ?? -1) - (a.match ?? -1)) || contextualSort(a, b));
   if (active === 'Pastor') return moodFiltered.sort((a, b) => {
     const aRating = a.tacos.find((taco) => contextualTaco && normalizeRadarText(taco.name) === normalizeRadarText(contextualTaco))?.rating ?? a.rating;
     const bRating = b.tacos.find((taco) => contextualTaco && normalizeRadarText(taco.name) === normalizeRadarText(contextualTaco))?.rating ?? b.rating;
     return (bRating - aRating) || contextualSort(a, b);
   });
-  if (active === 'Abierto ahora') return moodFiltered.filter((place) => isOpenNow(place.openUntil)).sort(contextualSort);
+  if (active === 'Abierto ahora') return moodFiltered.filter((place) => isOpenNow(place.openUntil, new Date(), place.weeklyHours, place.hoursKnown)).sort(contextualSort);
   return moodFiltered.sort(contextualSort);
 }

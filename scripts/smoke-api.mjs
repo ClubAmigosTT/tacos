@@ -43,6 +43,8 @@ await request('/v1/auth/register', {
 const alice = await createUser('Ana Smoke', 'ana');
 const bobDisplayName = `Beto Smoke ${suffix}`;
 const bob = await createUser(bobDisplayName, 'beto');
+const emptyTaste = await request('/v1/me/taste', { token: bob.token });
+if (emptyTaste.taste?.hasData !== false) throw new Error('A new account exposed a fabricated taste profile');
 const updatedProfile = await request('/v1/me/profile', { method: 'PATCH', body: JSON.stringify({ displayName: 'Ana Editada' }), token: alice.token });
 if (updatedProfile.user?.displayName !== 'Ana Editada') throw new Error('Profile name was not updated');
 const meAfterProfileUpdate = await request('/v1/me', { token: alice.token });
@@ -158,7 +160,7 @@ await request(`/v1/visits/${deletableVisit.id}`, { method: 'DELETE', token: bob.
 const recommendations = await request('/v1/recommendations', { token: bob.token });
 if (typeof recommendations.places?.[0]?.tasteMatch !== 'number') throw new Error('Taste-aware recommendation score missing');
 const taste = await request('/v1/me/taste', { token: bob.token });
-if (!taste.taste?.title) throw new Error('Taste profile missing');
+if (!taste.taste?.title || taste.taste.hasData !== true) throw new Error('Taste profile missing or not marked as formed');
 const report = await request('/v1/reports', { method: 'POST', body: JSON.stringify({ visitId: visit.id, reason: 'other' }), token: alice.token }, 201);
 if (report.status !== 'created') throw new Error('Report was not created');
 const duplicateReport = await request('/v1/reports', { method: 'POST', body: JSON.stringify({ visitId: visit.id, reason: 'other' }), token: alice.token });

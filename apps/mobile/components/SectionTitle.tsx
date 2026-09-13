@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, spacing } from '@/theme';
+import { colors, spacing, typography } from '@/theme';
 
 export function SectionTitle({ eyebrow, title, action, onAction }: { eyebrow?: string; title: string; action?: string; onAction?: () => void }) {
   return (
@@ -15,7 +15,7 @@ export function SectionTitle({ eyebrow, title, action, onAction }: { eyebrow?: s
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: spacing.md },
-  eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.6, marginBottom: 5 },
-  title: { color: colors.ink, fontSize: 24, fontWeight: '800', letterSpacing: -0.7 },
-  action: { color: colors.muted, fontSize: 12, fontWeight: '700', paddingBottom: 3 }
+  eyebrow: { color: colors.tortilla, fontFamily: typography.fontFamily.semibold, fontSize: typography.size.micro, fontWeight: typography.weight.semibold, letterSpacing: typography.tracking.loose, marginBottom: 6 },
+  title: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, fontSize: 23, fontWeight: typography.weight.semibold, letterSpacing: typography.tracking.tight },
+  action: { color: colors.textSecondary, fontFamily: typography.fontFamily.medium, fontSize: typography.size.caption, fontWeight: typography.weight.medium, paddingBottom: 3 }
 });

@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
-import { addListCollaborator, addListItemForUser, authenticateUser, closeRepository, consumeAuthRateLimit, createEmailVerificationToken, createListForUser, createPasswordResetToken, createSession, createVisitComment, createVisitForUser, deleteUserAccount, deleteVisitComment, deleteVisitForUser, discoverPlaces, exportUserData, findPlace, findUnverifiedUserByEmail, findUserById, followUser, getAdminAnalytics, getAdminComments, getAdminReports, getBranchReviews, getDiary, getFeed, getHealth, getListDetails, getLists, getPassport, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, getVisitComments, isSessionActive, listSessions, recordProductEvent, registerUser, removeListCollaborator, removeListItemForUser, reportVisitForUser, resetPassword, revokeAllSessions, revokeSession, reviewAdminComment, reviewAdminReport, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateUserProfileForUser, updateVisitForUser, verifyEmailToken, type PublicUser } from './repository.js';
+import { addListCollaborator, addListItemForUser, authenticateUser, closeRepository, consumeAuthRateLimit, createCatalogProposal, createEmailVerificationToken, createListForUser, createPasswordResetToken, createSession, createVisitComment, createVisitForUser, deleteUserAccount, deleteVisitComment, deleteVisitForUser, discoverPlaces, exportUserData, findPlace, findUnverifiedUserByEmail, findUserById, followUser, getAdminAnalytics, getAdminComments, getAdminReports, getBranchReviews, getCatalogProposals, getDiary, getFeed, getHealth, getListDetails, getLists, getPassport, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, getVisitComments, isSessionActive, listSessions, recordProductEvent, registerUser, removeListCollaborator, removeListItemForUser, reportVisitForUser, resetPassword, revokeAllSessions, revokeSession, reviewAdminComment, reviewAdminReport, reviewCatalogProposal, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateUserProfileForUser, updateVisitForUser, verifyEmailToken, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
 import { uploadVisitImage } from './storage.js';
 import { passwordResetUrl, sendTransactionalEmail, verificationUrl } from './email.js';
@@ -275,14 +275,16 @@ app.patch('/v1/me/privacy', async (request, reply) => {
 });
 
 app.get('/v1/discover', async (request) => {
-  const query = z.object({ q: z.string().optional(), lat: z.coerce.number().optional(), lng: z.coerce.number().optional(), limit: z.coerce.number().int().min(1).max(50).default(20) }).parse(request.query);
+  const query = z.object({ q: z.string().trim().max(120).optional(), lat: z.coerce.number().min(-90).max(90).optional(), lng: z.coerce.number().min(-180).max(180).optional(), radiusKm: z.coerce.number().min(0.1).max(50).optional(), offset: z.coerce.number().int().min(0).max(10000).default(0), openNow: z.enum(['true', 'false']).transform((value) => value === 'true').optional(), limit: z.coerce.number().int().min(1).max(50).default(20) }).parse(request.query);
   const user = await resolveUser(request);
   return { places: await discoverPlaces(query, user?.id), context: { query: query.q ?? null, personalized: Boolean(user), generatedAt: new Date().toISOString() } };
 });
 
 app.get('/v1/recommendations', async (request) => {
+  const query = z.object({ lat: z.coerce.number().min(-90).max(90).optional(), lng: z.coerce.number().min(-180).max(180).optional() }).parse(request.query);
   const user = await resolveUser(request);
-  return { places: await getRecommendations(user?.id), context: { personalized: Boolean(user), generatedAt: new Date().toISOString() } };
+  const location = query.lat != null && query.lng != null ? { latitude: query.lat, longitude: query.lng } : undefined;
+  return { places: await getRecommendations(user?.id, location), context: { personalized: Boolean(user), hasLocation: Boolean(location), generatedAt: new Date().toISOString() } };
 });
 
 app.get('/v1/me/taste', async (request, reply) => {
@@ -340,6 +342,20 @@ app.get('/v1/taquerias/:id', async (request, reply) => {
   const taqueria = await getTaqueria(params.id);
   if (!taqueria) return reply.code(404).send({ error: 'TAQUERIA_NOT_FOUND' });
   return taqueria;
+});
+
+app.post('/v1/catalog/proposals', async (request, reply) => {
+  const user = await requireUser(request, reply);
+  if (!user) return;
+  const body = z.object({
+    kind: z.enum(['branch', 'menu_item', 'correction']),
+    branchId: z.string().optional(),
+    payload: z.record(z.string(), z.unknown()).refine((value) => JSON.stringify(value).length <= 50_000, { message: 'Proposal payload is too large' }),
+    evidenceUrl: z.string().url().max(2000).refine((value) => value.startsWith('https://'), { message: 'evidenceUrl must use HTTPS' }).optional()
+  }).parse(request.body);
+  const proposal = await createCatalogProposal(body, user.id);
+  if (!proposal) return reply.code(404).send({ error: 'BRANCH_NOT_FOUND' });
+  return reply.code(201).send(proposal);
 });
 
 app.post('/v1/visits', async (request, reply) => {
@@ -574,6 +590,28 @@ app.get('/v1/admin/comments', async (request, reply) => {
   if (!user) return;
   const query = z.object({ visibility: z.enum(['visible', 'hidden', 'all']).default('visible') }).parse(request.query);
   return { comments: await getAdminComments(query.visibility) };
+});
+
+app.get('/v1/admin/catalog/proposals', async (request, reply) => {
+  const user = await requireAdmin(request, reply);
+  if (!user) return;
+  const query = z.object({ status: z.enum(['pending', 'approved', 'rejected', 'all']).default('pending') }).parse(request.query);
+  return { proposals: await getCatalogProposals(query.status) };
+});
+
+app.patch('/v1/admin/catalog/proposals/:id', async (request, reply) => {
+  const user = await requireAdmin(request, reply);
+  if (!user) return;
+  const params = z.object({ id: z.string().uuid() }).parse(request.params);
+  const body = z.object({ action: z.enum(['approve', 'reject']), reviewNote: z.string().trim().max(500).optional() }).parse(request.body);
+  try {
+    const updated = await reviewCatalogProposal(params.id, body.action, user.id, body.reviewNote);
+    if (!updated) return reply.code(404).send({ error: 'PROPOSAL_NOT_FOUND' });
+    return { status: body.action === 'approve' ? 'approved' : 'rejected', proposalId: params.id };
+  } catch (error) {
+    if (error instanceof Error && /propuesta|sucursal|taco|campos editables|coordenadas|horario|hora de cierre|imagen|campo .*no es válido|rango de precios|tags/.test(error.message)) return reply.code(400).send({ error: 'INVALID_PROPOSAL', message: error.message });
+    throw error;
+  }
 });
 
 app.patch('/v1/admin/comments/:id', async (request, reply) => {

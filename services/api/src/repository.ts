@@ -1,7 +1,8 @@
 import { Pool } from 'pg';
 import bcrypt from 'bcryptjs';
 import { createHash } from 'node:crypto';
-import { lists as fixtureLists, places, type ApiList, type ApiListDetail, type ApiPlace, type ApiTaqueria, type FlavorProfile, type TasteProfile } from './data.js';
+import { lists as fixtureLists, places, type ApiList, type ApiListDetail, type ApiPhoto, type ApiPlace, type ApiTaqueria, type FlavorProfile, type TasteProfile } from './data.js';
+import { isOpenNow } from './hours.js';
 
 const configuredDatabaseUrl = process.env.DATABASE_URL?.trim();
 if (process.env.NODE_ENV === 'production' && !configuredDatabaseUrl) {
@@ -11,9 +12,14 @@ if (process.env.NODE_ENV === 'production' && !configuredDatabaseUrl) {
 const pool = configuredDatabaseUrl
   ? new Pool({ connectionString: configuredDatabaseUrl, max: 10, connectionTimeoutMillis: 5_000, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined })
   : null;
-const allowDemoCatalog = process.env.NODE_ENV !== 'production' || process.env.ALLOW_DEMO_CATALOG === 'true';
+const allowDemoCatalog = process.env.ALLOW_DEMO_CATALOG?.trim().toLowerCase() === 'true' || process.env.NODE_ENV === 'test';
+const demoPlaceIds = new Set(places.map((place) => place.id));
 
-type DiscoverQuery = { q?: string; lat?: number; lng?: number; limit: number };
+function localCatalogPlaces() {
+  return allowDemoCatalog ? places : places.filter((place) => !demoPlaceIds.has(place.id));
+}
+
+type DiscoverQuery = { q?: string; lat?: number; lng?: number; radiusKm?: number; offset?: number; openNow?: boolean; limit: number };
 type VisitInput = { placeId: string; tacoIds: string[]; rating: number; tacoRatings?: Record<string, number>; price?: number; note?: string; photoUrl?: string; latitude?: number; longitude?: number };
 type ReportInput = { visitId: string; reason: 'spam' | 'inappropriate' | 'wrong_place' | 'other'; details?: string };
 export type PublicUser = { id: string; email: string; displayName: string; role: 'user' | 'admin'; following?: boolean; emailVerified?: boolean };
@@ -33,6 +39,23 @@ const localReports = new Map<string, { id: string; reporterId: string; visitId: 
 const localComments = new Map<string, { id: string; visitId: string; authorId: string; body: string; createdAt: string; visibility: 'visible' | 'hidden' }>();
 const localListCollaborators = new Map<string, { listId: string; userId: string; role: 'editor' | 'viewer'; createdAt: string }>();
 const localProductEvents: Array<{ eventName: string; userId?: string; anonymousId?: string; properties: Record<string, string | number | boolean | null>; createdAt: string }> = [];
+const localCatalogProposals = new Map<string, { id: string; proposerId: string; kind: CatalogProposalKind; branchId?: string; payload: Record<string, unknown>; evidenceUrl?: string; status: CatalogProposalStatus; reviewNote: string; reviewedBy?: string; createdAt: string; updatedAt: string }>();
+
+export type CatalogProposalKind = 'branch' | 'menu_item' | 'correction';
+export type CatalogProposalStatus = 'pending' | 'approved' | 'rejected';
+export type CatalogProposal = {
+  id: string;
+  kind: CatalogProposalKind;
+  branchId?: string;
+  payload: Record<string, unknown>;
+  evidenceUrl?: string;
+  status: CatalogProposalStatus;
+  reviewNote: string;
+  createdAt: string;
+  updatedAt: string;
+  proposer?: { id: string; displayName: string };
+  reviewer?: { id: string; displayName: string };
+};
 
 function sha256(value: string) {
   return createHash('sha256').update(value).digest('hex');
@@ -130,10 +153,11 @@ export async function consumeAuthRateLimit(key: string, limit = 10): Promise<{ a
 const configuredAdminEmails = new Set((process.env.ADMIN_EMAILS ?? '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean));
 
 const defaultTaste: TasteProfile = {
-  title: 'Pastor nocturno',
-  description: 'Picante alto · precio sensible · explorador de lugares callejeros',
-  tags: ['PASTOR 92%', 'PICANTE 84%', 'NOCHE 78%'],
-  profile: { intensity: 86, spicy: 72, traditional: 94, texture: 88, value: 78 }
+  title: 'Tu gusto se está formando',
+  description: 'Registra algunas visitas para descubrir tu perfil de sabor.',
+  tags: ['SIN DATOS', 'EXPLORA', 'REGISTRA'],
+  profile: { intensity: 50, spicy: 50, traditional: 50, texture: 50, value: 50 },
+  hasData: false
 };
 
 export async function getHealth() {
@@ -265,7 +289,8 @@ function normalizePlace(row: any): ApiPlace {
     neighborhood: row.neighborhood,
     address: row.address ?? undefined,
     phone: row.phone ?? undefined,
-    weeklyHours: row.weekly_hours ?? undefined,
+    weeklyHours: row.weekly_hours && Object.keys(row.weekly_hours).length ? row.weekly_hours : undefined,
+    hoursKnown: row.source_name && row.source_name !== 'demo' ? Boolean(row.weekly_hours && Object.keys(row.weekly_hours).length) : undefined,
     priceMin: row.price_min == null ? undefined : Number(row.price_min),
     priceMax: row.price_max == null ? undefined : Number(row.price_max),
     source: row.source_name ? { name: row.source_name, url: row.source_url ?? undefined, license: row.source_license ?? row.image_license ?? undefined, attribution: row.source_attribution ?? row.image_attribution ?? undefined, updatedAt: row.source_updated_at?.toISOString?.() ?? row.source_updated_at ?? undefined } : undefined,
@@ -273,15 +298,27 @@ function normalizePlace(row: any): ApiPlace {
     openUntil: row.open_until ?? '23:00',
     rating: Number(row.rating),
     reviewCount: row.review_count == null ? undefined : Number(row.review_count),
-    match: Number(row.match_score ?? 80),
+    match: row.match_score == null ? undefined : Number(row.match_score),
     style: row.style,
     coordinates: { latitude: Number(row.latitude), longitude: Number(row.longitude) },
     image: row.image_url,
     description: row.description,
     tags: row.tags ?? [],
     flavorProfile: { ...fallbackProfile, ...(row.flavor_profile ?? {}) },
-    tacos: (row.tacos ?? []).map((taco: any) => ({ id: taco.id, name: taco.name, rating: Number(taco.rating), price: Number(taco.price), note: taco.note }))
+    tacos: (row.tacos ?? []).map((taco: any) => ({ id: taco.id, name: taco.name, rating: Number(taco.rating), price: Number(taco.price), note: taco.note })),
+    photos: row.photos ?? undefined
   };
+}
+
+async function getBranchPhotos(branchId: string): Promise<ApiPhoto[] | undefined> {
+  if (!pool) return undefined;
+  const result = await pool.query(`
+    SELECT url, source_url, license, attribution
+    FROM branch_photos
+    WHERE branch_id = $1
+    ORDER BY is_primary DESC, created_at ASC
+  `, [branchId]);
+  return result.rows.map((row) => ({ url: row.url, sourceUrl: row.source_url ?? undefined, license: row.license, attribution: row.attribution }));
 }
 
 function haversineKm(from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }) {
@@ -401,21 +438,33 @@ function localReputation(place: ApiPlace): ApiPlace {
   return { ...place, rating: Number(localRobustScore(reviews, 10, place.rating).toFixed(2)), tacos, ...(reviews.length ? { reviewCount: reviews.length } : {}) };
 }
 
+function withoutPersonalMatch(place: ApiPlace): ApiPlace {
+  const { match: _match, ...catalogPlace } = place;
+  return catalogPlace;
+}
+
 export async function discoverPlaces(query: DiscoverQuery, userId?: string): Promise<ApiPlace[]> {
+  const limit = Math.min(Math.max(Math.trunc(query.limit), 1), 50);
+  const offset = Math.max(0, Math.trunc(query.offset ?? 0));
   let discovered: ApiPlace[];
   if (!pool) {
+    const localCatalog = localCatalogPlaces();
     const terms = query.q?.trim() ? searchTerms(query.q.trim()) : [];
-    const filtered = query.q?.trim()
-      ? places.filter((place) => {
+    let filtered = query.q?.trim()
+      ? localCatalog.filter((place) => {
         const haystack = normalizeSearchText(`${place.name} ${place.neighborhood} ${place.style} ${place.tags.join(' ')} ${place.tacos.map((taco) => taco.name).join(' ')}`);
         return terms.length > 0 && terms.every((term) => haystack.includes(term));
       })
-      : places;
-    const scored = filtered.map(localReputation);
-    discovered = query.lat == null || query.lng == null ? scored.slice(0, query.limit) : scored
+      : localCatalog;
+    if (query.lat != null && query.lng != null && query.radiusKm != null) {
+      filtered = filtered.filter((place) => haversineKm({ latitude: query.lat!, longitude: query.lng! }, place.coordinates) <= query.radiusKm!);
+    }
+    const scored = filtered.map(localReputation).filter((place) => !query.openNow || isOpenNow(place.openUntil, new Date(), place.weeklyHours, place.hoursKnown));
+    const ordered = query.lat == null || query.lng == null ? scored
+      .sort((a, b) => (b.rating - a.rating)) : scored
       .map((place) => ({ ...place, distance: `${haversineKm({ latitude: query.lat!, longitude: query.lng! }, place.coordinates).toFixed(1)} km` }))
       .sort((a, b) => Number.parseFloat(a.distance) - Number.parseFloat(b.distance))
-      .slice(0, query.limit);
+    discovered = ordered.slice(offset, offset + limit);
   } else {
     const values: unknown[] = [];
     const predicates: string[] = ["b.is_active = true", "b.catalog_status = 'active'"];
@@ -428,11 +477,26 @@ export async function discoverPlaces(query: DiscoverQuery, userId?: string): Pro
         predicates.push(`(unaccent(b.name) ILIKE unaccent($${values.length}) OR unaccent(b.neighborhood) ILIKE unaccent($${values.length}) OR unaccent(b.search_text) ILIKE unaccent($${values.length}) OR EXISTS (SELECT 1 FROM menu_items search_menu WHERE search_menu.branch_id = b.id AND search_menu.is_active = true AND unaccent(search_menu.name) ILIKE unaccent($${values.length})))`);
       }
     }
-    const distanceSelect = query.lat != null && query.lng != null
-      ? `ST_Distance(b.location, ST_SetSRID(ST_MakePoint($${values.length + 1}, $${values.length + 2}), 4326)::geography) / 1000 AS distance_km`
-      : 'NULL::numeric AS distance_km';
-    if (query.lat != null && query.lng != null) values.push(query.lng, query.lat);
-    values.push(query.limit);
+    let distanceSelect = 'NULL::numeric AS distance_km';
+    if (query.lat != null && query.lng != null) {
+      const longitudeParam = values.length + 1;
+      const latitudeParam = values.length + 2;
+      values.push(query.lng, query.lat);
+      distanceSelect = `ST_Distance(b.location, ST_SetSRID(ST_MakePoint($${longitudeParam}, $${latitudeParam}), 4326)::geography) / 1000 AS distance_km`;
+      if (query.radiusKm != null) {
+        const radiusParam = values.length + 1;
+        values.push(query.radiusKm * 1000);
+        predicates.push(`ST_DWithin(b.location, ST_SetSRID(ST_MakePoint($${longitudeParam}, $${latitudeParam}), 4326)::geography, $${radiusParam})`);
+      }
+    }
+    const fetchLimit = query.openNow ? Math.min(500, Math.max(limit + offset, limit) * 3) : limit;
+    const limitParam = values.length + 1;
+    values.push(fetchLimit);
+    const offsetSql = query.openNow || offset === 0 ? '' : (() => {
+      const offsetParam = values.length + 1;
+      values.push(offset);
+      return ` OFFSET $${offsetParam}`;
+    })();
     const orderBy = query.lat != null && query.lng != null ? 'distance_km ASC NULLS LAST, rating DESC' : 'rating DESC';
     const result = await pool.query(`
       SELECT b.id, b.taqueria_id, t.name AS taqueria_name, b.name, b.neighborhood, b.address, b.phone, b.weekly_hours, b.price_min, b.price_max, b.source_name, b.source_url, b.source_license, b.source_attribution, b.source_updated_at, b.image_license, b.image_attribution, b.open_until,
@@ -448,19 +512,21 @@ export async function discoverPlaces(query: DiscoverQuery, userId?: string): Pro
       ${reputationJoin}
       LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
     WHERE ${predicates.join(' AND ')}
-    GROUP BY b.id, t.name, reviews.review_count, reviews.score ORDER BY ${orderBy} LIMIT $${values.length}
+    GROUP BY b.id, t.name, reviews.review_count, reviews.score ORDER BY ${orderBy} LIMIT $${limitParam}${offsetSql}
     `, values);
     discovered = result.rows.map(normalizePlace);
+    if (query.openNow) discovered = discovered.filter((place) => isOpenNow(place.openUntil, new Date(), place.weeklyHours, place.hoursKnown)).slice(offset, offset + limit);
   }
-  if (!userId || !discovered.length) return discovered;
+  if (!userId || !discovered.length) return allowDemoCatalog ? discovered : discovered.map(withoutPersonalMatch);
   // Keep discovery's geographic/textual result set intact while replacing
   // only the affinity fields with the same recommendation model used by the
   // home screen. No social or private profile data is returned here.
   const personalized = await getRecommendations(userId);
   const scores = new Map(personalized.map((place) => [place.id, place]));
   return discovered.map((place) => {
+    const catalogPlace = withoutPersonalMatch(place);
     const match = scores.get(place.id);
-    return match ? { ...place, match: match.match, tasteMatch: match.tasteMatch, socialMatch: match.socialMatch, friendCount: match.friendCount } : place;
+    return match ? { ...catalogPlace, match: match.match, tasteMatch: match.tasteMatch, socialMatch: match.socialMatch, friendCount: match.friendCount } : catalogPlace;
   });
 }
 
@@ -468,8 +534,8 @@ function tokenise(value: string) {
   return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter((token) => token.length > 2);
 }
 
-export async function getRecommendations(userId?: string): Promise<ApiPlace[]> {
-  const candidates = await discoverPlaces({ limit: 50 });
+export async function getRecommendations(userId?: string, location?: { latitude: number; longitude: number }): Promise<ApiPlace[]> {
+  const candidates = await discoverPlaces({ limit: 50, lat: location?.latitude, lng: location?.longitude, radiusKm: location ? 20 : undefined });
   if (!userId) return candidates;
 
   const preferenceTokens = new Set<string>();
@@ -508,7 +574,7 @@ export async function getRecommendations(userId?: string): Promise<ApiPlace[]> {
     const socialSums = new Map<string, { sum: number; count: number; users: Set<string> }>();
     for (const visit of localVisits.values()) {
       if (visit.userId === userId && visit.rating >= 4 && visit.visibility === 'visible') {
-        const place = places.find((item) => item.id === visit.placeId);
+        const place = localCatalogPlaces().find((item) => item.id === visit.placeId);
         if (place) {
           tasteSamples += 1;
           for (const key of Object.keys(tasteSums) as Array<keyof FlavorProfile>) tasteSums[key] += place.flavorProfile[key];
@@ -525,12 +591,13 @@ export async function getRecommendations(userId?: string): Promise<ApiPlace[]> {
     }
     for (const [placeId, signal] of socialSums) socialSignals.set(placeId, { average: signal.sum / signal.count, friendCount: signal.users.size });
   }
-  if (!preferenceTokens.size && !socialSignals.size) return candidates;
+  if (!preferenceTokens.size && !socialSignals.size) return allowDemoCatalog ? candidates : candidates.map(withoutPersonalMatch);
   return candidates.map((place) => {
     const placeTokens = new Set(tokenise([place.name, place.style, ...place.tags, ...place.tacos.map((taco) => taco.name)].join(' ')));
     const overlap = [...placeTokens].filter((token) => preferenceTokens.has(token)).length;
     const tasteMatch = tasteSamples ? Math.max(0, Math.min(99, Math.round(100 - (Object.keys(tasteSums) as Array<keyof FlavorProfile>).reduce((sum, key) => sum + Math.abs(place.flavorProfile[key] - tasteSums[key] / tasteSamples), 0) / 5))) : undefined;
-    const personalMatch = Math.min(99, Math.round(place.match * 0.7 + (tasteMatch ?? place.match) * 0.3 + Math.min(12, overlap * 3)));
+    const catalogMatch = place.match ?? (place.rating > 0 ? Math.round(place.rating * 20) : 50);
+    const personalMatch = Math.min(99, Math.round(catalogMatch * 0.7 + (tasteMatch ?? catalogMatch) * 0.3 + Math.min(12, overlap * 3)));
     const social = socialSignals.get(place.id);
     const socialMatch = social ? Math.min(99, Math.round(social.average * 20)) : undefined;
     const match = socialMatch == null ? personalMatch : Math.min(99, Math.round(personalMatch * 0.75 + socialMatch * 0.25));
@@ -553,26 +620,28 @@ export async function getTasteProfile(userId: string): Promise<TasteProfile> {
     `, [userId]);
     const row = result.rows[0];
     visits = Number(row?.visits ?? 0);
+    // AVG already returns the per-visit mean. Store that mean directly so it
+    // is not divided by the visit count a second time below.
     if (visits) for (const key of Object.keys(sums) as Array<keyof FlavorProfile>) sums[key] = Number(row[key] ?? defaultTaste.profile[key]);
   } else {
     for (const visit of localVisits.values()) {
       if (visit.userId !== userId || visit.visibility !== 'visible') continue;
-      const place = places.find((item) => item.id === visit.placeId);
+      const place = localCatalogPlaces().find((item) => item.id === visit.placeId);
       if (!place) continue;
       visits += 1;
       for (const key of Object.keys(sums) as Array<keyof FlavorProfile>) sums[key] += place.flavorProfile[key];
     }
   }
   if (!visits) return { ...defaultTaste, profile: { ...defaultTaste.profile }, tags: [...defaultTaste.tags] };
-  const profile = Object.fromEntries((Object.keys(sums) as Array<keyof FlavorProfile>).map((key) => [key, Math.round(sums[key] / visits)])) as FlavorProfile;
+  const profile = Object.fromEntries((Object.keys(sums) as Array<keyof FlavorProfile>).map((key) => [key, Math.round(pool ? sums[key] : sums[key] / visits)])) as FlavorProfile;
   const title = profile.spicy >= 70 ? 'Pastor nocturno' : profile.value >= 80 ? 'Explorador de barrio' : profile.traditional >= 75 ? 'Clásico con criterio' : 'Curioso de la ciudad';
   const description = (profile.spicy >= 70 ? 'Picante alto' : 'Picante moderado') + ' · ' + (profile.value >= 75 ? 'precio sensible' : 'buscas equilibrio') + ' · ' + (profile.traditional >= 75 ? 'clásicos' : 'nuevos estilos');
   const tags = [Math.round(profile.traditional) + '% CLÁSICO', Math.round(profile.spicy) + '% PICANTE', Math.round(profile.value) + '% VALOR'];
-  return { title, description, tags, profile };
+  return { title, description, tags, profile, hasData: true };
 }
 
 export async function findPlace(id: string, userId?: string): Promise<ApiPlace | undefined> {
-  const fallback = places.find((place) => place.id === id);
+  const fallback = localCatalogPlaces().find((place) => place.id === id);
   let found: ApiPlace | undefined;
   if (!pool) {
     found = fallback ? localReputation(fallback) : fallback;
@@ -594,10 +663,12 @@ export async function findPlace(id: string, userId?: string): Promise<ApiPlace |
     `, [id]);
     found = result.rows[0] ? normalizePlace(result.rows[0]) : undefined;
   }
-  if (!found || !userId) return found;
+  if (found && pool) found = { ...found, photos: await getBranchPhotos(id) };
+  if (!found || !userId) return found && allowDemoCatalog ? found : found ? withoutPersonalMatch(found) : found;
   const personalized = await getRecommendations(userId);
   const match = personalized.find((place) => place.id === id);
-  return match ? { ...found, match: match.match, tasteMatch: match.tasteMatch, socialMatch: match.socialMatch, friendCount: match.friendCount } : found;
+  const catalogPlace = withoutPersonalMatch(found);
+  return match ? { ...catalogPlace, match: match.match, tasteMatch: match.tasteMatch, socialMatch: match.socialMatch, friendCount: match.friendCount } : catalogPlace;
 }
 
 export type ApiBranchReview = {
@@ -643,13 +714,13 @@ export async function getBranchReviews(branchId: string): Promise<ApiBranchRevie
     }));
   }
 
-  if (!places.some((place) => place.id === branchId)) return undefined;
+  if (!localCatalogPlaces().some((place) => place.id === branchId)) return undefined;
   return [...localVisits.entries()]
     .filter(([, visit]) => visit.placeId === branchId && visit.visibility === 'visible' && localUsers.get(visit.userId)?.shareActivity !== false)
     .sort(([, a], [, b]) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, 50)
     .map(([id, visit]) => {
-      const place = places.find((item) => item.id === visit.placeId);
+      const place = localCatalogPlaces().find((item) => item.id === visit.placeId);
       const tacos = visit.tacoIds.map((tacoId) => place?.tacos.find((taco) => taco.id === tacoId)?.name ?? tacoId).join(', ');
       const author = localUsers.get(visit.userId);
       return { id, visitedAt: visit.createdAt, rating: visit.rating, note: visit.note ?? '', photoUrl: visit.photoUrl ?? null, tacos, user: { id: visit.userId, displayName: author?.displayName ?? 'Cuenta eliminada' } };
@@ -660,18 +731,344 @@ export async function getTaqueria(id: string): Promise<ApiTaqueria | undefined> 
   if (pool) {
       const parent = await pool.query(`
       SELECT t.id, t.name, t.slug, t.description, COUNT(b.id)::int AS branch_count
-      FROM taquerias t LEFT JOIN branches b ON b.taqueria_id = t.id AND b.is_active = true AND b.catalog_status = 'active'
+      FROM taquerias t LEFT JOIN branches b ON b.taqueria_id = t.id AND b.is_active = true AND b.catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(b.source_name, '') <> 'demo'"}
       WHERE t.id = $1 GROUP BY t.id
     `, [id]);
     if (!parent.rows[0]) return undefined;
     const branchRows = await pool.query(`SELECT id FROM branches WHERE taqueria_id = $1 AND is_active = true AND catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"} ORDER BY neighborhood, name`, [id]);
     const branches = (await Promise.all(branchRows.rows.map((row) => findPlace(row.id)))).filter((place): place is ApiPlace => Boolean(place));
+    if (!branches.length) return undefined;
     return { id: parent.rows[0].id, name: parent.rows[0].name, slug: parent.rows[0].slug, description: parent.rows[0].description, branchCount: Number(parent.rows[0].branch_count), branches };
   }
-  const branches = places.filter((place) => (place.taqueriaId ?? place.id) === id);
+  const branches = localCatalogPlaces().filter((place) => (place.taqueriaId ?? place.id) === id);
   if (!branches.length) return undefined;
   const first = branches[0];
   return { id, name: first.taqueriaName ?? first.name, slug: id, description: `${first.name} y sus sucursales.`, branchCount: branches.length, branches };
+}
+
+function normalizeCatalogProposal(row: any): CatalogProposal {
+  const asIso = (value: any) => value?.toISOString?.() ?? value;
+  return {
+    id: row.id,
+    kind: row.kind,
+    branchId: row.branch_id ?? undefined,
+    payload: row.payload ?? {},
+    evidenceUrl: row.evidence_url ?? undefined,
+    status: row.status,
+    reviewNote: row.review_note ?? '',
+    createdAt: asIso(row.created_at),
+    updatedAt: asIso(row.updated_at),
+    proposer: row.proposer_id ? { id: row.proposer_id, displayName: row.proposer_name ?? 'Cuenta eliminada' } : undefined,
+    reviewer: row.reviewer_id ? { id: row.reviewer_id, displayName: row.reviewer_name ?? 'Cuenta eliminada' } : undefined
+  };
+}
+
+async function getCatalogProposal(id: string): Promise<CatalogProposal | undefined> {
+  if (pool) {
+    const result = await pool.query(`
+      SELECT p.id, p.kind, p.branch_id, p.payload, p.evidence_url, p.status, p.review_note, p.created_at, p.updated_at,
+        proposer.id AS proposer_id, proposer.display_name AS proposer_name,
+        reviewer.id AS reviewer_id, reviewer.display_name AS reviewer_name
+      FROM catalog_proposals p
+      LEFT JOIN users proposer ON proposer.id = p.proposer_id
+      LEFT JOIN users reviewer ON reviewer.id = p.reviewed_by
+      WHERE p.id = $1
+    `, [id]);
+    return result.rows[0] ? normalizeCatalogProposal(result.rows[0]) : undefined;
+  }
+  const proposal = localCatalogProposals.get(id);
+  if (!proposal) return undefined;
+  const proposer = localUsers.get(proposal.proposerId);
+  const reviewer = proposal.reviewedBy ? localUsers.get(proposal.reviewedBy) : undefined;
+  return { id: proposal.id, kind: proposal.kind, branchId: proposal.branchId, payload: proposal.payload, evidenceUrl: proposal.evidenceUrl, status: proposal.status, reviewNote: proposal.reviewNote, createdAt: proposal.createdAt, updatedAt: proposal.updatedAt, proposer: proposer ? { id: proposer.id, displayName: proposer.displayName } : undefined, reviewer: reviewer ? { id: reviewer.id, displayName: reviewer.displayName } : undefined };
+}
+
+export async function createCatalogProposal(input: { kind: CatalogProposalKind; branchId?: string; payload: Record<string, unknown>; evidenceUrl?: string }, proposerId: string): Promise<CatalogProposal | undefined> {
+  if (pool) {
+    if (input.kind !== 'branch') {
+      const branch = await pool.query(`SELECT 1 FROM branches WHERE id = $1 AND is_active = true AND catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"}`, [input.branchId ?? '']);
+      if (!branch.rowCount) return undefined;
+    }
+    const id = crypto.randomUUID();
+    await pool.query(`INSERT INTO catalog_proposals (id, proposer_id, kind, branch_id, payload, evidence_url) VALUES ($1, $2, $3, $4, $5::jsonb, $6)`, [id, proposerId, input.kind, input.branchId ?? null, JSON.stringify(input.payload), input.evidenceUrl ?? null]);
+    return getCatalogProposal(id);
+  }
+  if (input.kind !== 'branch' && (!input.branchId || !localCatalogPlaces().some((place) => place.id === input.branchId))) return undefined;
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  localCatalogProposals.set(id, { id, proposerId, kind: input.kind, branchId: input.branchId, payload: input.payload, evidenceUrl: input.evidenceUrl, status: 'pending', reviewNote: '', createdAt: now, updatedAt: now });
+  return getCatalogProposal(id);
+}
+
+export async function getCatalogProposals(status: CatalogProposalStatus | 'all' = 'pending'): Promise<CatalogProposal[]> {
+  if (pool) {
+    const result = await pool.query(`
+      SELECT p.id, p.kind, p.branch_id, p.payload, p.evidence_url, p.status, p.review_note, p.created_at, p.updated_at,
+        proposer.id AS proposer_id, proposer.display_name AS proposer_name,
+        reviewer.id AS reviewer_id, reviewer.display_name AS reviewer_name
+      FROM catalog_proposals p
+      LEFT JOIN users proposer ON proposer.id = p.proposer_id
+      LEFT JOIN users reviewer ON reviewer.id = p.reviewed_by
+      ${status === 'all' ? '' : 'WHERE p.status = $1'}
+      ORDER BY p.created_at DESC LIMIT 100
+    `, status === 'all' ? [] : [status]);
+    return result.rows.map(normalizeCatalogProposal);
+  }
+  return [...localCatalogProposals.values()]
+    .filter((proposal) => status === 'all' || proposal.status === status)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((proposal) => {
+      const proposer = localUsers.get(proposal.proposerId);
+      const reviewer = proposal.reviewedBy ? localUsers.get(proposal.reviewedBy) : undefined;
+      return { id: proposal.id, kind: proposal.kind, branchId: proposal.branchId, payload: proposal.payload, evidenceUrl: proposal.evidenceUrl, status: proposal.status, reviewNote: proposal.reviewNote, createdAt: proposal.createdAt, updatedAt: proposal.updatedAt, proposer: proposer ? { id: proposer.id, displayName: proposer.displayName } : undefined, reviewer: reviewer ? { id: reviewer.id, displayName: reviewer.displayName } : undefined };
+    });
+}
+
+function proposalText(payload: Record<string, unknown>, key: string, fallback = '') {
+  return typeof payload[key] === 'string' ? String(payload[key]).trim() : fallback;
+}
+
+function proposalNumber(payload: Record<string, unknown>, key: string) {
+  const value = payload[key];
+  return value === undefined || value === null || value === '' ? undefined : Number(value);
+}
+
+const proposalDayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+
+function isProposalTime(value: unknown): value is string {
+  return typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+function isProposalWeeklyHours(value: unknown): value is Record<string, Array<{ open: string; close: string }>> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const hours = value as Record<string, unknown>;
+  return proposalDayKeys.every((day) => {
+    const intervals = hours[day];
+    return Array.isArray(intervals) && intervals.every((interval) => {
+      if (!interval || typeof interval !== 'object' || Array.isArray(interval)) return false;
+      const entry = interval as Record<string, unknown>;
+      return isProposalTime(entry.open) && isProposalTime(entry.close) && entry.open !== entry.close;
+    });
+  });
+}
+
+function isProposalHttpsUrl(value: unknown) {
+  return typeof value === 'string' && value.trim().startsWith('https://') && value.trim().length <= 2000;
+}
+
+function validateProposalPrice(value: number | undefined, field: string) {
+  if (value !== undefined && (!Number.isFinite(value) || value < 0 || value > 100000)) throw new Error(`El campo ${field} no es válido`);
+}
+
+async function applyCatalogProposal(client: any, proposal: CatalogProposal) {
+  if (proposal.kind === 'branch') {
+    const name = proposalText(proposal.payload, 'name');
+    const neighborhood = proposalText(proposal.payload, 'neighborhood');
+    const address = proposalText(proposal.payload, 'address');
+    const latitude = proposalNumber(proposal.payload, 'latitude');
+    const longitude = proposalNumber(proposal.payload, 'longitude');
+    if (!name || !neighborhood || !address || latitude === undefined || longitude === undefined || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) throw new Error('La propuesta necesita nombre, colonia, dirección y coordenadas válidas');
+    const branchId = `community-${proposal.id}`;
+    // A community proposal always creates its own parent record. Never let a
+    // user-supplied payload overwrite an existing taqueria by reusing its id.
+    const taqueriaId = branchId;
+    const taqueriaName = name;
+    const taqueriaSlug = `${taqueriaName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48)}-${taqueriaId.slice(-8)}`;
+    await client.query(`INSERT INTO taquerias (id, name, slug, description) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description, updated_at = now()`, [taqueriaId, taqueriaName, taqueriaSlug || `taqueria-${taqueriaId}`, proposalText(proposal.payload, 'taqueriaDescription')]);
+    const tags = Array.isArray(proposal.payload.tags) ? proposal.payload.tags.map((tag) => String(tag).trim()).filter(Boolean).slice(0, 30) : [];
+    const hours = proposal.payload.weeklyHours;
+    if (hours !== undefined && !isProposalWeeklyHours(hours)) throw new Error('El horario semanal no es válido');
+    const openUntil = proposalText(proposal.payload, 'openUntil', '23:00');
+    if (!isProposalTime(openUntil)) throw new Error('La hora de cierre no es válida');
+    const priceMin = proposalNumber(proposal.payload, 'priceMin');
+    const priceMax = proposalNumber(proposal.payload, 'priceMax');
+    validateProposalPrice(priceMin, 'priceMin');
+    validateProposalPrice(priceMax, 'priceMax');
+    if (priceMin !== undefined && priceMax !== undefined && priceMin > priceMax) throw new Error('El rango de precios no es válido');
+    const imageUrl = proposalText(proposal.payload, 'imageUrl');
+    if (imageUrl && !isProposalHttpsUrl(imageUrl)) throw new Error('La imagen debe usar HTTPS');
+    await client.query(`
+      INSERT INTO branches (id, taqueria_id, name, neighborhood, address, phone, location, open_until, weekly_hours, price_min, price_max, style, image_url, image_license, image_attribution, image_source_url, description, tags, search_text, rating, match_score, is_active, source_name, source_place_id, source_url, source_license, source_attribution, dedupe_key, catalog_status, catalog_quality, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, ST_SetSRID(ST_MakePoint($7, $8), 4326)::geography, $9, $10::jsonb, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, 0, NULL, true, 'community', $21, $22, $23, $24, 'active', 'community', now())
+    `, [branchId, taqueriaId, name, neighborhood, address, proposalText(proposal.payload, 'phone') || null, longitude, latitude, openUntil, JSON.stringify(hours ?? {}), priceMin ?? null, priceMax ?? null, proposalText(proposal.payload, 'style', 'Clásico callejero'), imageUrl, proposalText(proposal.payload, 'imageLicense') || null, proposalText(proposal.payload, 'imageAttribution') || 'Propuesta de la comunidad', proposalText(proposal.payload, 'imageSourceUrl') || null, proposalText(proposal.payload, 'description'), tags, `${name} ${neighborhood} ${proposalText(proposal.payload, 'style')} ${tags.join(' ')}`, proposal.id, proposal.evidenceUrl ?? null, proposalText(proposal.payload, 'sourceLicense') || null, proposalText(proposal.payload, 'sourceAttribution') || 'Propuesta de la comunidad', `${name.toLowerCase()}:${latitude.toFixed(4)}:${longitude.toFixed(4)}`]);
+    return branchId;
+  }
+
+  if (proposal.kind === 'menu_item') {
+    const branchId = proposal.branchId ?? proposalText(proposal.payload, 'branchId');
+    const name = proposalText(proposal.payload, 'name');
+    if (!branchId || !name) throw new Error('La propuesta de taco necesita sucursal y nombre');
+    const price = proposalNumber(proposal.payload, 'price');
+    validateProposalPrice(price, 'price');
+    const branch = await client.query(`SELECT 1 FROM branches WHERE id = $1 AND is_active = true AND catalog_status = 'active'`, [branchId]);
+    if (!branch.rowCount) throw new Error('La sucursal ya no está disponible');
+    const tacoId = `community-${proposal.id}`;
+    await client.query(`INSERT INTO menu_items (id, branch_id, name, note, price, rating, is_active) VALUES ($1, $2, $3, $4, $5, 0, true)`, [tacoId, branchId, name, proposalText(proposal.payload, 'note'), price ?? 0]);
+    return tacoId;
+  }
+
+  const branchId = proposal.branchId ?? proposalText(proposal.payload, 'branchId');
+  if (!branchId) throw new Error('La corrección necesita sucursal');
+  const current = await client.query('SELECT price_min, price_max FROM branches WHERE id = $1 AND is_active = true AND catalog_status = \'active\'', [branchId]);
+  if (!current.rowCount) throw new Error('La sucursal ya no está disponible');
+  const changes: Record<string, unknown> = proposal.payload.changes && typeof proposal.payload.changes === 'object' && !Array.isArray(proposal.payload.changes) ? proposal.payload.changes as Record<string, unknown> : proposal.payload;
+  const allowed: Record<string, string> = { name: 'name', neighborhood: 'neighborhood', address: 'address', phone: 'phone', openUntil: 'open_until', weeklyHours: 'weekly_hours', priceMin: 'price_min', priceMax: 'price_max', style: 'style', description: 'description', tags: 'tags', imageUrl: 'image_url' };
+  const assignments = [];
+  const values: unknown[] = [branchId];
+  for (const [key, column] of Object.entries(allowed)) {
+    if (!(key in changes)) continue;
+    const value = changes[key];
+    if (['name', 'neighborhood', 'address', 'style', 'description'].includes(key) && (typeof value !== 'string' || !value.trim())) throw new Error(`El campo ${key} no es válido`);
+    if (key === 'openUntil' && !isProposalTime(value)) throw new Error('La hora de cierre no es válida');
+    if (key === 'weeklyHours' && !isProposalWeeklyHours(value)) throw new Error('El horario semanal no es válido');
+    if (key === 'imageUrl' && value !== '' && !isProposalHttpsUrl(value)) throw new Error('La imagen debe usar HTTPS');
+    if (key === 'tags' && !Array.isArray(value)) throw new Error('Los tags no son válidos');
+    if (key === 'priceMin' || key === 'priceMax') validateProposalPrice(proposalNumber(changes, key), key);
+    values.push(key === 'weeklyHours' ? JSON.stringify(value) : key === 'tags' ? (value as unknown[]).map((tag: unknown) => String(tag).trim()).filter(Boolean).slice(0, 30) : typeof value === 'string' ? value.trim() : value);
+    assignments.push(`${column} = $${values.length}${key === 'weeklyHours' ? '::jsonb' : ''}`);
+  }
+  const changedPriceMin = proposalNumber(changes, 'priceMin');
+  const changedPriceMax = proposalNumber(changes, 'priceMax');
+  const currentPriceMin = current.rows[0].price_min == null ? undefined : Number(current.rows[0].price_min);
+  const currentPriceMax = current.rows[0].price_max == null ? undefined : Number(current.rows[0].price_max);
+  const nextPriceMin = changedPriceMin ?? currentPriceMin;
+  const nextPriceMax = changedPriceMax ?? currentPriceMax;
+  if (nextPriceMin !== undefined && nextPriceMax !== undefined && nextPriceMin > nextPriceMax) throw new Error('El rango de precios no es válido');
+  if (!assignments.length) throw new Error('La corrección no contiene campos editables');
+  assignments.push("catalog_quality = 'community'", 'updated_at = now()');
+  const result = await client.query(`UPDATE branches SET ${assignments.join(', ')} WHERE id = $1 RETURNING id`, values);
+  if (!result.rowCount) throw new Error('La sucursal ya no está disponible');
+  return branchId;
+}
+
+function applyLocalCatalogProposal(proposal: CatalogProposal) {
+  if (proposal.kind === 'branch') {
+    const name = proposalText(proposal.payload, 'name');
+    const neighborhood = proposalText(proposal.payload, 'neighborhood');
+    const address = proposalText(proposal.payload, 'address');
+    const latitude = proposalNumber(proposal.payload, 'latitude');
+    const longitude = proposalNumber(proposal.payload, 'longitude');
+    if (!name || !neighborhood || !address || latitude === undefined || longitude === undefined || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) throw new Error('La propuesta necesita nombre, colonia, dirección y coordenadas válidas');
+    const openUntil = proposalText(proposal.payload, 'openUntil', '23:00');
+    if (!isProposalTime(openUntil)) throw new Error('La hora de cierre no es válida');
+    const weeklyHours = proposal.payload.weeklyHours;
+    if (weeklyHours !== undefined && !isProposalWeeklyHours(weeklyHours)) throw new Error('El horario semanal no es válido');
+    const priceMin = proposalNumber(proposal.payload, 'priceMin');
+    const priceMax = proposalNumber(proposal.payload, 'priceMax');
+    validateProposalPrice(priceMin, 'priceMin');
+    validateProposalPrice(priceMax, 'priceMax');
+    if (priceMin !== undefined && priceMax !== undefined && priceMin > priceMax) throw new Error('El rango de precios no es válido');
+    const imageUrl = proposalText(proposal.payload, 'imageUrl');
+    if (imageUrl && !isProposalHttpsUrl(imageUrl)) throw new Error('La imagen debe usar HTTPS');
+    const branchId = `community-${proposal.id}`;
+    const taqueriaName = name;
+    places.push({
+      id: branchId,
+      taqueriaId: branchId,
+      taqueriaName,
+      name,
+      neighborhood,
+      address,
+      phone: proposalText(proposal.payload, 'phone') || undefined,
+      distance: 'cerca de ti',
+      openUntil,
+      rating: 0,
+      match: undefined,
+      style: proposalText(proposal.payload, 'style', 'Clásico callejero'),
+      coordinates: { latitude, longitude },
+      image: imageUrl,
+      description: proposalText(proposal.payload, 'description'),
+      tacos: [],
+      weeklyHours,
+      priceMin,
+      priceMax,
+      tags: Array.isArray(proposal.payload.tags) ? proposal.payload.tags.map(String).map((tag) => tag.trim()).filter(Boolean).slice(0, 30) : [],
+      flavorProfile: { intensity: 50, spicy: 50, traditional: 50, texture: 50, value: 50 },
+      source: { name: 'community', url: proposal.evidenceUrl, attribution: 'Propuesta de la comunidad' }
+    });
+    return branchId;
+  }
+
+  const branchId = proposal.branchId ?? proposalText(proposal.payload, 'branchId');
+  const place = localCatalogPlaces().find((item) => item.id === branchId);
+  if (!place) throw new Error('La sucursal ya no está disponible');
+  if (proposal.kind === 'menu_item') {
+    const name = proposalText(proposal.payload, 'name');
+    if (!name) throw new Error('La propuesta de taco necesita sucursal y nombre');
+    const price = proposalNumber(proposal.payload, 'price');
+    validateProposalPrice(price, 'price');
+    const tacoId = `community-${proposal.id}`;
+    place.tacos.push({ id: tacoId, name, note: proposalText(proposal.payload, 'note'), price: price ?? 0, rating: 0 });
+    return tacoId;
+  }
+
+  const changes: Record<string, unknown> = proposal.payload.changes && typeof proposal.payload.changes === 'object' && !Array.isArray(proposal.payload.changes) ? proposal.payload.changes as Record<string, unknown> : proposal.payload;
+  const editable: Record<string, keyof ApiPlace> = { name: 'name', neighborhood: 'neighborhood', address: 'address', phone: 'phone', openUntil: 'openUntil', weeklyHours: 'weeklyHours', priceMin: 'priceMin', priceMax: 'priceMax', style: 'style', description: 'description', tags: 'tags', imageUrl: 'image' };
+  const pendingUpdates = new Map<keyof ApiPlace, unknown>();
+  for (const [key, property] of Object.entries(editable)) {
+    if (!(key in changes)) continue;
+    const value = changes[key];
+    if (['name', 'neighborhood', 'address', 'style', 'description'].includes(key)) {
+      if (typeof value !== 'string' || !value.trim()) throw new Error(`El campo ${key} no es válido`);
+      pendingUpdates.set(property, value.trim());
+    } else if (key === 'phone') {
+      if (typeof value !== 'string') throw new Error('El campo phone no es válido');
+      pendingUpdates.set(property, value.trim() || undefined);
+    } else if (key === 'openUntil') {
+      if (!isProposalTime(value)) throw new Error('La hora de cierre no es válida');
+      pendingUpdates.set(property, value);
+    } else if (key === 'imageUrl') {
+      if (value !== '' && !isProposalHttpsUrl(value)) throw new Error('La imagen debe usar HTTPS');
+      pendingUpdates.set(property, value);
+    } else if (key === 'tags') {
+      if (!Array.isArray(value)) throw new Error('Los tags no son válidos');
+      pendingUpdates.set(property, value.map(String).map((tag) => tag.trim()).filter(Boolean).slice(0, 30));
+    } else if (key === 'weeklyHours') {
+      if (!isProposalWeeklyHours(value)) throw new Error('El horario semanal no es válido');
+      pendingUpdates.set(property, value);
+    } else {
+      const parsed = Number(value);
+      validateProposalPrice(parsed, key);
+      pendingUpdates.set(property, parsed);
+    }
+  }
+  const changedPriceMin = proposalNumber(changes, 'priceMin');
+  const changedPriceMax = proposalNumber(changes, 'priceMax');
+  const nextPriceMin = changedPriceMin ?? place.priceMin;
+  const nextPriceMax = changedPriceMax ?? place.priceMax;
+  if (nextPriceMin !== undefined && nextPriceMax !== undefined && nextPriceMin > nextPriceMax) throw new Error('El rango de precios no es válido');
+  for (const [property, value] of pendingUpdates) (place as unknown as Record<string, unknown>)[property] = value;
+  if (!Object.keys(changes).some((key) => key in editable)) throw new Error('La corrección no contiene campos editables');
+  place.source = { ...place.source, name: 'community', url: proposal.evidenceUrl, attribution: 'Propuesta de la comunidad' };
+  return branchId;
+}
+
+export async function reviewCatalogProposal(id: string, action: 'approve' | 'reject', reviewerId: string, reviewNote = ''): Promise<boolean> {
+  const proposal = await getCatalogProposal(id);
+  if (!proposal || proposal.status !== 'pending') return false;
+  if (pool) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      if (action === 'approve') await applyCatalogProposal(client, proposal);
+      const result = await client.query(`UPDATE catalog_proposals SET status = $2, review_note = $3, reviewed_by = $4, updated_at = now() WHERE id = $1 AND status = 'pending' RETURNING id`, [id, action === 'approve' ? 'approved' : 'rejected', reviewNote.trim(), reviewerId]);
+      await client.query('COMMIT');
+      return Boolean(result.rowCount);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  const localProposal = localCatalogProposals.get(id);
+  if (!localProposal || localProposal.status !== 'pending') return false;
+  if (action === 'approve') applyLocalCatalogProposal({ id: localProposal.id, kind: localProposal.kind, branchId: localProposal.branchId, payload: localProposal.payload, evidenceUrl: localProposal.evidenceUrl, status: localProposal.status, reviewNote: localProposal.reviewNote, createdAt: localProposal.createdAt, updatedAt: localProposal.updatedAt });
+  localProposal.status = action === 'approve' ? 'approved' : 'rejected';
+  localProposal.reviewNote = reviewNote.trim();
+  localProposal.reviewedBy = reviewerId;
+  localProposal.updatedAt = new Date().toISOString();
+  return true;
 }
 
 export async function getSavedPlaceIds(userId: string): Promise<string[]> {
@@ -689,7 +1086,7 @@ export async function savePlaceForUser(placeId: string, userId: string): Promise
     const result = await pool.query('INSERT INTO saved_places (user_id, branch_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING branch_id', [userId, placeId]);
     return result.rowCount ? 'saved' : 'already_saved';
   }
-  if (!places.some((place) => place.id === placeId)) return 'not_found';
+  if (!localCatalogPlaces().some((place) => place.id === placeId)) return 'not_found';
   const key = `${userId}:${placeId}`;
   if (localSavedPlaces.has(key)) return 'already_saved';
   localSavedPlaces.add(key);
@@ -1050,7 +1447,7 @@ export async function getDiary(userId: string, includeHidden = true) {
       SELECT v.id, v.visited_at, v.rating, v.price, v.note, v.photo_url, b.name AS place_name, b.neighborhood,
         COALESCE(string_agg(m.name, ', ' ORDER BY m.name), '') AS tacos,
       COALESCE(json_object_agg(m.id, vi.rating) FILTER (WHERE m.id IS NOT NULL), '{}'::json) AS taco_ratings,
-        COALESCE(v.photo_url, b.image_url) AS image_url,
+        COALESCE(v.photo_url, b.image_url, '') AS image_url,
         ST_Y(COALESCE(v.visit_location, b.location)::geometry) AS latitude,
         ST_X(COALESCE(v.visit_location, b.location)::geometry) AS longitude
       FROM visits v JOIN branches b ON b.id = v.branch_id
@@ -1071,7 +1468,7 @@ export async function getDiary(userId: string, includeHidden = true) {
     }));
   }
   return [...localVisits.entries()].filter(([, visit]) => visit.userId === userId && (includeHidden || visit.visibility === 'visible')).sort(([, a], [, b]) => b.createdAt.localeCompare(a.createdAt)).map(([id, visit]) => {
-    const place = places.find((item) => item.id === visit.placeId);
+    const place = localCatalogPlaces().find((item) => item.id === visit.placeId);
     const tacoNames = visit.tacoIds.map((tacoId) => place?.tacos.find((taco) => taco.id === tacoId)?.name ?? tacoId).join(', ');
     return { id, visited_at: visit.createdAt, rating: visit.rating, price: visit.price ?? null, note: visit.note ?? '', photo_url: visit.photoUrl ?? null, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', tacos: tacoNames, taco_ratings: visit.tacoRatings ?? {}, latitude: visit.latitude ?? place?.coordinates.latitude ?? null, longitude: visit.longitude ?? place?.coordinates.longitude ?? null, image_url: visit.photoUrl ?? place?.image ?? '' };
   });
@@ -1110,14 +1507,14 @@ export async function getPassport(userId: string) {
   }
 
   const zoneMap = new Map<string, { branchCount: number; visitCount: number }>();
-  for (const place of places) {
+  for (const place of localCatalogPlaces()) {
     const current = zoneMap.get(place.neighborhood) ?? { branchCount: 0, visitCount: 0 };
     current.branchCount += 1;
     zoneMap.set(place.neighborhood, current);
   }
   for (const visit of localVisits.values()) {
     if (visit.userId !== userId || visit.visibility !== 'visible') continue;
-    const place = places.find((item) => item.id === visit.placeId);
+    const place = localCatalogPlaces().find((item) => item.id === visit.placeId);
     if (place) zoneMap.get(place.neighborhood)!.visitCount += 1;
   }
   const zones = [...zoneMap.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, counts]) => ({
@@ -1174,7 +1571,7 @@ function normalizeList(row: any): ApiList {
     owner: { id: row.owner_id, displayName: row.owner_name },
     itemCount: Number(row.item_count ?? 0),
     visitedCount: Number(row.visited_count ?? 0),
-    coverImage: row.cover_image_url ?? places[0].image,
+    coverImage: row.cover_image_url ?? places[0]?.image ?? '',
     visibility: row.visibility ?? 'public',
     collaboratorCount: Number(row.collaborator_count ?? 0),
     canEdit: Boolean(row.can_edit)
@@ -1211,7 +1608,7 @@ export async function getLists(userId?: string): Promise<ApiList[]> {
     const canEdit = list.ownerId === userId || [...localListCollaborators.values()].some((collaborator) => collaborator.listId === list.id && collaborator.userId === userId && collaborator.role === 'editor');
     return { id: list.id, title: list.title, description: list.description, owner: { id: list.ownerId, displayName: owner?.displayName ?? 'Tacos' }, itemCount: list.placeIds.length, visitedCount, coverImage: list.coverImage, visibility: list.visibility, collaboratorCount, canEdit } satisfies ApiList;
   });
-  return [...fixtureLists, ...mapped];
+  return [...(allowDemoCatalog ? fixtureLists : []), ...mapped];
 }
 
 export async function getListDetails(listId: string, userId?: string): Promise<ApiListDetail | undefined> {
@@ -1261,10 +1658,10 @@ export async function getListDetails(listId: string, userId?: string): Promise<A
       collaboratorCount: collaborators.length,
       canEdit,
       collaborators: visibleCollaborators,
-      items: local.placeIds.map((placeId, position) => { const place = places.find((item) => item.id === placeId); return place ? { branchId: placeId, note: '', position, place } : undefined; }).filter((item): item is { branchId: string; note: string; position: number; place: ApiPlace } => Boolean(item))
+      items: local.placeIds.map((placeId, position) => { const place = localCatalogPlaces().find((item) => item.id === placeId); return place ? { branchId: placeId, note: '', position, place } : undefined; }).filter((item): item is { branchId: string; note: string; position: number; place: ApiPlace } => Boolean(item))
     };
   }
-  const fixture = fixtureLists.find((item) => item.id === listId);
+  const fixture = allowDemoCatalog ? fixtureLists.find((item) => item.id === listId) : undefined;
   return fixture ? { ...fixture, items: [] } : undefined;
 }
 
@@ -1284,9 +1681,10 @@ export async function createListForUser(input: { title: string; description?: st
     return normalizeList(created.rows[0]);
   }
   const createdAt = new Date().toISOString();
-  localLists.set(id, { id, ownerId: userId, title, description, visibility, coverImage: places[0].image, placeIds: [], createdAt });
+  const coverImage = allowDemoCatalog ? places[0]?.image ?? '' : '';
+  localLists.set(id, { id, ownerId: userId, title, description, visibility, coverImage, placeIds: [], createdAt });
   const owner = localUsers.get(userId);
-  return { id, title, description, owner: { id: userId, displayName: owner?.displayName ?? 'Tacos' }, itemCount: 0, visitedCount: 0, coverImage: places[0].image, visibility, collaboratorCount: 0, canEdit: true };
+  return { id, title, description, owner: { id: userId, displayName: owner?.displayName ?? 'Tacos' }, itemCount: 0, visitedCount: 0, coverImage, visibility, collaboratorCount: 0, canEdit: true };
 }
 
 export async function updateListForUser(listId: string, input: { title?: string; description?: string; visibility?: 'public' | 'private' }, userId: string): Promise<ApiListDetail | undefined> {
@@ -1374,7 +1772,7 @@ export async function addListItemForUser(listId: string, placeId: string, userId
   }
   const list = localLists.get(listId);
   const role = list ? await getListRole(listId, userId) : undefined;
-  if (!list || (role !== 'owner' && role !== 'editor') || !places.some((place) => place.id === placeId)) return false;
+  if (!list || (role !== 'owner' && role !== 'editor') || !localCatalogPlaces().some((place) => place.id === placeId)) return false;
   if (!list.placeIds.includes(placeId)) list.placeIds.push(placeId);
   return true;
 }
@@ -1434,7 +1832,7 @@ export async function getFeed(userId: string) {
   if (pool) {
     const result = await pool.query(`
       SELECT v.id, v.visited_at, v.rating, v.note, u.id AS user_id, u.display_name,
-        b.id AS place_id, b.name AS place_name, b.neighborhood, COALESCE(v.photo_url, b.image_url) AS image_url,
+        b.id AS place_id, b.name AS place_name, b.neighborhood, COALESCE(v.photo_url, b.image_url, '') AS image_url,
         COALESCE(string_agg(m.name, ', ' ORDER BY m.name), '') AS tacos,
         (SELECT COUNT(*)::int FROM visit_comments c WHERE c.visit_id = v.id AND c.visibility = 'visible') AS comment_count
       FROM follows f JOIN visits v ON v.user_id = f.followed_id
@@ -1446,7 +1844,7 @@ export async function getFeed(userId: string) {
   }
   const followed = [...localFollows].filter((key) => key.startsWith(`${userId}:`)).map((key) => key.slice(userId.length + 1));
   return [...localVisits.entries()].filter(([, visit]) => followed.includes(visit.userId) && visit.visibility === 'visible' && localUsers.get(visit.userId)?.shareActivity !== false).sort(([, a], [, b]) => b.createdAt.localeCompare(a.createdAt)).map(([id, visit]) => {
-    const place = places.find((item) => item.id === visit.placeId);
+    const place = localCatalogPlaces().find((item) => item.id === visit.placeId);
     const user = localUsers.get(visit.userId);
     const tacos = visit.tacoIds.map((tacoId) => place?.tacos.find((taco) => taco.id === tacoId)?.name ?? tacoId).join(', ');
     return { id, visited_at: visit.createdAt, rating: visit.rating, note: visit.note ?? '', user_id: visit.userId, display_name: user?.displayName ?? 'Tacos', place_id: visit.placeId, place_name: place?.name ?? visit.placeId, neighborhood: place?.neighborhood ?? '', image_url: visit.photoUrl ?? place?.image ?? '', tacos, comment_count: [...localComments.values()].filter((comment) => comment.visitId === id && comment.visibility === 'visible').length };
@@ -1532,7 +1930,7 @@ export async function getAdminComments(visibility: 'visible' | 'hidden' | 'all' 
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .map((comment) => {
       const visit = localVisits.get(comment.visitId);
-      const place = visit ? places.find((item) => item.id === visit.placeId) : undefined;
+      const place = visit ? localCatalogPlaces().find((item) => item.id === visit.placeId) : undefined;
       const author = localUsers.get(comment.authorId);
       return { id: comment.id, visitId: comment.visitId, body: comment.body, visibility: comment.visibility, createdAt: comment.createdAt, author: { id: comment.authorId, displayName: author?.displayName ?? 'Cuenta eliminada' }, place: { id: place?.id ?? visit?.placeId ?? '', name: place?.name ?? 'Lugar desconocido' } } satisfies AdminComment;
     });
@@ -1605,7 +2003,7 @@ export async function getAdminReports(status: 'open' | 'reviewed' | 'dismissed' 
       const visit = localVisits.get(report.visitId);
       const reporter = localUsers.get(report.reporterId);
       const author = visit ? localUsers.get(visit.userId) : undefined;
-      const place = visit ? places.find((item) => item.id === visit.placeId) : undefined;
+      const place = visit ? localCatalogPlaces().find((item) => item.id === visit.placeId) : undefined;
       if (!visit || !place) return undefined;
       return { id: report.id, visitId: report.visitId, reason: report.reason, details: report.details, status: report.status, createdAt: report.createdAt, reporter: { id: report.reporterId, displayName: reporter?.displayName ?? 'Cuenta eliminada' }, author: { id: visit.userId, displayName: author?.displayName ?? 'Cuenta eliminada' }, place: { id: place.id, name: place.name }, rating: visit.rating, visitedAt: visit.createdAt } satisfies AdminReport;
     })

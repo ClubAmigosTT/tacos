@@ -7,7 +7,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ApiError, listDetails, removeListItem, trackEvent } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { colors, radii, spacing } from '@/theme';
+import { colors, radii, spacing, typography } from '@/theme';
 import { PlaceCard } from '@/components/PlaceCard';
 import { MapCanvas } from '@/components/MapCanvas';
 import { AsyncErrorState } from '@/components/AsyncErrorState';
@@ -35,19 +35,19 @@ export default function ListDetailScreen() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.ink} /></Pressable>
+        <Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.textPrimary} /></Pressable>
         <Text style={styles.eyebrow}>LISTA CURADA</Text>
-        {isOwner ? <View style={styles.headerActions}><Pressable accessibilityRole="button" accessibilityLabel="Compartir lista" style={styles.edit} onPress={() => void shareList()}><Ionicons name="share-outline" size={19} color={colors.accent} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Gestionar colaboradores" style={styles.edit} onPress={() => router.push({ pathname: '/list-collaborators', params: { id: list.id } })}><Ionicons name="people-outline" size={19} color={colors.accent} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Editar lista" style={styles.edit} onPress={() => router.push({ pathname: '/list-edit', params: { id: list.id } })}><Ionicons name="create-outline" size={19} color={colors.accent} /></Pressable></View> : <View style={styles.headerActions}><Pressable accessibilityRole="button" accessibilityLabel="Compartir lista" style={styles.edit} onPress={() => void shareList()}><Ionicons name="share-outline" size={19} color={colors.accent} /></Pressable><Ionicons accessibilityLabel={list.visibility === 'private' ? 'Lista privada' : 'Lista pública'} name={list.visibility === 'private' ? 'lock-closed' : 'bookmark'} size={20} color={colors.accent} /></View>}
+        {isOwner ? <View style={styles.headerActions}><Pressable accessibilityRole="button" accessibilityLabel="Compartir lista" style={styles.edit} onPress={() => void shareList()}><Ionicons name="share-outline" size={19} color={colors.tortilla} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Gestionar colaboradores" style={styles.edit} onPress={() => router.push({ pathname: '/list-collaborators', params: { id: list.id } })}><Ionicons name="people-outline" size={19} color={colors.tortilla} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Editar lista" style={styles.edit} onPress={() => router.push({ pathname: '/list-edit', params: { id: list.id } })}><Ionicons name="create-outline" size={19} color={colors.tortilla} /></Pressable></View> : <View style={styles.headerActions}><Pressable accessibilityRole="button" accessibilityLabel="Compartir lista" style={styles.edit} onPress={() => void shareList()}><Ionicons name="share-outline" size={19} color={colors.tortilla} /></Pressable><Ionicons accessibilityLabel={list.visibility === 'private' ? 'Lista privada' : 'Lista pública'} name={list.visibility === 'private' ? 'lock-closed' : 'bookmark'} size={20} color={colors.tortilla} /></View>}
       </View>
       <Text style={styles.title}>{list.title}</Text>
       <Text style={styles.description}>{list.description}</Text>
       <View style={styles.metaRow}><Text style={styles.owner}>por @{list.owner.displayName.toLowerCase().replace(/\s+/g, '')}</Text><Text style={styles.progress}>{list.visitedCount}/{list.itemCount} VISITADOS · {progress}%</Text></View>
       <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${progress}%` }]} /></View>
-      {isOwner ? <Pressable accessibilityRole="button" accessibilityLabel="Gestionar colaboradores" style={styles.collabLink} onPress={() => router.push({ pathname: '/list-collaborators', params: { id: list.id } })}><Ionicons name="people-outline" size={15} color={colors.accent} /><Text style={styles.collabText}>Gestionar colaboradores{list.collaboratorCount ? ` · ${list.collaboratorCount}` : ''}</Text><Ionicons name="chevron-forward" size={14} color={colors.dim} /></Pressable> : (list.collaboratorCount ?? list.collaborators?.length ?? 0) ? <Text style={styles.collabSummary}>{list.collaboratorCount ?? list.collaborators?.length} colaborador{(list.collaboratorCount ?? list.collaborators?.length) === 1 ? '' : 'es'}</Text> : null}
+      {isOwner ? <Pressable accessibilityRole="button" accessibilityLabel="Gestionar colaboradores" style={styles.collabLink} onPress={() => router.push({ pathname: '/list-collaborators', params: { id: list.id } })}><Ionicons name="people-outline" size={15} color={colors.tortilla} /><Text style={styles.collabText}>Gestionar colaboradores{list.collaboratorCount ? ` · ${list.collaboratorCount}` : ''}</Text><Ionicons name="chevron-forward" size={14} color={colors.textTertiary} /></Pressable> : (list.collaboratorCount ?? list.collaborators?.length ?? 0) ? <Text style={styles.collabSummary}>{list.collaboratorCount ?? list.collaborators?.length} colaborador{(list.collaboratorCount ?? list.collaborators?.length) === 1 ? '' : 'es'}</Text> : null}
       {list.items.length ? <View style={styles.mapPreview}><MapCanvas places={list.items.map((item) => item.place)} active="" onSelect={(placeId) => router.push(`/place/${placeId}`)} /></View> : null}
       <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Lugares</Text><Text style={styles.count}>{list.items.length}</Text></View>
       {removeMutation.isError ? <Text style={styles.error}>No pudimos quitar ese lugar. Inténtalo de nuevo.</Text> : null}
-      {list.items.length ? list.items.map((item) => <View key={item.branchId} style={styles.item}><PlaceCard place={item.place} compact />{item.note ? <Text style={styles.note}>{item.note}</Text> : null}{canEdit ? <Pressable style={styles.remove} disabled={removeMutation.isPending} onPress={() => removeMutation.mutate(item.branchId)}><Ionicons name="remove-circle-outline" size={15} color={colors.warm} /><Text style={styles.removeText}>{removeMutation.isPending ? 'Quitando…' : 'Quitar de la lista'}</Text></Pressable> : null}</View>) : <View style={styles.empty}><Ionicons name="map-outline" size={28} color={colors.dim} /><Text style={styles.emptyTitle}>Todavía no hay lugares</Text><Text style={styles.muted}>Guarda taquerías desde sus fichas para empezar esta ruta.</Text></View>}
+      {list.items.length ? list.items.map((item) => <View key={item.branchId} style={styles.item}><PlaceCard place={item.place} compact />{item.note ? <Text style={styles.note}>{item.note}</Text> : null}{canEdit ? <Pressable style={styles.remove} disabled={removeMutation.isPending} onPress={() => removeMutation.mutate(item.branchId)}><Ionicons name="remove-circle-outline" size={15} color={colors.salsa} /><Text style={styles.removeText}>{removeMutation.isPending ? 'Quitando…' : 'Quitar de la lista'}</Text></Pressable> : null}</View>) : <View style={styles.empty}><Ionicons name="map-outline" size={28} color={colors.textTertiary} /><Text style={styles.emptyTitle}>Todavía no hay lugares</Text><Text style={styles.muted}>Guarda taquerías desde sus fichas para empezar esta ruta.</Text></View>}
     </ScrollView>
   );
 }
@@ -60,29 +60,29 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   back: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   edit: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  eyebrow: { color: colors.accent, fontSize: 9, fontWeight: '900', letterSpacing: 1.6 },
-  title: { color: colors.ink, fontSize: 31, fontWeight: '900', letterSpacing: -1, lineHeight: 35 },
-  description: { color: colors.muted, fontSize: 14, lineHeight: 21, marginTop: 9 },
+  eyebrow: { color: colors.tortilla, fontSize: 9, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold, letterSpacing: 1.6 },
+  title: { color: colors.textPrimary, fontSize: 31, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold, letterSpacing: -1, lineHeight: 35 },
+  description: { color: colors.textSecondary, fontSize: 14, fontFamily: typography.fontFamily.regular, lineHeight: 21, marginTop: 9 },
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.lg },
-  owner: { color: colors.accent, fontSize: 10, fontWeight: '900' },
-  progress: { color: colors.muted, fontSize: 9, fontWeight: '900', letterSpacing: 0.6 },
+  owner: { color: colors.tortilla, fontSize: 10, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold },
+  progress: { color: colors.textSecondary, fontSize: 9, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold, letterSpacing: 0.6 },
   progressTrack: { height: 6, backgroundColor: colors.surfaceRaised, borderRadius: 4, overflow: 'hidden', marginTop: 9 },
-  progressFill: { height: '100%', backgroundColor: colors.accent, borderRadius: 4 },
+  progressFill: { height: '100%', backgroundColor: colors.tortilla, borderRadius: 4 },
   collabLink: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.md, paddingVertical: 5 },
-  collabText: { color: colors.accent, fontSize: 11, fontWeight: '900', flex: 1 },
-  collabSummary: { color: colors.muted, fontSize: 10, fontWeight: '800', marginTop: spacing.sm },
+  collabText: { color: colors.tortilla, fontSize: 11, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold, flex: 1 },
+  collabSummary: { color: colors.textSecondary, fontSize: 10, fontFamily: typography.fontFamily.semibold, fontWeight: typography.weight.semibold, marginTop: spacing.sm },
   mapPreview: { height: 190, borderRadius: radii.md, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, marginTop: spacing.xl },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: spacing.xxl, marginBottom: spacing.md },
-  sectionTitle: { color: colors.ink, fontSize: 23, fontWeight: '900' },
-  count: { color: colors.muted, fontSize: 12, fontWeight: '900' },
+  sectionTitle: { color: colors.textPrimary, fontSize: 23, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold },
+  count: { color: colors.textSecondary, fontSize: 12, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold },
   item: { marginBottom: spacing.sm },
-  note: { color: colors.warm, fontSize: 11, marginTop: -4, marginBottom: spacing.sm, paddingHorizontal: spacing.sm },
+  note: { color: colors.salsa, fontSize: 11, fontFamily: typography.fontFamily.regular, marginTop: -4, marginBottom: spacing.sm, paddingHorizontal: spacing.sm },
   remove: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: 6 },
-  removeText: { color: colors.warm, fontSize: 11, fontWeight: '800' },
-  error: { color: '#F08A8A', fontSize: 12, marginBottom: spacing.sm },
+  removeText: { color: colors.salsa, fontSize: 11, fontFamily: typography.fontFamily.semibold, fontWeight: typography.weight.semibold },
+  error: { color: colors.danger, fontFamily: typography.fontFamily.medium, fontSize: 12, marginBottom: spacing.sm },
   empty: { alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.xl, gap: 8 },
-  emptyTitle: { color: colors.ink, fontSize: 17, fontWeight: '900' },
-  muted: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 7 },
-  backButton: { backgroundColor: colors.accent, borderRadius: radii.pill, paddingHorizontal: 18, paddingVertical: 10, marginTop: spacing.lg },
-  backText: { color: colors.background, fontSize: 12, fontWeight: '900' }
+  emptyTitle: { color: colors.textPrimary, fontSize: 17, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold },
+  muted: { color: colors.textSecondary, fontSize: 13, fontFamily: typography.fontFamily.regular, lineHeight: 19, textAlign: 'center', marginTop: 7 },
+  backButton: { backgroundColor: colors.tortilla, borderRadius: radii.pill, paddingHorizontal: 18, paddingVertical: 10, marginTop: spacing.lg },
+  backText: { color: colors.background, fontSize: 12, fontFamily: typography.fontFamily.bold, fontWeight: typography.weight.bold }
 });

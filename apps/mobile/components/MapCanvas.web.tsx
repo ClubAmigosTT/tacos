@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Place } from '@/data/fixtures';
 import { MapPin } from './MapPin';
 import { normalizeRadarText } from '@/lib/radar';
+import { colors, typography } from '@/theme';
 
 const mapBounds = { north: 19.43, south: 19.37, west: -99.19, east: -99.14 };
 const defaultCenter = { latitude: 19.402, longitude: -99.163 };
@@ -59,15 +60,15 @@ export function MapCanvas({ places, active, tacoName, onSelect, userCoordinates,
   // Do not infer Pastor from the visual filter here: a neighborhood search
   // may leave that filter selected while pins should show branch ratings.
   const ratingTaco = tacoName;
-  return <View accessibilityRole="adjustable" accessibilityLabel="Mapa de taquerías; arrastra para explorar" style={styles.webMap} {...panResponder.panHandlers}><View style={[styles.mapContent, { transform: [{ translateX: pan.x }, { translateY: pan.y }] }]}><View style={styles.roadOne} /><View style={styles.roadTwo} /><View style={styles.roadThree} /><Text style={[styles.label, { top: '25%', left: '19%' }]}>NARVARTE</Text><Text style={[styles.label, { top: '44%', left: '57%' }]}>ROMA SUR</Text><Text style={[styles.label, { top: '67%', left: '72%' }]}>CONDESA</Text>{places.map((place) => { const taco = ratingTaco ? place.tacos.find((item) => normalizeRadarText(item.name) === normalizeRadarText(ratingTaco)) : undefined; const pinLabel = active === '92% para mí' ? `${place.match}%` : taco ? `${taco.name} ${taco.rating.toFixed(1)}` : place.rating.toFixed(1); return <Pressable key={place.id} accessibilityRole="button" accessibilityLabel={`Abrir ${place.name}, ${pinLabel}`} onPress={() => onSelect(place.id)} style={[styles.pinPosition, pinPosition(place)]}><MapPin label={pinLabel} accent={active === '92% para mí'} /></Pressable>; })}</View></View>;
+  return <View accessibilityRole="adjustable" accessibilityLabel="Mapa de taquerías; arrastra para explorar" style={styles.webMap} {...panResponder.panHandlers}><View style={[styles.mapContent, { transform: [{ translateX: pan.x }, { translateY: pan.y }] }]}><View style={styles.roadOne} /><View style={styles.roadTwo} /><View style={styles.roadThree} /><Text style={[styles.label, { top: '25%', left: '19%' }]}>NARVARTE</Text><Text style={[styles.label, { top: '44%', left: '57%' }]}>ROMA SUR</Text><Text style={[styles.label, { top: '67%', left: '72%' }]}>CONDESA</Text>{places.map((place) => { const taco = ratingTaco ? place.tacos.find((item) => normalizeRadarText(item.name) === normalizeRadarText(ratingTaco)) : undefined; const tacoLabel = taco ? `${taco.name} ${taco.rating > 0 ? taco.rating.toFixed(1) : '—'}` : undefined; const pinLabel = active === '92% para mí' ? (place.match != null ? `${place.match}%` : '—') : tacoLabel ?? (place.rating > 0 ? place.rating.toFixed(1) : '—'); return <Pressable key={place.id} accessibilityRole="button" accessibilityLabel={`Abrir ${place.name}, ${pinLabel}`} onPress={() => onSelect(place.id)} style={[styles.pinPosition, pinPosition(place)]}><MapPin label={pinLabel} accent={active === '92% para mí'} /></Pressable>; })}</View></View>;
 }
 
 const styles = StyleSheet.create({
-  webMap: { ...StyleSheet.absoluteFill, backgroundColor: '#151B18', overflow: 'hidden' },
+  webMap: { ...StyleSheet.absoluteFill, backgroundColor: colors.mapBase, overflow: 'hidden' },
   mapContent: { ...StyleSheet.absoluteFill },
-  roadOne: { position: 'absolute', width: '145%', height: 1, backgroundColor: '#354039', top: '42%', left: '-15%', transform: [{ rotate: '-18deg' }] },
-  roadTwo: { position: 'absolute', width: '145%', height: 1, backgroundColor: '#354039', top: '66%', left: '-13%', transform: [{ rotate: '21deg' }] },
-  roadThree: { position: 'absolute', width: 1, height: '130%', backgroundColor: '#354039', top: '-15%', left: '49%', transform: [{ rotate: '17deg' }] },
-  label: { position: 'absolute', color: '#718077', fontSize: 11, fontWeight: '900', letterSpacing: 2 },
+  roadOne: { position: 'absolute', width: '145%', height: 1, backgroundColor: colors.mapRoad, top: '42%', left: '-15%', transform: [{ rotate: '-18deg' }] },
+  roadTwo: { position: 'absolute', width: '145%', height: 1, backgroundColor: colors.mapRoad, top: '66%', left: '-13%', transform: [{ rotate: '21deg' }] },
+  roadThree: { position: 'absolute', width: 1, height: '130%', backgroundColor: colors.mapRoad, top: '-15%', left: '49%', transform: [{ rotate: '17deg' }] },
+  label: { position: 'absolute', color: colors.mapLabel, fontFamily: typography.fontFamily.semibold, fontSize: 11, fontWeight: typography.weight.semibold, letterSpacing: 2 },
   pinPosition: { position: 'absolute' },
 });
