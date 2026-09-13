@@ -120,3 +120,19 @@ Las correcciones de la comunidad se manejan desde el flujo de Moderación y
 quedan marcadas como `community` hasta que una fuente las confirme. Si una
 reimportación posterior actualiza el mismo registro desde OSM, la corrección
 debe revisarse nuevamente.
+
+## Catálogo local de la app
+
+La app móvil incluye una copia estática del feed OSM para poder mostrar el
+catálogo aunque la API o la conexión fallen. Se regenera al preparar cada
+versión de la app y se publica con una cadencia quincenal:
+
+```bash
+pnpm catalog:build:mobile
+```
+
+La salida se guarda en `apps/mobile/data/catalog.ts`. La app usa primero los
+datos de la API cuando están disponibles (para conservar calificaciones,
+visitas y actividad de usuarios) y usa esta copia local como respaldo. Cambiar
+el catálogo no llega automáticamente a teléfonos ya instalados: requiere una
+nueva versión de la app, idealmente cada 15 días.

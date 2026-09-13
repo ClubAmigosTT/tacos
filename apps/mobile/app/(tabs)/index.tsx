@@ -6,6 +6,7 @@ import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { lists as fixtureLists } from '@/data/fixtures';
 import { feed as feedRequest, isDemoMode, lists as listsRequest, recommendations } from '@/lib/api';
+import { localRecommendations } from '@/lib/localCatalog';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, shadows, spacing, typography } from '@/theme';
 import { PlaceCard } from '@/components/PlaceCard';
@@ -33,7 +34,7 @@ export default function HomeScreen() {
     })();
     return () => { active = false; };
   }, []);
-  const { data = [], isError: recommendationsError, refetch: refetchRecommendations } = useQuery({ queryKey: ['recommendations', token, coordinates?.latitude, coordinates?.longitude], queryFn: () => recommendations(token, coordinates), enabled: !authLoading });
+  const { data = [], isError: recommendationsError, refetch: refetchRecommendations } = useQuery({ queryKey: ['recommendations', token, coordinates?.latitude, coordinates?.longitude], queryFn: () => recommendations(token, coordinates), initialData: () => localRecommendations(coordinates), enabled: !authLoading });
   const { data: feedData, isError: feedError, refetch: refetchFeed } = useQuery({ queryKey: ['feed', 'home', token], queryFn: () => feedRequest(token!), enabled: !authLoading && Boolean(token), staleTime: 60_000 });
   const { data: listData, isError: listsError, refetch: refetchLists } = useQuery({ queryKey: ['lists', 'home', token], queryFn: () => listsRequest(token), enabled: !authLoading, staleTime: 60_000 });
   const featured = data[0];
@@ -69,7 +70,7 @@ export default function HomeScreen() {
         <Pressable accessibilityRole="button" accessibilityLabel="Ejecutar búsqueda" style={styles.searchShortcut} onPress={submitSearch}><Text style={styles.shortcutText}>↵</Text></Pressable>
       </View>
 
-      {recommendationsError && !demoMode ? <View style={styles.recommendationError}><AsyncErrorState title={token ? 'No pudimos personalizar tu inicio' : 'No pudimos cargar el catálogo'} detail={token ? 'Tus visitas siguen guardadas. Revisa la conexión para recuperar tus recomendaciones.' : 'Revisa la conexión para ver recomendaciones reales.'} onAction={() => void refetchRecommendations()} /></View> : featured ? (
+      {recommendationsError && !demoMode && !data.length ? <View style={styles.recommendationError}><AsyncErrorState title={token ? 'No pudimos personalizar tu inicio' : 'No pudimos cargar el catálogo'} detail={token ? 'Tus visitas siguen guardadas. Revisa la conexión para recuperar tus recomendaciones.' : 'Revisa la conexión para ver recomendaciones reales.'} onAction={() => void refetchRecommendations()} /></View> : featured ? (
         <Link href={`/place/${featured.id}`} asChild>
           <Pressable accessibilityRole="button" accessibilityLabel={`Abrir recomendación ${featured.name}, ${featuredTaco?.name ?? 'taco'} ${featuredTaco && featuredTaco.rating > 0 ? featuredTaco.rating.toFixed(2) : featured.rating > 0 ? featured.rating.toFixed(2) : 'sin calificación'}`} style={styles.hero}>
             <CatalogImage uri={featured.image} accessibilityLabel={`Imagen de ${featured.name}`} style={styles.heroImage} />

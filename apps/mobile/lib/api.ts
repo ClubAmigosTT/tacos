@@ -1,7 +1,8 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { places, type CategoryRatings, type Place } from '@/data/fixtures';
+import { type CategoryRatings, type Place } from '@/data/fixtures';
+import { localDiscover, localPlace, localRecommendations, localTaqueria } from '@/lib/localCatalog';
 
 export type AuthUser = { id: string; email: string; displayName: string; role?: 'user' | 'admin'; following?: boolean; emailVerified?: boolean };
 export type ApiList = { id: string; title: string; description: string; owner: { id: string; displayName: string }; itemCount: number; visitedCount: number; coverImage: string; visibility?: 'public' | 'private'; collaboratorCount?: number; canEdit?: boolean };
@@ -60,24 +61,6 @@ async function getAnonymousId() {
   return anonymousIdPromise;
 }
 
-function haversineKm(from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }) {
-  const earthRadiusKm = 6371;
-  const latitudeDelta = (to.latitude - from.latitude) * Math.PI / 180;
-  const longitudeDelta = (to.longitude - from.longitude) * Math.PI / 180;
-  const latitudeA = from.latitude * Math.PI / 180;
-  const latitudeB = to.latitude * Math.PI / 180;
-  const a = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(latitudeA) * Math.cos(latitudeB) * Math.sin(longitudeDelta / 2) ** 2;
-  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function normalizeSearchText(value: string) {
-  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-}
-
-function searchTerms(value: string) {
-  return normalizeSearchText(value).split(/[^a-z0-9]+/).filter((term) => term.length >= 2);
-}
-
 async function request<T>(path: string, options?: RequestInit, token?: string): Promise<T> {
   if (!API_URL) throw new Error('API URL no configurada');
   const controller = new AbortController();
@@ -126,23 +109,14 @@ export async function discover(options: { q?: string; lat?: number; lng?: number
     if (options.limit != null) params.set('limit', String(options.limit));
     const query = params.toString();
     const result = await request<{ places: Place[] }>(`/v1/discover${query ? `?${query}` : ''}`, undefined, token);
-    return result.places;
+    // A healthy API with an empty catalog must not erase the bundled snapshot
+    // for the normal browse screen. Search queries still preserve a genuine
+    // empty result.
+    return result.places.length || options.q?.trim() ? result.places : localDiscover(options);
   } catch (cause) {
-    // Anonymous discovery can keep using the local catalog for design/offline
-    // review. Once a session exists, never present demo branches as if they
-    // were the current server-backed result set.
-    if (token || !DEMO_MODE) throw cause;
-    const terms = options.q?.trim() ? searchTerms(options.q.trim()) : [];
-    const filtered = options.q?.trim()
-      ? places.filter((place) => {
-        const haystack = normalizeSearchText(`${place.name} ${place.neighborhood} ${place.style} ${place.tags.join(' ')} ${place.tacos.map((taco) => taco.name).join(' ')}`);
-        return terms.length > 0 && terms.every((term) => haystack.includes(term));
-      })
-      : places;
-    const withDistance = options.lat == null || options.lng == null
-      ? filtered
-      : filtered.map((place) => ({ ...place, distance: `${haversineKm({ latitude: options.lat!, longitude: options.lng! }, place.coordinates).toFixed(1)} km` })).sort((a, b) => Number.parseFloat(a.distance) - Number.parseFloat(b.distance));
-    return withDistance.slice(0, options.limit ?? 20);
+    // The catalog snapshot is part of the app, so discovery remains useful
+    // when the server is waking up or the device is temporarily offline.
+    return localDiscover(options);
   }
 }
 
@@ -150,13 +124,11 @@ export async function recommendations(token?: string, location?: { latitude: num
   try {
     const params = location ? `?lat=${encodeURIComponent(String(location.latitude))}&lng=${encodeURIComponent(String(location.longitude))}` : '';
     const result = await request<{ places: Place[] }>(`/v1/recommendations${params}`, undefined, token);
-    return result.places;
+    return result.places.length ? result.places : localRecommendations(location);
   } catch (cause) {
-    // Anonymous discovery can keep using the local catalog for design/offline
-    // review. Once a session exists, surface the failure so private affinity
-    // signals are never replaced silently by demo recommendations.
-    if (token || !DEMO_MODE) throw cause;
-    return places;
+    // Personal signals disappear offline, but the local catalog remains
+    // available so Inicio never becomes an empty error state.
+    return localRecommendations(location);
   }
 }
 
@@ -172,12 +144,10 @@ export async function getPlace(id: string, token?: string): Promise<Place> {
   try {
     return await request<Place>(`/v1/branches/${id}`, undefined, token);
   } catch (cause) {
-    // A real 4xx means the branch is gone or the link is invalid. Do not
-    // resurrect a stale local fixture in its place; the route can then show
-    // the proper unavailable state. Network/5xx failures may still use the
-    // catalog fallback while the API recovers.
-    if (!DEMO_MODE || cause instanceof ApiError && cause.status < 500) throw cause;
-    const fallback = places.find((place) => place.id === id);
+    // A real 4xx means the branch is gone or the link is invalid. Network and
+    // 5xx failures may still use the bundled catalog while the API recovers.
+    if (cause instanceof ApiError && cause.status < 500) throw cause;
+    const fallback = localPlace(id);
     if (!fallback) throw new Error('Taquería no encontrada');
     return fallback;
   }
@@ -203,11 +173,10 @@ export async function getTaqueria(id: string) {
   try {
     return await request<ApiTaqueria>(`/v1/taquerias/${id}`);
   } catch (cause) {
-    if (!DEMO_MODE || cause instanceof ApiError && cause.status < 500) throw cause;
-    const branches = places.filter((place) => (place.taqueriaId ?? place.id) === id);
-    if (!branches.length) throw new Error('Taquería no encontrada');
-    const first = branches[0];
-    return { id, name: first.taqueriaName ?? first.name, slug: id, description: `${first.name} y sus sucursales.`, branchCount: branches.length, branches } satisfies ApiTaqueria;
+    if (cause instanceof ApiError && cause.status < 500) throw cause;
+    const fallback = localTaqueria(id);
+    if (!fallback) throw new Error('Taquería no encontrada');
+    return fallback satisfies ApiTaqueria;
   }
 }
 

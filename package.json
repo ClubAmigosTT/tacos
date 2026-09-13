@@ -23,6 +23,7 @@
     "catalog:discover:ids": "python scripts/discover-taqueria-ids.py --batch-size 60",
     "catalog:enrich:ids": "python scripts/enrich-taqueria-ids.py --batch-size 60",
     "catalog:build:osm": "node scripts/build-osm-catalog.mjs",
+    "catalog:build:mobile": "node scripts/build-mobile-catalog.mjs",
     "smoke:api": "node scripts/smoke-api.mjs",
     "smoke:admin": "node scripts/smoke-admin.mjs",
     "smoke:hours": "node scripts/smoke-hours.mjs",

@@ -31,6 +31,7 @@ function run(args, cwd = root) {
 }
 
 console.log(`Validando Tacos antes del release ${platform}...`);
+await run(['catalog:build:mobile']);
 await run(['typecheck']);
 await run(['smoke:config']);
 await run(['--filter', '@tacos/mobile', 'exec', 'expo', 'export', '--platform', 'web']);

@@ -4,8 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { places } from '@/data/fixtures';
 import { discover, isDemoMode, trackEvent } from '@/lib/api';
+import { localDiscover, places } from '@/lib/localCatalog';
 import { colors, radii, shadows, spacing, typography } from '@/theme';
 import { RatingBadge } from '@/components/RatingBadge';
 import { MapCanvas } from '@/components/MapCanvas';
@@ -55,7 +55,8 @@ export default function MapScreen() {
     if (moved) { setPendingMapCenter(next); setMapMoved(true); }
     else { setPendingMapCenter(undefined); setMapMoved(false); }
   };
-  const { data, isLoading: discoverLoading, isError: discoverError, refetch: refetchDiscover } = useQuery({ queryKey: ['discover', 'map', searchQuery, searchCoordinates?.latitude, searchCoordinates?.longitude, active, token], queryFn: () => discover({ q: searchQuery, lat: searchCoordinates?.latitude, lng: searchCoordinates?.longitude, radiusKm: searchCoordinates ? 8 : undefined, openNow: active === 'Abierto ahora' ? true : undefined, limit: 50 }, token), enabled: !authLoading });
+  const discoveryQuery = { q: searchQuery, lat: searchCoordinates?.latitude, lng: searchCoordinates?.longitude, radiusKm: searchCoordinates ? 8 : undefined, openNow: active === 'Abierto ahora' ? true : undefined, limit: 50 };
+  const { data, isLoading: discoverLoading, isError: discoverError, refetch: refetchDiscover } = useQuery({ queryKey: ['discover', 'map', searchQuery, searchCoordinates?.latitude, searchCoordinates?.longitude, active, token], queryFn: () => discover(discoveryQuery, token), initialData: () => localDiscover(discoveryQuery), enabled: !authLoading });
   // Fixtures are only a deliberate demo-mode fallback. A real build must
   // never make an unavailable or unconfigured API look like a live catalog.
   const discoveryPlaces = data ?? (isDemoMode() ? places : []);
@@ -71,7 +72,7 @@ export default function MapScreen() {
   // constraint. Once the user searches for a neighborhood or another branch
   // attribute, let the API result set speak for itself unless a taco name was
   // actually detected in the query.
-  const contextualTaco = requestedTaco ?? (!hasFreeTextSearch && active === 'Pastor' ? 'Pastor' : undefined);
+  const contextualTaco = requestedTaco;
   const sorted = useMemo(() => applyRadar({ places: discoveryPlaces, active, contextualTaco, distance: radarDistance, price: radarPrice, mood: radarMood, hunger: radarHungerLevel }), [active, contextualTaco, discoveryPlaces, radarDistance, radarHungerLevel, radarMood, radarPrice]);
   // Never recommend a place outside the active search/Radar constraints.
   // An empty result set must remain empty instead of silently escaping the
@@ -80,7 +81,7 @@ export default function MapScreen() {
 
   if (authLoading) return <View style={styles.authLoading}><Text style={styles.authLoadingText}>Preparando tu mapa…</Text></View>;
 
-  if (discoverError && !isDemoMode()) return <View style={styles.errorScreen}><AsyncErrorState title="No pudimos actualizar tu mapa" detail="Revisa la conexión para ver sucursales reales del catálogo." onAction={() => void refetchDiscover()} /></View>;
+  if (discoverError && !isDemoMode() && !data?.length) return <View style={styles.errorScreen}><AsyncErrorState title="No pudimos actualizar tu mapa" detail="Revisa la conexión para ver sucursales reales del catálogo." onAction={() => void refetchDiscover()} /></View>;
 
   function clearDiscovery() {
     setActive('Pastor');
