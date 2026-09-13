@@ -159,7 +159,13 @@ try {
         continue;
       }
 
-      const taqueriaSlug = `${slug(taqueriaName)}-${slug(taqueriaId).slice(-8)}`.slice(0, 64);
+      // Keep the source id inside the slug even when a DENUE establishment
+      // name is longer than PostgreSQL's 64-character slug limit. Truncating
+      // the complete string after appending the suffix made long DENUE names
+      // collide and abort the whole transaction.
+      const slugBase = slug(taqueriaName) || 'taqueria';
+      const slugSuffix = slug(taqueriaId).slice(-8) || 'branch';
+      const taqueriaSlug = `${slugBase.slice(0, Math.max(1, 64 - slugSuffix.length - 1))}-${slugSuffix}`;
       await client.query(`
         INSERT INTO taquerias (id, name, slug, description)
         VALUES ($1, $2, $3, $4)
@@ -177,8 +183,12 @@ try {
       // Keep user/business contributions across the biweekly catalog refresh.
       // Legacy rows predate source_type and are treated as catalog rows by the
       // migration's default, so only catalog-owned photos are replaced here.
-      await client.query("DELETE FROM branch_photos WHERE branch_id = $1 AND source_type = 'catalog'", [id]);
-      for (const photo of photos) await client.query('INSERT INTO branch_photos (id, branch_id, url, source_url, license, attribution, is_primary, source_type, status) VALUES ($1, $2, $3, $4, $5, $6, $7, \'catalog\', \'approved\')', [randomUUID(), id, photo.url, photo.sourceUrl || null, photo.license, photo.attribution, photo === primary]);
+      // DENUE rows intentionally have no photos; avoid one DELETE round trip
+      // per branch when a partial source has no media to refresh.
+      if (photos.length) {
+        await client.query("DELETE FROM branch_photos WHERE branch_id = $1 AND source_type = 'catalog'", [id]);
+        for (const photo of photos) await client.query('INSERT INTO branch_photos (id, branch_id, url, source_url, license, attribution, is_primary, source_type, status) VALUES ($1, $2, $3, $4, $5, $6, $7, \'catalog\', \'approved\')', [randomUUID(), id, photo.url, photo.sourceUrl || null, photo.license, photo.attribution, photo === primary]);
+      }
 
       if (Array.isArray(row?.tacos) && (!allowPartial || row.tacos.length > 0)) {
         const activeTacoIds = [];
