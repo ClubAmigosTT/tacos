@@ -10,15 +10,18 @@ import { colors, radii, shadows, spacing, typography } from '@/theme';
 import { RatingBadge } from '@/components/RatingBadge';
 import { MapCanvas } from '@/components/MapCanvas';
 import { AsyncErrorState } from '@/components/AsyncErrorState';
+import { CatalogImage } from '@/components/CatalogImage';
 import { useAuth } from '@/lib/auth';
-import { applyRadar, normalizeRadarText, radarDistances, radarHunger, radarMoods, radarPrices, type RadarDistance, type RadarHunger, type RadarMood, type RadarPrice } from '@/lib/radar';
-const filters = ['Pastor', 'Abierto ahora', 'Barato', '92% para mí'];
+
+const filters = ['Todos', 'Abierto ahora', 'Barato'] as const;
+type MapFilter = (typeof filters)[number];
+
 const defaultMapCenter = { latitude: 19.402, longitude: -99.163 };
 
 export default function MapScreen() {
   const { token, loading: authLoading } = useAuth();
   const { q: initialQuery } = useLocalSearchParams<{ q?: string }>();
-  const [active, setActive] = useState('Pastor');
+  const [active, setActive] = useState<MapFilter>('Todos');
   const [search, setSearch] = useState(initialQuery ?? '');
   const [searchQuery, setSearchQuery] = useState(initialQuery ?? '');
   const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number }>();
@@ -26,86 +29,265 @@ export default function MapScreen() {
   const [pendingMapCenter, setPendingMapCenter] = useState<{ latitude: number; longitude: number }>();
   const [mapMoved, setMapMoved] = useState(false);
   const [locationDenied, setLocationDenied] = useState(false);
-  const [radarOpen, setRadarOpen] = useState(false);
-  const [radarDistance, setRadarDistance] = useState<RadarDistance>('En la zona');
-  const [radarPrice, setRadarPrice] = useState<RadarPrice>('Cualquier precio');
-  const [radarMood, setRadarMood] = useState<RadarMood>('Alta calidad');
-  const [radarHungerLevel, setRadarHungerLevel] = useState<RadarHunger>('Normal');
-  useEffect(() => { if (initialQuery != null) setSearch(initialQuery); }, [initialQuery]);
+  const [sheetCollapsed, setSheetCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (initialQuery != null) setSearch(initialQuery);
+  }, [initialQuery]);
+
   useEffect(() => {
     const timer = setTimeout(() => setSearchQuery(search.trim()), 250);
     return () => clearTimeout(timer);
   }, [search]);
+
   async function loadLocation() {
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
-      if (permission.status !== Location.PermissionStatus.GRANTED) { setLocationDenied(true); return; }
+      if (permission.status !== Location.PermissionStatus.GRANTED) {
+        setLocationDenied(true);
+        return;
+      }
       const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       setCoordinates({ latitude: current.coords.latitude, longitude: current.coords.longitude });
       setSearchCenter(undefined);
       setPendingMapCenter(undefined);
       setMapMoved(false);
-    } catch { setLocationDenied(true); }
+      setLocationDenied(false);
+    } catch {
+      setLocationDenied(true);
+    }
   }
-  useEffect(() => { if (Platform.OS !== 'web') void loadLocation(); }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') void loadLocation();
+  }, []);
+
   const searchCoordinates = searchCenter ?? coordinates;
   const handleMapRegionChange = (next: { latitude: number; longitude: number }) => {
     const baseline = searchCoordinates ?? defaultMapCenter;
     const moved = Math.abs(next.latitude - baseline.latitude) > 0.002 || Math.abs(next.longitude - baseline.longitude) > 0.002;
-    if (moved) { setPendingMapCenter(next); setMapMoved(true); }
-    else { setPendingMapCenter(undefined); setMapMoved(false); }
+    if (moved) {
+      setPendingMapCenter(next);
+      setMapMoved(true);
+    } else {
+      setPendingMapCenter(undefined);
+      setMapMoved(false);
+    }
   };
-  const discoveryQuery = { q: searchQuery, lat: searchCoordinates?.latitude, lng: searchCoordinates?.longitude, radiusKm: searchCoordinates ? 8 : undefined, openNow: active === 'Abierto ahora' ? true : undefined, limit: 50 };
-  const { data, isLoading: discoverLoading, isError: discoverError, refetch: refetchDiscover } = useQuery({ queryKey: ['discover', 'map', searchQuery, searchCoordinates?.latitude, searchCoordinates?.longitude, active, token], queryFn: () => discover(discoveryQuery, token), initialData: () => localDiscover(discoveryQuery), enabled: !authLoading });
-  // Fixtures are only a deliberate demo-mode fallback. A real build must
-  // never make an unavailable or unconfigured API look like a live catalog.
+
+  const discoveryQuery = {
+    q: searchQuery,
+    lat: searchCoordinates?.latitude,
+    lng: searchCoordinates?.longitude,
+    radiusKm: searchCoordinates ? 8 : undefined,
+    openNow: active === 'Abierto ahora' ? true : undefined,
+    limit: 50
+  };
+  const { data, isLoading: discoverLoading, isError: discoverError, refetch: refetchDiscover } = useQuery({
+    queryKey: ['discover', 'map', searchQuery, searchCoordinates?.latitude, searchCoordinates?.longitude, active, token],
+    queryFn: () => discover(discoveryQuery, token),
+    initialData: () => localDiscover(discoveryQuery),
+    enabled: !authLoading
+  });
+
+  // The bundled catalog remains useful while the API wakes up or the device is
+  // offline. Fixtures are only a deliberate demo-mode fallback.
   const discoveryPlaces = data ?? (isDemoMode() ? places : []);
-  const requestedTaco = useMemo(() => {
-    const normalized = normalizeRadarText(searchQuery.trim());
-    if (normalized.length < 3) return undefined;
-    const tacoNames = [...new Set(discoveryPlaces.flatMap((place) => place.tacos.map((taco) => taco.name)))];
-    return tacoNames.find((name) => normalized.includes(normalizeRadarText(name)))
-      ?? tacoNames.find((name) => normalizeRadarText(name).includes(normalized));
-  }, [discoveryPlaces, searchQuery]);
+  const sorted = useMemo(() => {
+    if (active !== 'Barato') return discoveryPlaces;
+
+    // Catalog prices are sparse. Unknown prices remain visible; this filter
+    // only excludes places whose known minimum is above the affordable range.
+    return discoveryPlaces.filter((place) => {
+      const prices = [
+        place.priceMin,
+        place.priceMax,
+        ...place.tacos.map((taco) => taco.price)
+      ].filter((price): price is number => typeof price === 'number' && Number.isFinite(price) && price > 0);
+      return !prices.length || Math.min(...prices) <= 24;
+    });
+  }, [active, discoveryPlaces]);
+
   const hasFreeTextSearch = searchQuery.trim().length > 0;
-  // "Pastor" is the visual default for an empty map, not a hidden query
-  // constraint. Once the user searches for a neighborhood or another branch
-  // attribute, let the API result set speak for itself unless a taco name was
-  // actually detected in the query.
-  const contextualTaco = requestedTaco;
-  const sorted = useMemo(() => applyRadar({ places: discoveryPlaces, active, contextualTaco, distance: radarDistance, price: radarPrice, mood: radarMood, hunger: radarHungerLevel }), [active, contextualTaco, discoveryPlaces, radarDistance, radarHungerLevel, radarMood, radarPrice]);
-  // Never recommend a place outside the active search/Radar constraints.
-  // An empty result set must remain empty instead of silently escaping the
-  // user's distance, price or mood choices.
-  const suggestion = sorted[0];
+  const sheetTitle = discoverLoading
+    ? 'Actualizando tu mapa…'
+    : hasFreeTextSearch
+      ? `Resultados para "${searchQuery.trim()}"`
+      : active === 'Todos'
+        ? 'Taquerías cerca de ti'
+        : active;
 
-  if (authLoading) return <View style={styles.authLoading}><Text style={styles.authLoadingText}>Preparando tu mapa…</Text></View>;
+  if (authLoading) {
+    return <View style={styles.authLoading}><Text style={styles.authLoadingText}>Preparando tu mapa…</Text></View>;
+  }
 
-  if (discoverError && !isDemoMode() && !data?.length) return <View style={styles.errorScreen}><AsyncErrorState title="No pudimos actualizar tu mapa" detail="Revisa la conexión para ver sucursales reales del catálogo." onAction={() => void refetchDiscover()} /></View>;
+  if (discoverError && !isDemoMode() && !data?.length) {
+    return <View style={styles.errorScreen}><AsyncErrorState title="No pudimos actualizar tu mapa" detail="Revisa la conexión para ver sucursales reales del catálogo." onAction={() => void refetchDiscover()} /></View>;
+  }
 
   function clearDiscovery() {
-    setActive('Pastor');
-    setRadarDistance('En la zona');
-    setRadarPrice('Cualquier precio');
-    setRadarMood('Alta calidad');
-    setRadarHungerLevel('Normal');
+    setActive('Todos');
     setSearch('');
     setSearchQuery('');
     setSearchCenter(undefined);
     setPendingMapCenter(undefined);
     setMapMoved(false);
+    setSheetCollapsed(false);
   }
 
   return (
     <View style={styles.screen}>
-      <MapCanvas places={sorted} active={active} tacoName={contextualTaco} onSelect={(id) => router.push(`/place/${id}`)} userCoordinates={coordinates} onRegionChangeComplete={handleMapRegionChange} />
-      <View style={styles.topOverlay}><Pressable accessibilityRole="button" accessibilityLabel="Volver" style={styles.backButton} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.textPrimary} /></Pressable><View style={styles.mapTitle}><Text style={styles.mapKicker}>EXPLORAR</Text><Text style={styles.mapHeading}>Cerca de ti</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Usar mi ubicación" style={[styles.locate, coordinates && styles.locateActive]} onPress={() => void loadLocation()}><Ionicons name="navigate" size={18} color={coordinates ? colors.meatDark : colors.textPrimary} /></Pressable></View>
-      <View style={styles.searchBar}><Ionicons name="search" size={17} color={colors.textSecondary} /><TextInput accessibilityLabel="Buscar taquerías, tacos o zonas" value={search} onChangeText={setSearch} onSubmitEditing={() => { setSearchQuery(search.trim()); void trackEvent('map_search', { query_length: search.trim().length }, token); }} placeholder="Pastor, suadero, Roma…" placeholderTextColor={colors.textSecondary} style={styles.searchInput} returnKeyType="search" /></View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters} contentContainerStyle={styles.filterContent}>{filters.map((filter) => { const selected = filter === active && !(filter === 'Pastor' && hasFreeTextSearch && !requestedTaco); return <Pressable key={filter} accessibilityRole="button" accessibilityLabel={`Filtrar por ${filter}`} accessibilityState={{ selected }} onPress={() => { setActive(filter); void trackEvent('map_filter', { filter }, token); }} style={[styles.filter, selected && styles.filterActive]}><Text style={[styles.filterText, selected && styles.filterTextActive]}>{filter}</Text></Pressable>; })}<Pressable accessibilityRole="button" accessibilityLabel="Abrir Radar de tacos" accessibilityState={{ expanded: radarOpen }} onPress={() => { setRadarOpen((value) => !value); void trackEvent('radar_filter', { filter: 'open' }, token); }} style={[styles.filter, radarOpen && styles.filterActive]}><Ionicons name="options-outline" size={13} color={radarOpen ? colors.background : colors.textPrimary} /><Text style={[styles.filterText, radarOpen && styles.filterTextActive]}>Radar</Text></Pressable></ScrollView>
-      {radarOpen ? <View style={styles.radarPanel}><View style={styles.radarHeader}><View><Text style={styles.radarEyebrow}>RADAR DE TACOS</Text><Text style={styles.radarTitle}>Encuentra algo para ti</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Cerrar Radar" onPress={() => setRadarOpen(false)}><Ionicons name="close" size={19} color={colors.textSecondary} /></Pressable></View><Text style={styles.radarLabel}>DISTANCIA</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radarOptions}>{radarDistances.map((option) => <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Distancia: ${option}`} accessibilityState={{ selected: radarDistance === option }} onPress={() => { setRadarDistance(option); void trackEvent('radar_filter', { filter: `distance:${option}` }, token); }} style={[styles.radarOption, radarDistance === option && styles.radarOptionActive]}><Text style={[styles.radarOptionText, radarDistance === option && styles.radarOptionTextActive]}>{option}</Text></Pressable>)}</ScrollView><Text style={styles.radarLabel}>PRECIO</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radarOptions}>{radarPrices.map((option) => <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Precio: ${option}`} accessibilityState={{ selected: radarPrice === option }} onPress={() => { setRadarPrice(option); void trackEvent('radar_filter', { filter: `price:${option}` }, token); }} style={[styles.radarOption, radarPrice === option && styles.radarOptionActive]}><Text style={[styles.radarOptionText, radarPrice === option && styles.radarOptionTextActive]}>{option}</Text></Pressable>)}</ScrollView><Text style={styles.radarLabel}>ANTOJO</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radarOptions}>{radarMoods.map((option) => <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Antojo: ${option}`} accessibilityState={{ selected: radarMood === option }} onPress={() => { setRadarMood(option); void trackEvent('radar_filter', { filter: `mood:${option}` }, token); }} style={[styles.radarOption, radarMood === option && styles.radarOptionActive]}><Text style={[styles.radarOptionText, radarMood === option && styles.radarOptionTextActive]}>{option}</Text></Pressable>)}</ScrollView><Text style={styles.radarLabel}>HAMBRE</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radarOptions}>{radarHunger.map((option) => <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Hambre: ${option}`} accessibilityState={{ selected: radarHungerLevel === option }} onPress={() => { setRadarHungerLevel(option); void trackEvent('radar_filter', { filter: `hunger:${option}` }, token); }} style={[styles.radarOption, radarHungerLevel === option && styles.radarOptionActive]}><Text style={[styles.radarOptionText, radarHungerLevel === option && styles.radarOptionTextActive]}>{option}</Text></Pressable>)}</ScrollView></View> : null}
-      {mapMoved && pendingMapCenter ? <Pressable accessibilityRole="button" accessibilityLabel="Buscar en esta zona" style={styles.searchAreaButton} onPress={() => { setSearchCenter(pendingMapCenter); setPendingMapCenter(undefined); setMapMoved(false); void trackEvent('map_filter', { filter: 'search_area' }, token); }}><Ionicons name="search" size={14} color={colors.background} /><Text style={styles.searchAreaText}>Buscar en esta zona</Text></Pressable> : null}
-      <View style={styles.sheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><View><Text style={styles.sheetEyebrow}>{discoverLoading ? 'BUSCANDO EN EL CATÁLOGO' : `${sorted.length} LUGARES EN ESTA ZONA`}</Text><Text style={styles.sheetTitle}>{discoverLoading ? 'Actualizando tu mapa…' : requestedTaco ? `${requestedTaco} que vale la pena` : hasFreeTextSearch ? `Resultados para "${searchQuery.trim()}"` : active === 'Pastor' ? 'Pastor que vale la pena' : active}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={suggestion ? `Abrir recomendación para ${suggestion.name}` : 'Sin recomendaciones disponibles'} style={[styles.magicButton, !suggestion && styles.magicButtonDisabled]} disabled={!suggestion} onPress={() => suggestion && router.push(`/place/${suggestion.id}`)}><Ionicons name="sparkles-outline" size={14} color={colors.background} /><Text style={styles.magicText}>Para mí</Text></Pressable></View>{discoverLoading ? <View style={styles.loadingResults}><Ionicons name="sync-outline" size={18} color={colors.tortilla} /><Text style={styles.loadingResultsText}>Consultando el catálogo de Tacos…</Text></View> : sorted.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false}>{sorted.map((place) => <Pressable key={place.id} accessibilityRole="button" accessibilityLabel={`${place.name}, ${place.rating > 0 ? place.rating.toFixed(1) : 'sin calificación'}, ${place.distance}`} style={styles.resultCard} onPress={() => router.push(`/place/${place.id}`)}><View style={styles.resultTop}><Text style={styles.resultName} numberOfLines={1}>{place.name}</Text><RatingBadge rating={contextualTaco ? place.tacos.find((taco) => taco.name.toLowerCase() === contextualTaco.toLowerCase())?.rating ?? place.rating : place.rating} /></View><Text style={styles.resultMeta}>{place.neighborhood} · {place.distance}</Text><Text style={styles.resultStyle}>{place.style}</Text></Pressable>)}</ScrollView> : <View style={styles.emptyResults}><Ionicons name="moon-outline" size={21} color={colors.salsa} /><View style={styles.emptyResultsCopy}><Text style={styles.emptyResultsTitle}>No hay lugares con esta combinación</Text><Text style={styles.emptyResultsText}>Prueba otra hora, zona o criterio para seguir explorando.</Text><Pressable accessibilityRole="button" accessibilityLabel="Proponer una taquería que no aparece" onPress={() => router.push({ pathname: '/catalog-proposal', params: { kind: 'branch' } })}><Text style={styles.proposeLink}>¿Falta una taquería? Agrégala</Text></Pressable></View><Pressable accessibilityRole="button" accessibilityLabel="Limpiar filtros y búsqueda" style={styles.clearButton} onPress={clearDiscovery}><Text style={styles.clearButtonText}>Limpiar</Text></Pressable></View>}</View>
-      {locationDenied ? <Pressable accessibilityRole="button" accessibilityLabel="Activar ubicación para calcular distancias reales" style={styles.locationHint} onPress={() => void loadLocation()}><Ionicons name="location-outline" size={14} color={colors.salsa} /><Text style={styles.locationHintText}>Activa ubicación para calcular distancias reales</Text></Pressable> : null}
+      <MapCanvas places={sorted} active={active} onSelect={(id) => router.push(`/place/${id}`)} userCoordinates={coordinates} onRegionChangeComplete={handleMapRegionChange} />
+
+      <View style={styles.topOverlay}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Volver" style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
+        </Pressable>
+        <View style={styles.mapTitle}>
+          <Text style={styles.mapKicker}>EXPLORAR</Text>
+          <Text style={styles.mapHeading}>Cerca de ti</Text>
+        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Usar mi ubicación" style={[styles.locate, coordinates && styles.locateActive]} onPress={() => void loadLocation()}>
+          <Ionicons name="navigate" size={18} color={coordinates ? colors.meatDark : colors.textPrimary} />
+        </Pressable>
+      </View>
+
+      <View style={styles.searchBar}>
+        <Ionicons name="search" size={17} color={colors.textSecondary} />
+        <TextInput
+          accessibilityLabel="Buscar taquerías, tacos o zonas"
+          value={search}
+          onChangeText={setSearch}
+          onSubmitEditing={() => {
+            setSearchQuery(search.trim());
+            void trackEvent('map_search', { query_length: search.trim().length }, token);
+          }}
+          placeholder="Busca una taquería o zona…"
+          placeholderTextColor={colors.textSecondary}
+          style={styles.searchInput}
+          returnKeyType="search"
+        />
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters} contentContainerStyle={styles.filterContent}>
+        {filters.map((filter) => {
+          const selected = filter === active;
+          return (
+            <Pressable
+              key={filter}
+              accessibilityRole="button"
+              accessibilityLabel={`Filtrar por ${filter}`}
+              accessibilityState={{ selected }}
+              onPress={() => {
+                setActive(filter);
+                void trackEvent('map_filter', { filter }, token);
+              }}
+              style={[styles.filter, selected && styles.filterActive]}
+            >
+              <Text style={[styles.filterText, selected && styles.filterTextActive]}>{filter}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      {mapMoved && pendingMapCenter ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Buscar en esta zona"
+          style={styles.searchAreaButton}
+          onPress={() => {
+            setSearchCenter(pendingMapCenter);
+            setPendingMapCenter(undefined);
+            setMapMoved(false);
+            void trackEvent('map_filter', { filter: 'search_area' }, token);
+          }}
+        >
+          <Ionicons name="search" size={14} color={colors.background} />
+          <Text style={styles.searchAreaText}>Buscar en esta zona</Text>
+        </Pressable>
+      ) : null}
+
+      <View style={[styles.sheet, sheetCollapsed && styles.sheetCollapsed]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={sheetCollapsed ? 'Mostrar lugares' : 'Reducir lista de lugares'}
+          accessibilityState={{ expanded: !sheetCollapsed }}
+          style={styles.sheetHandleButton}
+          onPress={() => setSheetCollapsed((value) => !value)}
+        >
+          <View style={styles.sheetHandle} />
+          <Ionicons name={sheetCollapsed ? 'chevron-up' : 'chevron-down'} size={15} color={colors.textTertiary} />
+        </Pressable>
+
+        {sheetCollapsed ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="Expandir lugares de la zona" style={styles.collapsedSummary} onPress={() => setSheetCollapsed(false)}>
+            <View style={styles.collapsedCopy}>
+              <Text style={styles.sheetEyebrow}>{discoverLoading ? 'BUSCANDO EN EL CATÁLOGO' : `${sorted.length} LUGARES EN ESTA ZONA`}</Text>
+              <Text style={styles.collapsedTitle} numberOfLines={1}>{sheetTitle}</Text>
+            </View>
+            <Ionicons name="chevron-up" size={18} color={colors.tortilla} />
+          </Pressable>
+        ) : (
+          <>
+            <View style={styles.sheetHeader}>
+              <View style={styles.sheetHeaderCopy}>
+                <Text style={styles.sheetEyebrow}>{discoverLoading ? 'BUSCANDO EN EL CATÁLOGO' : `${sorted.length} LUGARES EN ESTA ZONA`}</Text>
+                <Text style={styles.sheetTitle}>{sheetTitle}</Text>
+              </View>
+            </View>
+
+            {discoverLoading ? (
+              <View style={styles.loadingResults}>
+                <Ionicons name="sync-outline" size={18} color={colors.tortilla} />
+                <Text style={styles.loadingResultsText}>Consultando el catálogo de Tacos…</Text>
+              </View>
+            ) : sorted.length ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {sorted.map((place) => (
+                  <Pressable
+                    key={place.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${place.name}, ${place.rating > 0 ? place.rating.toFixed(1) : 'sin calificación'}, ${place.distance}`}
+                    style={styles.resultCard}
+                    onPress={() => router.push(`/place/${place.id}`)}
+                  >
+                    <CatalogImage uri={place.image} fallbackLabel="Imagen ilustrativa" accessibilityLabel={`Imagen de ${place.name}`} style={styles.resultImage} />
+                    <View style={styles.resultBody}>
+                      <View style={styles.resultTop}>
+                        <Text style={styles.resultName} numberOfLines={1}>{place.name}</Text>
+                        <RatingBadge rating={place.rating} />
+                      </View>
+                      <Text style={styles.resultMeta}>{place.neighborhood} · {place.distance}</Text>
+                      <Text style={styles.resultStyle}>{place.style}</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={styles.emptyResults}>
+                <Ionicons name="moon-outline" size={21} color={colors.salsa} />
+                <View style={styles.emptyResultsCopy}>
+                  <Text style={styles.emptyResultsTitle}>No hay lugares con este criterio</Text>
+                  <Text style={styles.emptyResultsText}>Prueba otra zona o quita el filtro para seguir explorando.</Text>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Proponer una taquería que no aparece" onPress={() => router.push({ pathname: '/catalog-proposal', params: { kind: 'branch' } })}>
+                    <Text style={styles.proposeLink}>¿Falta una taquería? Agrégala</Text>
+                  </Pressable>
+                </View>
+                <Pressable accessibilityRole="button" accessibilityLabel="Limpiar filtros y búsqueda" style={styles.clearButton} onPress={clearDiscovery}>
+                  <Text style={styles.clearButtonText}>Limpiar</Text>
+                </Pressable>
+              </View>
+            )}
+          </>
+        )}
+      </View>
+
+      {locationDenied ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Activar ubicación para calcular distancias reales" style={styles.locationHint} onPress={() => void loadLocation()}>
+          <Ionicons name="location-outline" size={14} color={colors.salsa} />
+          <Text style={styles.locationHintText}>Activa ubicación para calcular distancias reales</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -130,27 +312,22 @@ const styles = StyleSheet.create({
   filterActive: { backgroundColor: colors.tortilla, borderColor: colors.tortilla },
   filterText: { color: colors.textPrimary, fontFamily: typography.fontFamily.medium, fontSize: 12, fontWeight: typography.weight.medium },
   filterTextActive: { color: colors.meatDark, fontFamily: typography.fontFamily.semibold, fontWeight: typography.weight.semibold },
-  radarPanel: { position: 'absolute', top: 220, left: spacing.lg, right: spacing.lg, backgroundColor: colors.surfaceTranslucent, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, padding: spacing.md, zIndex: 5, ...shadows.floating },
-  radarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm },
-  radarEyebrow: { color: colors.tortilla, fontFamily: typography.fontFamily.semibold, fontSize: typography.size.micro, letterSpacing: typography.tracking.label, fontWeight: typography.weight.semibold },
-  radarTitle: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, fontSize: 17, fontWeight: typography.weight.semibold, marginTop: 3 },
-  radarLabel: { color: colors.textTertiary, fontFamily: typography.fontFamily.semibold, fontSize: typography.size.micro, letterSpacing: 1.2, fontWeight: typography.weight.semibold, marginTop: spacing.sm, marginBottom: 7 },
-  radarOptions: { gap: 7 },
-  radarOption: { paddingHorizontal: 11, paddingVertical: 8, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceElevated },
-  radarOptionActive: { backgroundColor: colors.tortilla, borderColor: colors.tortilla },
-  radarOptionText: { color: colors.textPrimary, fontFamily: typography.fontFamily.medium, fontSize: 11, fontWeight: typography.weight.medium },
-  radarOptionTextActive: { color: colors.meatDark, fontFamily: typography.fontFamily.semibold, fontWeight: typography.weight.semibold },
   searchAreaButton: { position: 'absolute', top: 220, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.tortilla, borderRadius: radii.pill, paddingHorizontal: 14, paddingVertical: 9, zIndex: 6, ...shadows.card },
   searchAreaText: { color: colors.meatDark, fontFamily: typography.fontFamily.semibold, fontSize: 11, fontWeight: typography.weight.semibold },
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, minHeight: 230, backgroundColor: colors.overlayStrong, borderTopLeftRadius: radii.lg, borderTopRightRadius: radii.lg, padding: spacing.lg, paddingBottom: 102, ...shadows.floating },
-  sheetHandle: { width: 34, height: 4, borderRadius: 4, backgroundColor: colors.textTertiary, alignSelf: 'center', marginBottom: spacing.lg },
-  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: spacing.md },
+  sheetCollapsed: { minHeight: 94, paddingTop: 6, paddingBottom: 74 },
+  sheetHandleButton: { height: 27, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, marginBottom: 2 },
+  sheetHandle: { width: 34, height: 4, borderRadius: 4, backgroundColor: colors.textTertiary },
+  collapsedSummary: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  collapsedCopy: { flex: 1 },
+  collapsedTitle: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, fontSize: 18, fontWeight: typography.weight.semibold, letterSpacing: -0.3 },
+  sheetHeader: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: spacing.md },
+  sheetHeaderCopy: { flex: 1 },
   sheetEyebrow: { color: colors.tortilla, fontFamily: typography.fontFamily.semibold, fontSize: typography.size.micro, letterSpacing: typography.tracking.label, fontWeight: typography.weight.semibold, marginBottom: 5 },
   sheetTitle: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, fontSize: 23, fontWeight: typography.weight.semibold, letterSpacing: -0.6 },
-  magicButton: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.tortilla, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 8 },
-  magicButtonDisabled: { opacity: 0.35 },
-  magicText: { color: colors.meatDark, fontFamily: typography.fontFamily.semibold, fontWeight: typography.weight.semibold, fontSize: 10 },
-  resultCard: { width: 230, backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, marginRight: spacing.sm, ...shadows.card },
+  resultCard: { width: 230, backgroundColor: colors.surface, borderRadius: radii.lg, overflow: 'hidden', marginRight: spacing.sm, ...shadows.card },
+  resultImage: { width: '100%', height: 88, backgroundColor: colors.surfaceRaised },
+  resultBody: { padding: spacing.md },
   resultTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
   resultName: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, fontSize: 15, fontWeight: typography.weight.semibold, flex: 1 },
   resultMeta: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular, fontSize: 11, marginTop: 7 },

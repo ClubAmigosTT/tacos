@@ -63,7 +63,10 @@ services:
           type: web
           envVarKey: RENDER_EXTERNAL_URL
       - key: REQUIRE_EMAIL_VERIFICATION
-        value: "true"
+        # La primera versión debe permitir crear la cuenta sin depender de
+        # Resend; la verificación por correo se puede activar cuando el
+        # proveedor de correo esté configurado y probado en producción.
+        value: "false"
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM

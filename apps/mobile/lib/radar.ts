@@ -57,15 +57,15 @@ export function applyRadar({ places, active, contextualTaco, distance, price, mo
   });
 
   const moodFiltered = mood === 'Clásico'
-    ? filtered.filter((place) => place.flavorProfile.traditional >= 70)
+    ? filtered.filter((place) => (place.flavorProfile?.traditional ?? 0) >= 70)
     : mood === 'Aventura'
-      ? filtered.filter((place) => place.flavorProfile.traditional < 80 || place.flavorProfile.intensity >= 75)
+      ? filtered.filter((place) => (place.flavorProfile?.traditional ?? 0) < 80 || (place.flavorProfile?.intensity ?? 0) >= 75)
       : filtered;
   const hungerScore = (place: Place) => Math.max(...place.tacos.map((taco) => taco.price), 0) + place.tacos.length * 4;
   const moodScore = (place: Place) => mood === 'Clásico'
-    ? place.flavorProfile.traditional
+    ? (place.flavorProfile?.traditional ?? 0)
     : mood === 'Aventura'
-      ? place.flavorProfile.intensity + (100 - place.flavorProfile.traditional)
+      ? (place.flavorProfile?.intensity ?? 0) + (100 - (place.flavorProfile?.traditional ?? 0))
       : place.rating * 20;
   const contextualSort = (a: Place, b: Place) => {
     if (hunger !== 'Normal') {

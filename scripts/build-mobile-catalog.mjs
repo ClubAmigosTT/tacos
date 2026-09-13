@@ -105,8 +105,7 @@ const places = rows.map((row, index) => {
     description: text(row?.description),
     tacos: normalizedTacos(row?.tacos),
     photos,
-    tags,
-    flavorProfile: { intensity: 50, spicy: 50, traditional: 50, texture: 50, value: 50 }
+    tags
   };
 }).sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }) || a.id.localeCompare(b.id));
 

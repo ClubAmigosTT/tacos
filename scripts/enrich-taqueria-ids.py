@@ -67,6 +67,7 @@ EXPORT_COLUMNS = (
     "opening_hours",
     "phone",
     "website",
+    "image_url",
     "cuisine",
     "amenity",
     "description",
@@ -219,6 +220,21 @@ def first_tag(tags: dict, *names: str) -> str:
     for name in names:
         value = str(tags.get(name) or "").strip()
         if value:
+            return value
+    return ""
+
+
+def image_url_from_raw_tags(raw_tags_json: str | None) -> str:
+    """Return only an explicitly tagged HTTPS image; never invent a photo URL."""
+    try:
+        tags = json.loads(raw_tags_json or "{}")
+    except (TypeError, json.JSONDecodeError):
+        return ""
+    if not isinstance(tags, dict):
+        return ""
+    for key in ("image", "image:url"):
+        value = str(tags.get(key) or "").strip()
+        if value.startswith("https://"):
             return value
     return ""
 
@@ -422,20 +438,26 @@ def export_details(
     csv_path: Path,
     json_path: Path,
 ) -> int:
+    select_columns = tuple(column for column in EXPORT_COLUMNS if column != "image_url") + ("raw_tags_json",)
     query = f"""
-        SELECT {', '.join(EXPORT_COLUMNS)}
+        SELECT {', '.join(select_columns)}
         FROM taqueria_source_ids
         ORDER BY CASE confidence WHEN 'high' THEN 0 ELSE 1 END,
                  lower(name), source_id
     """
     rows = connection.execute(query).fetchall()
+    export_rows = []
+    for row in rows:
+        item = {column: row[column] for column in EXPORT_COLUMNS if column != "image_url"}
+        item["image_url"] = image_url_from_raw_tags(row["raw_tags_json"])
+        export_rows.append(item)
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     json_path.parent.mkdir(parents=True, exist_ok=True)
 
     with csv_path.open("w", newline="", encoding="utf-8-sig") as output:
         writer = csv.writer(output)
         writer.writerow(EXPORT_COLUMNS)
-        writer.writerows(tuple(row[column] for column in EXPORT_COLUMNS) for row in rows)
+        writer.writerows(tuple(item[column] for column in EXPORT_COLUMNS) for item in export_rows)
 
     payload = {
         "source": "OpenStreetMap",
@@ -443,9 +465,7 @@ def export_details(
         "license": "ODbL 1.0",
         "attribution": "© OpenStreetMap contributors",
         "exportedAt": utc_now(),
-        "places": [
-            {column: row[column] for column in EXPORT_COLUMNS} for row in rows
-        ],
+        "places": export_rows,
     }
     json_path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",

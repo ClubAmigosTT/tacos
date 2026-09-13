@@ -18,6 +18,15 @@ function text(value, fallback = '') {
   return typeof value === 'string' ? value.trim() || fallback : fallback;
 }
 
+function httpsUrl(value) {
+  const candidate = text(value);
+  try {
+    return new URL(candidate).protocol === 'https:' ? candidate : '';
+  } catch {
+    return '';
+  }
+}
+
 function unique(values) {
   return [...new Set(values.map((value) => text(value).toLowerCase()).filter(Boolean))];
 }
@@ -204,15 +213,20 @@ const seenDedupeKeys = new Set();
 const branches = [];
 let highRows = 0;
 let namedHighRows = 0;
+let candidateRows = 0;
+let namedCandidateRows = 0;
 let outsideRows = 0;
 let duplicateRows = 0;
 
 for (const place of places) {
-  if (text(place.confidence) !== 'high') continue;
-  highRows += 1;
+  const confidence = text(place.confidence);
+  if (confidence !== 'high' && confidence !== 'candidate') continue;
+  if (confidence === 'high') highRows += 1;
+  else candidateRows += 1;
   const name = text(place.name);
   if (!name) continue;
-  namedHighRows += 1;
+  if (confidence === 'high') namedHighRows += 1;
+  else namedCandidateRows += 1;
 
   const latitude = Number(place.latitude);
   const longitude = Number(place.longitude);
@@ -244,6 +258,13 @@ for (const place of places) {
   const tags = unique(['tacos', 'openstreetmap', coverage, ...cuisineTags, place.amenity]);
   const sourceUpdatedAt = text(place.details_updated_at, text(place.last_seen_at, text(raw.exportedAt)));
   const website = text(place.website);
+  const imageUrl = httpsUrl(place.image_url);
+  const photos = imageUrl ? [{
+    url: imageUrl,
+    sourceUrl: imageUrl,
+    license: 'Licencia no indicada por la fuente',
+    attribution: 'Imagen enlazada en el registro de OpenStreetMap'
+  }] : [];
 
   const branch = {
     id,
@@ -267,10 +288,13 @@ for (const place of places) {
     sourceLicense: text(raw.license, 'ODbL 1.0'),
     sourceAttribution: text(raw.attribution, '© OpenStreetMap contributors'),
     sourceUpdatedAt,
+    // Both high-confidence and candidate rows are source-backed catalog data.
+    // Candidate rows stay visible so the community can correct them in-app.
     catalogQuality: 'catalog',
     catalogStatus: 'active',
     ...(website.startsWith('https://') ? { website } : {}),
-    photos: [],
+    ...(imageUrl ? { imageUrl } : {}),
+    photos,
     tacos: []
   };
   branches.push(branch);
@@ -285,8 +309,8 @@ await writeFile(outputPath, `${JSON.stringify({
   attribution: text(raw.attribution, '© OpenStreetMap contributors'),
   exportedAt: new Date().toISOString(),
   coverage: ['Ciudad de México', 'Estado de México'],
-  selection: 'confidence=high y nombre no vacío dentro de los límites administrativos de CDMX o Edomex',
-  stats: { inputRows: places.length, highRows, namedHighRows, outsideRows, duplicateRows, branches: branches.length },
+  selection: 'confidence=high o candidate, nombre no vacío dentro de los límites administrativos de CDMX o Edomex',
+  stats: { inputRows: places.length, highRows, namedHighRows, candidateRows, namedCandidateRows, outsideRows, duplicateRows, branches: branches.length },
   branches
 }, null, 2)}\n`, 'utf8');
 
@@ -297,6 +321,8 @@ console.log(JSON.stringify({
   inputRows: places.length,
   highRows,
   namedHighRows,
+  candidateRows,
+  namedCandidateRows,
   outsideRows,
   duplicateRows,
   branches: branches.length

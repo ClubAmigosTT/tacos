@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
-import { forgotPassword, resendVerification, verifyEmail } from '@/lib/api';
+import { ApiError, forgotPassword, resendVerification, verifyEmail } from '@/lib/api';
 import { colors, spacing, typography } from '@/theme';
 import { BrandMark, TacoButton, TacoInput } from '@/components/DesignSystem';
 
@@ -20,21 +20,22 @@ export default function AuthScreen() {
 
   async function submit() {
     setError('');
-    if (!email || (mode !== 'forgot' && mode !== 'verify' && password.length < 8) || (mode === 'register' && displayName.trim().length < 2) || (mode === 'verify' && verificationToken.trim().length < 20)) { setError(mode === 'register' ? 'Completa nombre, correo y una contraseña de 8 caracteres.' : mode === 'verify' ? 'Pega el token de verificación recibido por correo.' : mode === 'forgot' ? 'Escribe tu correo.' : 'Escribe un correo y una contraseña de 8 caracteres.'); return; }
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || (mode !== 'forgot' && mode !== 'verify' && password.length < 8) || (mode === 'register' && displayName.trim().length < 2) || (mode === 'verify' && verificationToken.trim().length < 20)) { setError(mode === 'register' ? 'Completa nombre, correo y una contraseña de 8 caracteres.' : mode === 'verify' ? 'Pega el token de verificación recibido por correo.' : mode === 'forgot' ? 'Escribe tu correo.' : 'Escribe un correo y una contraseña de 8 caracteres.'); return; }
     setSaving(true);
     try {
       if (mode === 'register') {
-        const result = await signUp({ email, password, displayName });
+        const result = await signUp({ email: normalizedEmail, password, displayName: displayName.trim() });
         if (result.verificationRequired) { setVerificationToken(result.verificationToken ?? ''); setMode('verify'); return; }
       } else if (mode === 'forgot') {
-        await forgotPassword(email);
+        await forgotPassword(normalizedEmail);
         setError('Si el correo existe, recibirás un enlace para restablecer la contraseña.');
         return;
       } else if (mode === 'verify') {
         const result = await verifyEmail(verificationToken.trim());
         // Verification returns a session so the user can continue directly.
         await completeSession(result);
-      } else await signIn({ email, password });
+      } else await signIn({ email: normalizedEmail, password });
       if (returnTo === '/register') router.replace({ pathname: '/register', params: placeId ? { placeId } : undefined });
       else if (returnTo === '/catalog-proposal') router.replace({ pathname: '/catalog-proposal', params: { ...(branchId ? { branchId } : {}), ...(kind ? { kind } : {}) } });
       else if (returnTo === '/lists') router.replace({ pathname: '/lists', params: placeId ? { placeId } : undefined });
@@ -43,8 +44,10 @@ export default function AuthScreen() {
       else if (returnTo?.startsWith('/user/')) router.replace(returnTo as never);
       else router.replace('/(tabs)/profile');
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : '';
-      setError(message.includes('409') ? 'Ese correo ya está registrado.' : 'No pudimos completar el acceso. Revisa tus datos.');
+      if (cause instanceof ApiError && cause.status === 409) setError('Ese correo ya está registrado. Entra con tu contraseña.');
+      else if (cause instanceof ApiError && cause.status === 503) setError('La cuenta no pudo activarse temporalmente. Inténtalo de nuevo en unos minutos.');
+      else if (cause instanceof ApiError && cause.status === 400) setError('Revisa los datos: el correo o la contraseña no tienen un formato válido.');
+      else setError('No pudimos completar el acceso. Revisa tus datos.');
     } finally { setSaving(false); }
   }
 
