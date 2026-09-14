@@ -4,8 +4,8 @@
 The input is deliberately local.  The DENUE bulk downloader is run outside the
 application, the raw ZIPs stay out of git, and this command produces the
 auditable catalog feed that the API consumes. A combined export can be
-generated for audits or manual migrations, but the full regional feed is not
-embedded in JavaScript.
+generated for audits, migrations, and the active offline snapshot bundled by
+the mobile app.
 
 By default this selects SCIAN 722514 (restaurants with taco and torta
 preparation) for CDMX (09) and Estado de México (15), plus named taco places
@@ -120,6 +120,14 @@ def has_name_signal(name: str) -> bool:
     return bool(NAME_SIGNAL_RE.search(name))
 
 
+def business_type(name: str, primary_activity: bool) -> str:
+    if has_name_signal(name):
+        if re.search(r"\bcanasta\b", normalized(name)):
+            return "tacos_de_canasta"
+        return "taqueria"
+    return "restaurant_with_tacos" if primary_activity else "candidate"
+
+
 def build_address(row: dict[str, str]) -> str:
     vial_type = clean(row.get("tipo_vial"))
     vial_name = clean(row.get("nom_vial"))
@@ -210,7 +218,16 @@ def denue_branch(row: dict[str, str], release: str) -> dict[str, Any] | None:
 
     coverage = "cdmx" if entity_code == "09" else "edomex"
     name_signal = has_name_signal(name)
-    tags = ["tacos", "denue", f"scian-{activity_code}", coverage]
+    confidence = "high" if name_signal else "medium"
+    place_type = business_type(name, primary_activity)
+    tags = [
+        "tacos",
+        "denue",
+        f"scian-{activity_code}",
+        coverage,
+        f"confidence-{confidence}",
+        "taco-core" if name_signal else "taco-candidate",
+    ]
     if primary_activity:
         tags.append("actividad-principal-tacos-y-tortas")
     else:
@@ -230,6 +247,12 @@ def denue_branch(row: dict[str, str], release: str) -> dict[str, Any] | None:
         "taqueriaName": name,
         "name": name,
         "neighborhood": neighborhood,
+        "municipality": clean(row.get("municipio")) or STATE_NAMES[entity_code],
+        "state": STATE_NAMES[entity_code],
+        "activityCode": activity_code,
+        "businessType": place_type,
+        "confidence": confidence,
+        "matchReason": "name_signal" if name_signal else "primary_activity",
         "latitude": latitude,
         "longitude": longitude,
         "address": build_address(row),
@@ -245,7 +268,7 @@ def denue_branch(row: dict[str, str], release: str) -> dict[str, Any] | None:
         "sourceAttribution": f"Fuente: INEGI, DENUE, edición {release[:4]}-{release[4:6]}",
         "sourceUpdatedAt": source_updated_at(release),
         "catalogQuality": "catalog",
-        "catalogStatus": "active",
+        "catalogStatus": "active" if name_signal else "needs_review",
         "tacos": [],
         "photos": [],
     }
@@ -310,7 +333,7 @@ def same_place(left: dict[str, Any], right: dict[str, Any]) -> bool:
     return len(overlap) >= 2
 
 
-def load_high_osm(path: Path, enriched_path: Path) -> list[dict[str, Any]]:
+def load_osm(path: Path, enriched_path: Path, include_candidates: bool = False) -> list[dict[str, Any]]:
     raw = json.loads(path.read_text(encoding="utf-8"))
     rows = raw if isinstance(raw, list) else raw.get("branches", [])
     high_ids: set[str] = set()
@@ -327,6 +350,9 @@ def load_high_osm(path: Path, enriched_path: Path) -> list[dict[str, Any]]:
     result = []
     for row in rows:
         source_id = clean(row.get("sourcePlaceId"))
+        if include_candidates:
+            result.append(row)
+            continue
         if high_ids and source_id not in high_ids:
             continue
         if not high_ids and not has_name_signal(clean(row.get("name"))):
@@ -369,10 +395,11 @@ def add_unmatched_osm(denue: list[dict[str, Any]], osm: list[dict[str, Any]]) ->
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input-dir", type=Path, default=Path("data/denue/202605"))
+    parser.add_argument("--input-dir", type=Path, default=Path("data/denue/latest"))
     parser.add_argument("--output", type=Path, default=Path("catalog/denue-cdmx-edomex.json"))
-    parser.add_argument("--release", default="202605", help="Edición DENUE en formato YYYYMM")
+    parser.add_argument("--release", default="", help="Edición DENUE en formato YYYYMM; por defecto usa release.txt del input")
     parser.add_argument("--include-osm", action="store_true", help="Añadir OSM de alta confianza sin duplicar DENUE")
+    parser.add_argument("--include-osm-candidates", action="store_true", help="Conservar también OSM candidatos o sin nombre como needs_review")
     parser.add_argument("--osm-file", type=Path, default=Path("catalog/osm-cdmx-edomex.json"))
     parser.add_argument("--osm-enriched-file", type=Path, default=Path("taquerias_enriquecidas.json"))
     return parser.parse_args()
@@ -380,6 +407,17 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    if not list(args.input_dir.glob("*.zip")):
+        legacy_input = Path("data/denue/202605")
+        if args.input_dir == Path("data/denue/latest") and list(legacy_input.glob("*.zip")):
+            print(f"No hay ZIPs en {args.input_dir}; usando el snapshot existente {legacy_input}")
+            args.input_dir = legacy_input
+    if not args.release:
+        release_file = args.input_dir / "release.txt"
+        if release_file.exists():
+            args.release = release_file.read_text(encoding="ascii").strip()
+        else:
+            args.release = "202605"
     if not re.fullmatch(r"\d{6}", args.release):
         raise SystemExit("--release debe tener formato YYYYMM")
 
@@ -410,7 +448,7 @@ def main() -> None:
     osm_rows: list[dict[str, Any]] = []
     matched_osm = 0
     if args.include_osm:
-        osm_rows = load_high_osm(args.osm_file, args.osm_enriched_file)
+        osm_rows = load_osm(args.osm_file, args.osm_enriched_file, args.include_osm_candidates)
         osm_rows, matched_osm = add_unmatched_osm(denue_branches, osm_rows)
 
     branches, combined_duplicate_rows = dedupe_branches(denue_branches + osm_rows)
@@ -432,7 +470,7 @@ def main() -> None:
         # a new snapshot yet.
         "exportedAt": source_updated_at(args.release),
         "coverage": ["Ciudad de México", "Estado de México"],
-        "selection": "SCIAN 722514 y nombres con señal explícita de tacos dentro de actividades 7225; registros con nombre y coordenadas válidas" + ("; OSM confidence=high sin duplicados" if args.include_osm else ""),
+        "selection": "SCIAN 722514 y nombres con señal explícita de tacos dentro de actividades 7225; registros con nombre y coordenadas válidas" + ("; OSM high sin duplicados" if args.include_osm and not args.include_osm_candidates else "; OSM high y candidates sin duplicados, candidates=needs_review" if args.include_osm else ""),
         "stats": {
             "rawRowsRead": total_rows,
             "denueCandidates": len(candidates),
@@ -444,7 +482,8 @@ def main() -> None:
             "denueSkippedNoName": skipped_no_name,
             "denueSkippedNoCoordinate": skipped_no_coordinate,
             "denueByCoverage": dict(counts_by_coverage),
-            "osmHighInput": len(load_high_osm(args.osm_file, args.osm_enriched_file)) if args.include_osm else 0,
+            "osmHighInput": len(load_osm(args.osm_file, args.osm_enriched_file)) if args.include_osm else 0,
+            "osmCandidateInput": len(load_osm(args.osm_file, args.osm_enriched_file, True)) if args.include_osm and args.include_osm_candidates else 0,
             "osmMatchedToDenue": matched_osm,
             "osmAdded": len(osm_rows),
             "combinedDuplicatesRemoved": combined_duplicate_rows,

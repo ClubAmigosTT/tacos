@@ -7,6 +7,50 @@ fotografía con licencia explícita). Cada registro debe incluir los siete días
 dirección, coordenadas, precios y al menos una foto con `license`, `attribution`
 y `sourceUrl`.
 
+## Fase 1: ampliar cobertura sin depender de Google
+
+El objetivo de esta fase es maximizar la cobertura de CDMX y Estado de México
+con fuentes reutilizables, conservar la procedencia de cada fila y evitar que
+un restaurante genérico se publique automáticamente como taquería.
+
+El flujo operativo es:
+
+1. Descargar la edición vigente de DENUE desde INEGI para las entidades 09 y
+   15.
+2. Descubrir candidatos de OSM por grupos de señales (`taco`, `birria`,
+   `carnitas`, `barbacoa`, `suadero`, `pastor`, `canasta`, `cabeza`, `trompo`,
+   `quesabirria` y `guisado`) y por cobertura territorial. El proceso guarda
+   IDs estables `osm:tipo:id` y realiza lotes locales de 60.
+3. Enriquecer esos IDs con las etiquetas disponibles en OSM. Los campos
+   ausentes permanecen vacíos; no se inventan fotos, horarios ni teléfonos.
+4. Normalizar clasificación, municipio/alcaldía, fuente y calidad. Los
+   candidatos quedan como `needs_review`; sólo las filas con señal suficiente
+   pasan como `active`.
+5. Combinar DENUE y OSM con deduplicación por fuente y por nombre/coordenadas.
+   Las coincidencias sospechosas se reportan, no se eliminan silenciosamente.
+6. Auditar antes de importar: cobertura por alcaldía/municipio, mezcla de
+   fuentes, faltantes y candidatos de duplicado.
+
+Comandos principales:
+
+```bash
+pnpm catalog:refresh
+pnpm catalog:audit
+pnpm smoke:catalog
+```
+
+`catalog:refresh` no importa automáticamente a producción. Eso es deliberado:
+primero se revisan los reportes de `catalog/reports/` y después se ejecuta la
+importación con el feed aprobado. Si Overpass está saturado, el descubridor
+reintenta y divide la entidad en celdas de 0.25 grados; una corrida parcial
+guarda lo conseguido pero nunca reconcilia ni archiva registros anteriores.
+
+La ejecución local de septiembre de 2026 produjo 35,652 sucursales regionales:
+34,413 de DENUE y 1,239 de OSM. Después de recalcular las señales históricas de
+OSM, 25,153 están activas para publicación y 10,499 quedan en revisión. Esos
+números son una fotografía de la edición DENUE 202605 y del snapshot OSM local;
+deben recalcularse después de cada actualización.
+
 Importa en PostgreSQL/PostGIS con:
 
 ```bash
@@ -80,6 +124,11 @@ nombre y están dentro de los límites administrativos de CDMX o Edomex:
 ```bash
 pnpm catalog:build:osm
 ```
+
+El constructor fusiona el JSON enriquecido con `taqueria_ids.csv`. Por eso un
+ID recién descubierto puede aparecer de inmediato como `needs_review` aunque
+todavía no tenga dirección u horario; al completar el enriquecimiento, los
+datos detallados sustituyen al registro provisional por el mismo ID.
 
 El comando guarda `catalog/osm-cdmx-edomex.json` y conserva los límites de
 ambas entidades en `catalog/osm-boundaries.json` para no descargarlos en cada
@@ -156,8 +205,8 @@ teléfono; no aporta fotografías, menús, horarios semanales ni calificaciones 
 la comunidad.
 
 Para generar un feed combinado para auditorías, exportaciones o una migración
-manual, combina DENUE con los 584 registros OSM de alta confianza que no se
-dupliquen:
+manual, combina DENUE con los registros OSM candidatos y de alta confianza que
+no se dupliquen:
 
 ```bash
 pnpm catalog:build:osm
@@ -191,25 +240,25 @@ conserva la fuente y la fecha de edición para que esa atribución no se pierda.
 Revisa los [Términos de Libre Uso de INEGI](https://www.inegi.org.mx/inegi/terminos.html)
 cuando cambie la edición.
 
-## Catálogo local de respaldo de la app
+## Catálogo local de la app
 
-La app móvil incluye una copia estática pequeña de los 584 registros OSM de
-alta confianza. Sirve para que Inicio y Mapa no queden vacíos mientras la API
-despierta o si el dispositivo pierde conexión, pero no es la fuente completa:
-el catálogo regional de 34,413 sucursales vive en PostgreSQL/PostGIS y el API
-devuelve como máximo 50 resultados por consulta. Empaquetar las 34,801 filas
-completas en JavaScript hace crecer el binario y puede agotar la memoria de
-Metro durante la compilación.
+La app móvil incluye una copia estática de las filas activas del catálogo
+regional combinado. Así Inicio y Mapa no quedan vacíos mientras la API despierta
+o si el dispositivo pierde conexión. El servidor sigue siendo necesario para
+calificaciones, visitas, cuentas y actividad social, pero la búsqueda básica de
+taquerías también funciona con la información que ya viene almacenada en la
+app. Los registros `needs_review` no se publican automáticamente.
 
-Se regenera el respaldo al preparar cada versión de la app:
+Se regenera la copia al preparar cada versión de la app:
 
 ```bash
 pnpm catalog:build:mobile
 ```
 
-La salida se guarda en `apps/mobile/data/catalog.ts`. La app usa primero los
-datos del API cuando están disponibles (para conservar calificaciones, visitas
-y actividad de usuarios) y usa la copia OSM como respaldo. Cambiar el catálogo
-DENUE llega al API en el siguiente deploy; no requiere que alguien abra la app
-ni una nueva versión de iOS. El respaldo OSM sí requiere una nueva versión,
-pero se mantiene deliberadamente pequeño.
+La salida se guarda en `apps/mobile/data/catalog.ts`. El constructor usa
+`catalog/cdmx-edomex.json` cuando existe y, en un checkout limpio, combina los
+feeds regionales versionados de DENUE y OSM. La app usa primero el API cuando
+está disponible para conservar calificaciones, visitas y actividad de usuarios;
+si falla, consulta esta copia local. Por eso una actualización quincenal se
+distribuye al servidor mediante el catálogo y llega al almacenamiento local de
+la app en la siguiente versión de iOS.
