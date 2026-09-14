@@ -34,16 +34,24 @@ DEFAULT_ENDPOINTS = (
 
 DETAIL_COLUMNS = {
     "coverage": "TEXT",
+    "brand": "TEXT",
+    "official_name": "TEXT",
+    "alt_name": "TEXT",
+    "operator": "TEXT",
     "address": "TEXT",
     "street": "TEXT",
     "house_number": "TEXT",
     "neighborhood": "TEXT",
+    "municipality": "TEXT",
     "city": "TEXT",
     "postcode": "TEXT",
     "opening_hours": "TEXT",
     "phone": "TEXT",
     "website": "TEXT",
     "cuisine": "TEXT",
+    "dish": "TEXT",
+    "menu": "TEXT",
+    "product": "TEXT",
     "amenity": "TEXT",
     "description": "TEXT",
     "details_status": "TEXT",
@@ -56,10 +64,15 @@ EXPORT_COLUMNS = (
     "source_id",
     "provider_id",
     "name",
+    "brand",
+    "official_name",
+    "alt_name",
+    "operator",
     "address",
     "street",
     "house_number",
     "neighborhood",
+    "municipality",
     "city",
     "postcode",
     "latitude",
@@ -67,6 +80,9 @@ EXPORT_COLUMNS = (
     "opening_hours",
     "phone",
     "website",
+    "dish",
+    "menu",
+    "product",
     "image_url",
     "cuisine",
     "amenity",
@@ -249,13 +265,14 @@ def build_address(tags: dict) -> dict[str, str]:
         "addr:suburb",
         "addr:quarter",
     )
-    city = first_tag(tags, "addr:city", "addr:municipality", "addr:town")
+    municipality = first_tag(tags, "addr:municipality")
+    city = first_tag(tags, "addr:city", "addr:town")
     postcode = first_tag(tags, "addr:postcode")
 
     if not full_address:
         street_line = " ".join(value for value in (street, house_number) if value)
         full_address = ", ".join(
-            value for value in (street_line, neighborhood, city, postcode) if value
+            value for value in (street_line, neighborhood, municipality, city, postcode) if value
         )
 
     return {
@@ -263,6 +280,7 @@ def build_address(tags: dict) -> dict[str, str]:
         "street": street,
         "house_number": house_number,
         "neighborhood": neighborhood,
+        "municipality": municipality,
         "city": city,
         "postcode": postcode,
     }
@@ -276,6 +294,7 @@ def pending_rows(
 ) -> list[sqlite3.Row]:
     conditions: list[str] = []
     parameters: list[object] = []
+    conditions.append("COALESCE(discovery_status, 'seen') = 'seen'")
     if not refresh:
         conditions.append("COALESCE(details_status, '') NOT IN ('OK', 'NOT_FOUND')")
     if confidence != "all":
@@ -333,11 +352,13 @@ def save_batch(
             """
             UPDATE taqueria_source_ids
             SET name = CASE WHEN ? <> '' THEN ? ELSE name END,
+                brand = ?, official_name = ?, alt_name = ?, operator = ?,
                 address = ?, street = ?, house_number = ?, neighborhood = ?,
-                city = ?, postcode = ?,
+                municipality = ?, city = ?, postcode = ?,
                 latitude = COALESCE(?, latitude),
                 longitude = COALESCE(?, longitude),
                 opening_hours = ?, phone = ?, website = ?, cuisine = ?,
+                dish = ?, menu = ?, product = ?,
                 amenity = ?, description = ?, details_status = 'OK',
                 details_updated_at = ?, details_attempts = details_attempts + 1,
                 raw_tags_json = ?, last_seen_at = ?
@@ -346,10 +367,15 @@ def save_batch(
             (
                 name,
                 name,
+                first_tag(tags, "brand"),
+                first_tag(tags, "official_name"),
+                first_tag(tags, "alt_name"),
+                first_tag(tags, "operator"),
                 address["address"],
                 address["street"],
                 address["house_number"],
                 address["neighborhood"],
+                address["municipality"],
                 address["city"],
                 address["postcode"],
                 latitude,
@@ -358,6 +384,9 @@ def save_batch(
                 first_tag(tags, "phone", "contact:phone", "mobile"),
                 first_tag(tags, "website", "contact:website"),
                 first_tag(tags, "cuisine"),
+                first_tag(tags, "dish"),
+                first_tag(tags, "menu"),
+                first_tag(tags, "product"),
                 first_tag(tags, "amenity"),
                 first_tag(tags, "description"),
                 now,
@@ -442,6 +471,7 @@ def export_details(
     query = f"""
         SELECT {', '.join(select_columns)}
         FROM taqueria_source_ids
+        WHERE COALESCE(discovery_status, 'seen') = 'seen'
         ORDER BY CASE confidence WHEN 'high' THEN 0 ELSE 1 END,
                  lower(name), source_id
     """

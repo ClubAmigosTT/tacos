@@ -19,11 +19,17 @@ El flujo operativo es:
    15.
 2. Descubrir candidatos de OSM por grupos de señales (`taco`, `birria`,
    `carnitas`, `barbacoa`, `suadero`, `pastor`, `canasta`, `cabeza`, `trompo`,
-   `quesabirria` y `guisado`) y por cobertura territorial. El proceso guarda
-   IDs estables `osm:tipo:id` y realiza lotes locales de 60.
+   `quesabirria`, `guisado` y `antojitos`) y por cobertura territorial. La
+   búsqueda revisa `cuisine` y también `name`, `brand`, `official_name`,
+   `alt_name`, `operator`, `description`, `dish`, `menu` y `product` en
+   negocios de alimentos. El proceso guarda IDs estables `osm:tipo:id` y
+   realiza lotes locales de 60.
 3. Enriquecer esos IDs con las etiquetas disponibles en OSM. Los campos
    ausentes permanecen vacíos; no se inventan fotos, horarios ni teléfonos.
-4. Normalizar clasificación, municipio/alcaldía, fuente y calidad. Los
+4. Normalizar clasificación, municipio/alcaldía, fuente y calidad. El
+   constructor usa las alcaldías y municipios presentes en DENUE para corregir
+   valores genéricos como `Ciudad de México` o `Estado de México` cuando la
+   etiqueta contextual de OSM permite identificar el territorio. Los
    candidatos quedan como `needs_review`; sólo las filas con señal suficiente
    pasan como `active`.
 5. Combinar DENUE y OSM con deduplicación por fuente y por nombre/coordenadas.
@@ -93,6 +99,15 @@ de Google Maps, ejecuta:
 ```bash
 pnpm catalog:discover:ids
 ```
+
+Si Overpass está ocupado, la corrida se puede repartir por grupos y reanudar
+sin perder lo ya guardado. Por ejemplo, `--query-offset 1 --max-queries 1`
+ejecuta solamente el segundo grupo territorial; las corridas parciales nunca
+reconcilian ni archivan IDs anteriores.
+
+En una automatización equivalente se pueden usar
+`CATALOG_DISCOVERY_OFFSET` y `CATALOG_DISCOVERY_MAX_QUERIES` para pasar esos
+valores a `catalog:refresh`.
 
 El proceso consulta por separado los límites `MX-CMX` y `MX-MEX`, y guarda o
 actualiza los resultados en lotes transaccionales de 60. Mantiene `taqueria_ids.sqlite` y
