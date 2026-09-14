@@ -51,9 +51,9 @@ importación con el feed aprobado. Si Overpass está saturado, el descubridor
 reintenta y divide la entidad en celdas de 0.25 grados; una corrida parcial
 guarda lo conseguido pero nunca reconcilia ni archiva registros anteriores.
 
-La ejecución local de septiembre de 2026 produjo 35,652 sucursales regionales:
-34,413 de DENUE y 1,239 de OSM. Después de recalcular las señales históricas de
-OSM, 25,153 están activas para publicación y 10,499 quedan en revisión. Esos
+La ejecución local de septiembre de 2026 produjo 35,661 sucursales regionales:
+34,413 de DENUE y 1,248 de OSM. Después de recalcular las señales históricas de
+OSM, 25,165 están activas para publicación y 10,496 quedan en revisión. Esos
 números son una fotografía de la edición DENUE 202605 y del snapshot OSM local;
 deben recalcularse después de cada actualización.
 
