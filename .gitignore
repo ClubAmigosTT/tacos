@@ -35,3 +35,7 @@ scripts/__pycache__/
 # Local iOS signing credentials downloaded from EAS; never commit these.
 apps/mobile/credentials.json
 apps/mobile/credentials/
+
+# Temporary read-only deploy key used by the public CI relay; never commit.
+.tacos-ci-deploy-key
+.tacos-ci-deploy-key.pub

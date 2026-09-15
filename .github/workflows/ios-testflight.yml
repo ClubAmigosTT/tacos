@@ -179,9 +179,9 @@ jobs:
         run: |
           set -euo pipefail
           pnpm exec expo prebuild --platform ios --clean --no-install
-          test -f ios/Tacos.xcworkspace/contents.xcworkspacedata
           cd ios
           pod install
+          test -f Tacos.xcworkspace/contents.xcworkspacedata
 
       - name: Preparar firma y perfil
         shell: bash
