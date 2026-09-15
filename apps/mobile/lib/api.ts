@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { type CategoryRatings, type Place } from '@/data/fixtures';
 import { localDiscover, localPlace, localRecommendations, localTaqueria } from '@/lib/localCatalog';
+import { isDisplayablePlace } from '@/lib/catalogQuality';
 
 export type AuthUser = { id: string; email: string; displayName: string; role?: 'user' | 'admin'; following?: boolean; emailVerified?: boolean };
 export type ApiList = { id: string; title: string; description: string; owner: { id: string; displayName: string }; itemCount: number; visitedCount: number; coverImage: string; visibility?: 'public' | 'private'; collaboratorCount?: number; canEdit?: boolean };
@@ -46,7 +47,7 @@ function withBundledCatalogMedia(place: Place): Place {
 }
 
 function withBundledCatalogMediaList(items: Place[]) {
-  return items.map(withBundledCatalogMedia);
+  return items.filter(isDisplayablePlace).map(withBundledCatalogMedia);
 }
 
 const ANONYMOUS_ID_KEY = 'tacos.analytics.anonymous_id';

@@ -36,7 +36,22 @@ export default function DiaryScreen() {
     <Pressable style={styles.callout} onPress={() => router.push('/wrapped')}><View style={styles.calloutIcon}><Ionicons name="sparkles" color={colors.background} size={17} /></View><View style={{ flex: 1 }}><Text style={styles.calloutTitle}>Tu resumen anual</Text><Text style={styles.calloutText}>Mira tus tacos, zonas exploradas y el lugar que más defendiste.</Text></View><Ionicons name="chevron-forward" size={17} color={colors.textSecondary} /></Pressable>
     <SectionTitle eyebrow={diaryPeriod} title="Últimos tacos" action="Ver todo" />
   </View>;
-  return <FlatList data={entries} keyExtractor={(entry) => entry.id} renderItem={renderEntry} style={styles.screen} contentContainerStyle={styles.content} ListHeaderComponent={header} showsVerticalScrollIndicator={false} />;
+  return <FlatList data={entries} keyExtractor={(entry) => entry.id} renderItem={renderEntry} style={styles.screen} contentContainerStyle={[styles.content, !entries.length && styles.emptyContent]} ListHeaderComponent={header} ListEmptyComponent={<DiaryEmptyState authenticated={Boolean(token)} />} showsVerticalScrollIndicator={false} />;
+}
+
+function DiaryEmptyState({ authenticated }: { authenticated: boolean }) {
+  return <View style={styles.emptyState}>
+    <View style={styles.emptyIcon}><Ionicons name="book-outline" size={24} color={colors.background} /></View>
+    <Text style={styles.emptyTitle}>{authenticated ? 'Tu diario empieza aquí' : 'Guarda tus taquitos'}</Text>
+    <Text style={styles.emptyCopy}>{authenticated ? 'Registra tu primera visita y construye una historia de lugares, sabores y calificaciones.' : 'Crea una cuenta para registrar visitas, conservar tus calificaciones y volver a tus favoritos.'}</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel={authenticated ? 'Explorar mapa' : 'Crear cuenta'} style={styles.emptyPrimary} onPress={() => router.push(authenticated ? '/(tabs)/map' : '/auth')}>
+      <Text style={styles.emptyPrimaryText}>{authenticated ? 'Explorar mapa' : 'Crear cuenta'}</Text>
+      <Ionicons name="arrow-forward" size={17} color={colors.background} />
+    </Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel={authenticated ? 'Proponer una taquería' : 'Explorar mapa sin cuenta'} onPress={() => router.push(authenticated ? '/catalog-proposal' : '/(tabs)/map')}>
+      <Text style={styles.emptySecondaryText}>{authenticated ? '¿Falta una taquería? Agrégala' : 'Explorar mapa sin cuenta'}</Text>
+    </Pressable>
+  </View>;
 }
 
 function DiaryEntryCard({ entry, isLast, editable }: { entry: DiaryEntry; isLast: boolean; editable: boolean }) {
@@ -48,6 +63,7 @@ const styles = StyleSheet.create({
   loading: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
   loadingText: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular },
   content: { paddingHorizontal: spacing.lg, paddingTop: 66, paddingBottom: 115 },
+  emptyContent: { flexGrow: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xl },
   kicker: { color: colors.tortilla, fontFamily: typography.fontFamily.semibold, fontSize: typography.size.micro, fontWeight: typography.weight.semibold, letterSpacing: typography.tracking.loose, marginBottom: 5 },
   title: { color: colors.textPrimary, fontFamily: typography.fontFamily.bold, fontSize: 34, fontWeight: typography.weight.bold, letterSpacing: typography.tracking.display },
@@ -56,6 +72,13 @@ const styles = StyleSheet.create({
   calloutIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.tortilla, alignItems: 'center', justifyContent: 'center' },
   calloutTitle: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, fontSize: 13, fontWeight: typography.weight.semibold },
   calloutText: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  emptyState: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.xl, marginTop: spacing.sm, ...shadows.card },
+  emptyIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.tortilla, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
+  emptyTitle: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, fontSize: 20, fontWeight: typography.weight.semibold, textAlign: 'center' },
+  emptyCopy: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 8 },
+  emptyPrimary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, alignSelf: 'stretch', backgroundColor: colors.tortilla, borderRadius: radii.pill, paddingVertical: 12, marginTop: spacing.lg },
+  emptyPrimaryText: { color: colors.background, fontFamily: typography.fontFamily.semibold, fontSize: 12, fontWeight: typography.weight.semibold },
+  emptySecondaryText: { color: colors.tortilla, fontFamily: typography.fontFamily.semibold, fontSize: 11, fontWeight: typography.weight.semibold, marginTop: spacing.md },
   timeline: { marginTop: 2 },
   entry: { flexDirection: 'row', minHeight: 112 },
   date: { width: 42, paddingTop: 10 },

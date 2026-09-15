@@ -49,6 +49,8 @@ export type Place = {
   tacos: Taco[];
   photos?: Photo[];
   tags: string[];
+  /** How a free-text query matched this place, when one is active. */
+  searchEvidence?: 'menu' | 'name' | 'catalog';
   /** Optional; only user/community evidence can populate a taste profile. */
   flavorProfile?: { intensity: number; spicy: number; traditional: number; texture: number; value: number };
   tasteMatch?: number;

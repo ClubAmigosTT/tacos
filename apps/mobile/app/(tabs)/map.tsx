@@ -12,6 +12,7 @@ import { MapCanvas } from '@/components/MapCanvas';
 import { AsyncErrorState } from '@/components/AsyncErrorState';
 import { CatalogImage } from '@/components/CatalogImage';
 import { useAuth } from '@/lib/auth';
+import { isDisplayablePlace, searchEvidence, searchEvidenceLabel } from '@/lib/catalogQuality';
 
 const filters = ['Todos', 'Abierto ahora', 'Barato'] as const;
 type MapFilter = (typeof filters)[number];
@@ -109,7 +110,10 @@ export default function MapScreen() {
 
   // The small bundled fallback remains useful while the API wakes up or the
   // device is offline. Fixtures are only a deliberate demo-mode fallback.
-  const discoveryPlaces = data ?? (isDemoMode() ? places : []);
+  const rawDiscoveryPlaces = data ?? (isDemoMode() ? places : []);
+  const discoveryPlaces = useMemo(() => rawDiscoveryPlaces
+    .filter(isDisplayablePlace)
+    .map((place) => ({ ...place, searchEvidence: searchEvidence(place, searchQuery) })), [rawDiscoveryPlaces, searchQuery]);
   const sorted = useMemo(() => {
     if (active !== 'Barato') return discoveryPlaces;
 
@@ -359,6 +363,7 @@ const styles = StyleSheet.create({
 });
 
 function MapResultCard({ place, onPress }: { place: (typeof places)[number]; onPress: (id: string) => void }) {
+  const evidenceLabel = searchEvidenceLabel(place.searchEvidence);
   return (
     <Pressable
       accessibilityRole="button"
@@ -375,7 +380,7 @@ function MapResultCard({ place, onPress }: { place: (typeof places)[number]; onP
         <Text style={styles.resultMeta}>{place.neighborhood} · {place.distance}</Text>
         <View style={styles.resultBottom}>
           <Text style={styles.resultStyle}>{place.style}</Text>
-          {place.catalogStatus === 'needs_review' ? <Text style={styles.reviewLabel}>Por verificar</Text> : null}
+          {evidenceLabel ? <Text style={styles.reviewLabel}>{evidenceLabel}</Text> : place.catalogStatus === 'needs_review' ? <Text style={styles.reviewLabel}>Por verificar</Text> : null}
         </View>
       </View>
     </Pressable>

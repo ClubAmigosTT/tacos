@@ -13,6 +13,7 @@ import { StarRating } from '@/components/StarRating';
 import { isOpenNow } from '@/lib/hours';
 import type { Place } from '@/data/fixtures';
 import { CatalogImage } from '@/components/CatalogImage';
+import { isDisplayablePlace } from '@/lib/catalogQuality';
 
 export default function PlaceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -29,7 +30,7 @@ export default function PlaceScreen() {
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['saved-places', token] }); }
   });
   if (authLoading || isLoading) return <View style={styles.loading}><Text style={styles.loadingText}>{authLoading ? 'Preparando la ficha…' : 'Cargando lugar…'}</Text></View>;
-  if (isError || !place) return <View style={styles.notFound}><Ionicons name="location-outline" size={28} color={colors.tortilla} /><Text style={styles.notFoundTitle}>Taquería no disponible</Text><Text style={styles.notFoundCopy}>El enlace puede haber cambiado o la sucursal ya no existe.</Text><Pressable style={styles.notFoundButton} onPress={() => router.replace('/(tabs)/map')}><Text style={styles.notFoundButtonText}>Volver al mapa</Text></Pressable></View>;
+  if (isError || !place || !isDisplayablePlace(place)) return <View style={styles.notFound}><Ionicons name="location-outline" size={28} color={colors.tortilla} /><Text style={styles.notFoundTitle}>Taquería no disponible</Text><Text style={styles.notFoundCopy}>El enlace puede haber cambiado o la sucursal no tiene un nombre comercial verificable.</Text><Pressable style={styles.notFoundButton} onPress={() => router.replace('/(tabs)/map')}><Text style={styles.notFoundButtonText}>Volver al mapa</Text></Pressable></View>;
   const currentPlace = place;
   const averagePrice = place.tacos.length ? Math.round(place.tacos.reduce((sum, taco) => sum + taco.price, 0) / place.tacos.length) : undefined;
   const priceLabel = place.priceMin != null || place.priceMax != null
@@ -76,12 +77,13 @@ function PlaceInfo({ place }: { place: Place }) {
   function callPlace() {
     if (place.phone) void Linking.openURL(`tel:${place.phone.replace(/[^+\d]/g, '')}`);
   }
+  const sourceAttribution = (place.source?.attribution ?? place.source?.name ?? '').replace(/^Fuente:\s*/i, '').trim();
   return <View style={styles.infoBlock}>
     <CommunityRatingBreakdown place={place} />
     {place.address ? <Pressable accessibilityRole="button" accessibilityLabel="Abrir dirección en mapas" style={styles.infoRow} onPress={openMaps}><Ionicons name="navigate-outline" size={17} color={colors.tortilla} /><Text style={styles.infoText}>{place.address}</Text><Ionicons name="open-outline" size={15} color={colors.textTertiary} /></Pressable> : null}
     {place.phone ? <Pressable accessibilityRole="button" accessibilityLabel="Llamar a la taquería" style={styles.infoRow} onPress={callPlace}><Ionicons name="call-outline" size={17} color={colors.tortilla} /><Text style={styles.infoText}>{place.phone}</Text><Ionicons name="call-outline" size={15} color={colors.textTertiary} /></Pressable> : null}
     <View style={styles.hoursBlock}><View style={styles.hoursHeading}><Ionicons name="time-outline" size={17} color={colors.tortilla} /><Text style={styles.infoHeading}>HORARIO SEMANAL</Text></View>{place.weeklyHours ? scheduleDays.map(([key, label]) => <View key={key} style={styles.hoursRow}><Text style={styles.dayLabel}>{label}</Text><Text style={styles.hoursText}>{place.weeklyHours?.[key]?.length ? place.weeklyHours[key].map((interval) => `${interval.open}–${interval.close}`).join(', ') : 'Cerrado'}</Text></View>) : <Text style={styles.unverified}>{place.hoursKnown === false ? 'Horario no disponible en la fuente. Puedes proponer una actualización.' : `Horario semanal aún no verificado. Referencia: cierre a las ${place.openUntil}.`}</Text>}</View>
-    {place.source?.attribution || place.source?.name ? <Text style={styles.sourceText}>Fuente: {place.source.attribution ?? place.source.name}{place.source.updatedAt ? ` · actualizado ${new Date(place.source.updatedAt).toLocaleDateString('es-MX')}` : ''}</Text> : null}
+    {sourceAttribution ? <Text style={styles.sourceText}>Fuente: {sourceAttribution}{place.source?.updatedAt ? ` · actualizado ${new Date(place.source.updatedAt).toLocaleDateString('es-MX')}` : ''}</Text> : null}
   </View>;
 }
 

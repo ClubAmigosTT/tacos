@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts, Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold } from '@expo-google-fonts/manrope';
@@ -27,9 +27,17 @@ const queryClient = new QueryClient({
 });
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({ Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold });
+  const [fontsLoaded, fontError] = useFonts({ Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold });
+  const [fontTimedOut, setFontTimedOut] = useState(false);
+  useEffect(() => {
+    if (fontsLoaded || fontError) return;
+    const timeout = setTimeout(() => setFontTimedOut(true), 3_500);
+    return () => clearTimeout(timeout);
+  }, [fontsLoaded, fontError]);
   useEffect(() => { void trackEvent('app_open'); }, []);
-  if (!fontsLoaded) return <View style={styles.loading}><StatusBar style="light" /><Text style={styles.loadingText}>Preparando tu mesa…</Text></View>;
+  // A font download is cosmetic. If it fails or takes too long, render the
+  // app with the platform sans-serif fallback instead of blocking navigation.
+  if (!fontsLoaded && !fontError && !fontTimedOut) return <View style={styles.loading}><StatusBar style="light" /><Text style={styles.loadingText}>Preparando tu mesa…</Text></View>;
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>

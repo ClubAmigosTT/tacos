@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import bcrypt from 'bcryptjs';
 import { createHash } from 'node:crypto';
 import { lists as fixtureLists, places, type ApiList, type ApiListDetail, type ApiPhoto, type ApiPlace, type ApiTaqueria, type CategoryRatings, type FlavorProfile, type RatingBreakdown, type RatingCategory, type TasteProfile } from './data.js';
+import { isDisplayableCatalogPlace } from './catalogQuality.js';
 import { isOpenNow } from './hours.js';
 
 const configuredDatabaseUrl = process.env.DATABASE_URL?.trim();
@@ -16,7 +17,8 @@ const allowDemoCatalog = process.env.ALLOW_DEMO_CATALOG?.trim().toLowerCase() ==
 const demoPlaceIds = new Set(places.map((place) => place.id));
 
 function localCatalogPlaces() {
-  return allowDemoCatalog ? places : places.filter((place) => !demoPlaceIds.has(place.id));
+  const displayable = places.filter(isDisplayableCatalogPlace);
+  return allowDemoCatalog ? displayable : displayable.filter((place) => !demoPlaceIds.has(place.id));
 }
 
 type DiscoverQuery = { q?: string; lat?: number; lng?: number; radiusKm?: number; offset?: number; openNow?: boolean; limit: number };
@@ -791,14 +793,12 @@ export async function discoverPlaces(query: DiscoverQuery, userId?: string): Pro
         predicates.push(`ST_DWithin(b.location, ST_SetSRID(ST_MakePoint($${longitudeParam}, $${latitudeParam}), 4326)::geography, $${radiusParam})`);
       }
     }
-    const fetchLimit = query.openNow ? Math.min(500, Math.max(limit + offset, limit) * 3) : limit;
+    // Fetch a wider window because generic activity labels are filtered after
+    // normalization. Applying SQL OFFSET first could otherwise hide valid
+    // taquerías behind rows such as "TORTAS" or "DESAYUNOS".
+    const fetchLimit = Math.min(500, Math.max(limit + offset, limit) * 3);
     const limitParam = values.length + 1;
     values.push(fetchLimit);
-    const offsetSql = query.openNow || offset === 0 ? '' : (() => {
-      const offsetParam = values.length + 1;
-      values.push(offset);
-      return ` OFFSET $${offsetParam}`;
-    })();
     // Keep offset pagination stable when catalog rows share the same rating.
     // Without a deterministic tie-breaker, PostgreSQL may repeat or skip rows
     // between pages, which is especially visible in a new catalog with no
@@ -820,10 +820,11 @@ export async function discoverPlaces(query: DiscoverQuery, userId?: string): Pro
       ${categoryRatingsJoin}
       LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
     WHERE ${predicates.join(' AND ')}
-    GROUP BY b.id, t.name, reviews.review_count, reviews.score, category_ratings.tortilla, category_ratings.service, category_ratings.price, category_ratings.meat, category_ratings.salsas ORDER BY ${orderBy} LIMIT $${limitParam}${offsetSql}
+    GROUP BY b.id, t.name, reviews.review_count, reviews.score, category_ratings.tortilla, category_ratings.service, category_ratings.price, category_ratings.meat, category_ratings.salsas ORDER BY ${orderBy} LIMIT $${limitParam}
     `, values);
-    discovered = result.rows.map(normalizePlace);
-    if (query.openNow) discovered = discovered.filter((place) => isOpenNow(place.openUntil, new Date(), place.weeklyHours, place.hoursKnown)).slice(offset, offset + limit);
+    discovered = result.rows.map(normalizePlace).filter(isDisplayableCatalogPlace);
+    if (query.openNow) discovered = discovered.filter((place) => isOpenNow(place.openUntil, new Date(), place.weeklyHours, place.hoursKnown));
+    discovered = discovered.slice(offset, offset + limit);
   }
   if (!userId || !discovered.length) return allowDemoCatalog ? discovered : discovered.map(withoutPersonalMatch);
   // Keep discovery's geographic/textual result set intact while replacing
@@ -972,6 +973,7 @@ export async function findPlace(id: string, userId?: string): Promise<ApiPlace |
     WHERE b.id = $1 AND b.is_active = true AND b.catalog_status IN ('active', 'needs_review') ${allowDemoCatalog ? '' : "AND COALESCE(b.source_name, '') <> 'demo'"} GROUP BY b.id, t.name, reviews.review_count, reviews.score, category_ratings.tortilla, category_ratings.service, category_ratings.price, category_ratings.meat, category_ratings.salsas
     `, [id]);
     found = result.rows[0] ? normalizePlace(result.rows[0]) : undefined;
+    if (found && !isDisplayableCatalogPlace(found)) found = undefined;
   }
   if (found) {
     const photos = await getBranchPhotos(id);

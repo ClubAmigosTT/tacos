@@ -20,6 +20,34 @@ function rowsFrom(raw) {
   return Array.isArray(raw) ? raw : raw?.branches;
 }
 
+const GENERIC_NAME_TOKENS = new Set([
+  'a', 'al', 'antojito', 'antojitos', 'bar', 'carnita', 'carnitas', 'carne',
+  'comida', 'comidas', 'con', 'cocina', 'de', 'del', 'desayuno', 'desayunos',
+  'el', 'en', 'fonda', 'food', 'horas', 'la', 'las', 'los', 'mexicana',
+  'mexicano', 'mexicanos', 'puesto', 'restaurant', 'restaurante',
+  'restaurantes', 'sin', 'suadero', 'taco', 'tacos', 'taqueria', 'tortas',
+  'y', 'barbacoa', 'birria', 'pastor', 'canasta'
+]);
+
+const GENERIC_EXACT_NAMES = new Set([
+  'antojito', 'antojitos', 'barbacoa', 'birria', 'carnitas', 'comida',
+  'comida mexicana', 'comidas', 'cocina economica', 'desayuno', 'desayunos',
+  'food truck', 'mexicana', 'mexicano', 'puesto de tacos', 'restaurant',
+  'restaurante', 'restaurantes', 'suadero', 'taco', 'tacos', 'taqueria',
+  'tortas', 'tacos de canasta', 'zona de comida'
+]);
+
+function hasCommercialName(value) {
+  const normalized = text(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+  if (!normalized || GENERIC_EXACT_NAMES.has(normalized)) return false;
+  return normalized.split(' ').some((token) => !GENERIC_NAME_TOKENS.has(token) && !/^\d+$/.test(token) && token.length >= 2);
+}
+
 function catalogRowKey(row) {
   const sourceName = text(row?.sourceName);
   const sourcePlaceId = text(row?.sourcePlaceId);
@@ -65,6 +93,8 @@ if (!rows?.length && !configuredSource) {
 }
 
 if (!Array.isArray(rows) || !rows.length) throw new Error('El catálogo móvil debe contener al menos una sucursal');
+const inputRowsCount = rows.length;
+rows = rows.filter((row) => hasCommercialName(row?.name ?? row?.taqueriaName));
 // Keep valid review records visible in the offline snapshot.  They are not
 // treated as verified; the app labels them so we do not silently lose places
 // that came from DENUE, OSM, or a user-provided catalog.  Set the env flag to
@@ -217,10 +247,10 @@ const metadata = {
   exportedAt: text(raw.exportedAt, new Date().toISOString()),
   coverage: Array.isArray(raw.coverage) ? raw.coverage.map((item) => text(item)).filter(Boolean) : [],
   branchCount: places.length,
-  sourceRows: rows.length,
+  sourceRows: inputRowsCount,
   includedActive: places.filter((place) => place.catalogStatus === 'active').length,
   includedNeedsReview: places.filter((place) => place.catalogStatus === 'needs_review').length,
-  excludedRows: rows.length - places.length
+  excludedRows: inputRowsCount - places.length
 };
 
 // Keep the bundled snapshot compact.  The catalog is read-only generated data;

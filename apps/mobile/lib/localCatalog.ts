@@ -1,8 +1,12 @@
-import { places } from '@/data/catalog';
+import { places as bundledPlaces } from '@/data/catalog';
 import type { Place } from '@/data/fixtures';
+import { isDisplayablePlace, searchEvidence } from './catalogQuality';
 import { isOpenNow } from './hours';
 
-export { places };
+// Keep the offline catalog aligned with the public catalog rules. Older
+// snapshots can contain generic activity labels such as "TORTAS" or
+// "DESAYUNOS"; those are not commercial place names.
+export const places = bundledPlaces.filter(isDisplayablePlace);
 
 type Coordinates = { latitude: number; longitude: number };
 export type LocalCatalogQuery = {
@@ -65,7 +69,11 @@ export function localDiscover(options: LocalCatalogQuery = {}) {
       if (b.place.rating !== a.place.rating) return b.place.rating - a.place.rating;
       return a.place.name.localeCompare(b.place.name, 'es', { sensitivity: 'base' });
     })
-    .map(({ place, distance }) => ({ ...place, distance: distance == null ? 'cerca de ti' : `${distance.toFixed(1)} km` }));
+    .map(({ place, distance }) => ({
+      ...place,
+      distance: distance == null ? 'cerca de ti' : `${distance.toFixed(1)} km`,
+      searchEvidence: searchEvidence(place, options.q)
+    }));
 
   return candidates.slice(offset, offset + limit);
 }

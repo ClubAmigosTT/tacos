@@ -55,7 +55,7 @@ STYLE_PATTERNS = (
 )
 GENERIC_NAME_TOKENS = {
     "a", "al", "antojito", "antojitos", "bar", "carne", "comida",
-    "con", "cocina", "de", "del", "el", "en", "fonda", "la", "las",
+    "con", "cocina", "de", "del", "desayuno", "desayunos", "el", "en", "fonda", "horas", "la", "las",
     "los", "mexicana", "mexicano", "mexicanos", "nombre", "pizzeria",
     "puesto", "restaurante", "restaurantes", "sin", "taco", "tacos",
     "taqueria", "tortas", "y",
@@ -118,6 +118,19 @@ def style_for_name(name: str) -> str:
 
 def has_name_signal(name: str) -> bool:
     return bool(NAME_SIGNAL_RE.search(name))
+
+
+def has_commercial_name(name: str) -> bool:
+    """Reject activity labels that are not identifiable businesses."""
+    tokens = [token for token in normalized(name).split() if token]
+    if not tokens:
+        return False
+    return any(
+        len(token) >= 2
+        and token not in GENERIC_NAME_TOKENS
+        and not token.isdigit()
+        for token in tokens
+    )
 
 
 def business_type(name: str, primary_activity: bool) -> str:
@@ -207,6 +220,8 @@ def denue_branch(row: dict[str, str], release: str) -> dict[str, Any] | None:
     latitude = parse_coordinate(row.get("latitud"))
     longitude = parse_coordinate(row.get("longitud"))
     if not name or latitude is None or longitude is None:
+        return None
+    if not has_commercial_name(name):
         return None
     if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
         return None

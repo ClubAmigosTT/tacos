@@ -45,6 +45,29 @@ function normalizedKey(value) {
     .trim();
 }
 
+const GENERIC_NAME_TOKENS = new Set([
+  'a', 'al', 'antojito', 'antojitos', 'bar', 'carnita', 'carnitas', 'carne',
+  'comida', 'comidas', 'con', 'cocina', 'de', 'del', 'desayuno', 'desayunos',
+  'el', 'en', 'fonda', 'food', 'horas', 'la', 'las', 'los', 'mexicana',
+  'mexicano', 'mexicanos', 'puesto', 'restaurant', 'restaurante',
+  'restaurantes', 'sin', 'suadero', 'taco', 'tacos', 'taqueria', 'tortas',
+  'y', 'barbacoa', 'birria', 'pastor', 'canasta'
+]);
+
+const GENERIC_EXACT_NAMES = new Set([
+  'antojito', 'antojitos', 'barbacoa', 'birria', 'carnitas', 'comida',
+  'comida mexicana', 'comidas', 'cocina economica', 'desayuno', 'desayunos',
+  'food truck', 'mexicana', 'mexicano', 'puesto de tacos', 'restaurant',
+  'restaurante', 'restaurantes', 'suadero', 'taco', 'tacos', 'taqueria',
+  'tortas', 'tacos de canasta', 'zona de comida'
+]);
+
+function hasCommercialName(value) {
+  const name = normalizedKey(value);
+  if (!name || GENERIC_EXACT_NAMES.has(name)) return false;
+  return name.split(' ').some((token) => !GENERIC_NAME_TOKENS.has(token) && !/^\d+$/.test(token) && token.length >= 2);
+}
+
 const CDMX_ALCALDIAS = new Map([
   ['alvaro obregon', 'Álvaro Obregón'],
   ['azcapotzalco', 'Azcapotzalco'],
@@ -432,6 +455,7 @@ let highRows = 0;
 let namedHighRows = 0;
 let candidateRows = 0;
 let namedCandidateRows = 0;
+let skippedGenericRows = 0;
 let outsideRows = 0;
 let duplicateRows = 0;
 
@@ -450,6 +474,10 @@ for (const place of places) {
     place.name,
     text(place.brand, text(place.official_name, text(place.alt_name)))
   );
+  if (!hasCommercialName(originalName)) {
+    skippedGenericRows += 1;
+    continue;
+  }
   if (originalName) {
     if (confidence === 'high') namedHighRows += 1;
     else namedCandidateRows += 1;
@@ -471,7 +499,7 @@ for (const place of places) {
   }
   seenSourceIds.add(sourcePlaceId);
 
-  const name = originalName || 'Puesto de tacos por verificar';
+  const name = originalName;
   const key = dedupeKey(name, place.latitude, place.longitude);
   if (seenDedupeKeys.has(key)) {
     duplicateRows += 1;
@@ -485,7 +513,7 @@ for (const place of places) {
   const municipalityInfo = municipalityFor(place, coverage, canonicalMunicipalities);
   const municipality = municipalityInfo.name;
   const cuisineTags = text(place.cuisine).split(';');
-  const generatedName = !originalName;
+  const generatedName = false;
   const tags = unique([
     'tacos',
     'openstreetmap',
@@ -558,9 +586,9 @@ await writeFile(outputPath, `${JSON.stringify({
   exportedAt: new Date().toISOString(),
   coverage: ['Ciudad de México', 'Estado de México'],
   selection: includeCandidates
-    ? 'confidence=high o candidate dentro de los límites administrativos de CDMX o Edomex; los candidatos y lugares sin nombre quedan needs_review'
-    : 'confidence=high, nombre no vacío dentro de los límites administrativos de CDMX o Edomex',
-  stats: { inputRows: places.length, highRows, namedHighRows, candidateRows, namedCandidateRows, outsideRows, duplicateRows, branches: branches.length },
+    ? 'confidence=high o candidate con nombre comercial dentro de los límites administrativos de CDMX o Edomex; los candidatos quedan needs_review'
+    : 'confidence=high con nombre comercial dentro de los límites administrativos de CDMX o Edomex',
+  stats: { inputRows: places.length, highRows, namedHighRows, candidateRows, namedCandidateRows, skippedGenericRows, outsideRows, duplicateRows, branches: branches.length },
   branches
 }, null, 2)}\n`, 'utf8');
 
@@ -573,6 +601,7 @@ console.log(JSON.stringify({
   namedHighRows,
   candidateRows,
   namedCandidateRows,
+  skippedGenericRows,
   outsideRows,
   duplicateRows,
   branches: branches.length

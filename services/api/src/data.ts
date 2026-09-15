@@ -43,6 +43,7 @@ export type ApiPlace = {
   tacos: ApiTaco[];
   photos?: ApiPhoto[];
   tags: string[];
+  searchEvidence?: 'menu' | 'name' | 'catalog';
   flavorProfile: FlavorProfile;
   tasteMatch?: number;
   socialMatch?: number;
