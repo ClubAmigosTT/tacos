@@ -1,5 +1,5 @@
-import { PanResponder, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { useEffect, useRef, useState } from 'react';
+import { Animated, PanResponder, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { memo, useEffect, useRef } from 'react';
 import type { Place } from '@/data/fixtures';
 import { MapPin } from './MapPin';
 import { normalizeRadarText } from '@/lib/radar';
@@ -16,11 +16,11 @@ function pinPosition(place: Place) {
   return { top: `${top}%`, left: `${left}%` } as const;
 }
 
-export function MapCanvas({ places, active, tacoName, onSelect, userCoordinates, onRegionChangeComplete }: { places: Place[]; active: string; tacoName?: string; onSelect: (id: string) => void; userCoordinates?: { latitude: number; longitude: number }; onRegionChangeComplete?: (coordinates: { latitude: number; longitude: number }) => void }) {
+export const MapCanvas = memo(function MapCanvas({ places, active, tacoName, onSelect, userCoordinates, onRegionChangeComplete }: { places: Place[]; active: string; tacoName?: string; onSelect: (id: string) => void; userCoordinates?: { latitude: number; longitude: number }; onRegionChangeComplete?: (coordinates: { latitude: number; longitude: number }) => void }) {
   const viewport = useWindowDimensions();
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const panRef = useRef(pan);
-  const dragStartRef = useRef(pan);
+  const panValue = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const panRef = useRef({ x: 0, y: 0 });
+  const dragStartRef = useRef({ x: 0, y: 0 });
   const originRef = useRef(defaultCenter);
   const previousUserCoordinates = useRef<string | undefined>(undefined);
   const viewportRef = useRef(viewport);
@@ -33,8 +33,8 @@ export function MapCanvas({ places, active, tacoName, onSelect, userCoordinates,
     previousUserCoordinates.current = userCoordinatesKey;
     originRef.current = userCoordinates ?? defaultCenter;
     panRef.current = { x: 0, y: 0 };
-    setPan({ x: 0, y: 0 });
-  }, [userCoordinatesKey]);
+    panValue.setValue({ x: 0, y: 0 });
+  }, [panValue, userCoordinatesKey, userCoordinates]);
   const panResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => false,
     onMoveShouldSetPanResponder: (_event, gestureState) => Math.abs(gestureState.dx) > 4 || Math.abs(gestureState.dy) > 4,
@@ -46,7 +46,9 @@ export function MapCanvas({ places, active, tacoName, onSelect, userCoordinates,
         y: Math.max(-currentViewport.height * 0.28, Math.min(currentViewport.height * 0.28, dragStartRef.current.y + gestureState.dy))
       };
       panRef.current = next;
-      setPan(next);
+      // Keep the drag on the animated view. Updating React state here caused
+      // every marker to render again for every pointer movement.
+      panValue.setValue(next);
     },
     onPanResponderRelease: () => {
       const currentViewport = viewportRef.current;
@@ -60,8 +62,8 @@ export function MapCanvas({ places, active, tacoName, onSelect, userCoordinates,
   // Do not infer Pastor from the visual filter here: a neighborhood search
   // may leave that filter selected while pins should show branch ratings.
   const ratingTaco = tacoName;
-  return <View accessibilityRole="adjustable" accessibilityLabel="Mapa de taquerías; arrastra para explorar" style={styles.webMap} {...panResponder.panHandlers}><View style={[styles.mapContent, { transform: [{ translateX: pan.x }, { translateY: pan.y }] }]}><View style={styles.roadOne} /><View style={styles.roadTwo} /><View style={styles.roadThree} /><Text style={[styles.label, { top: '25%', left: '19%' }]}>NARVARTE</Text><Text style={[styles.label, { top: '44%', left: '57%' }]}>ROMA SUR</Text><Text style={[styles.label, { top: '67%', left: '72%' }]}>CONDESA</Text>{places.map((place) => { const taco = ratingTaco ? place.tacos.find((item) => normalizeRadarText(item.name) === normalizeRadarText(ratingTaco)) : undefined; const tacoLabel = taco ? `${taco.name} ${taco.rating > 0 ? taco.rating.toFixed(1) : '—'}` : undefined; const pinLabel = active === '92% para mí' ? (place.match != null ? `${place.match}%` : '—') : tacoLabel ?? (place.rating > 0 ? place.rating.toFixed(1) : '—'); return <Pressable key={place.id} accessibilityRole="button" accessibilityLabel={`Abrir ${place.name}, ${pinLabel}`} onPress={() => onSelect(place.id)} style={[styles.pinPosition, pinPosition(place)]}><MapPin label={pinLabel} accent={active === '92% para mí'} /></Pressable>; })}</View></View>;
-}
+  return <View accessibilityRole="adjustable" accessibilityLabel="Mapa de taquerías; arrastra para explorar" style={styles.webMap} {...panResponder.panHandlers}><Animated.View style={[styles.mapContent, panValue.getTranslateTransform()]}><View style={styles.roadOne} /><View style={styles.roadTwo} /><View style={styles.roadThree} /><Text style={[styles.label, { top: '25%', left: '19%' }]}>NARVARTE</Text><Text style={[styles.label, { top: '44%', left: '57%' }]}>ROMA SUR</Text><Text style={[styles.label, { top: '67%', left: '72%' }]}>CONDESA</Text>{places.map((place) => { const taco = ratingTaco ? place.tacos.find((item) => normalizeRadarText(item.name) === normalizeRadarText(ratingTaco)) : undefined; const tacoLabel = taco ? `${taco.name} ${taco.rating > 0 ? taco.rating.toFixed(1) : '—'}` : undefined; const pinLabel = active === '92% para mí' ? (place.match != null ? `${place.match}%` : '—') : tacoLabel ?? (place.rating > 0 ? place.rating.toFixed(1) : '—'); return <Pressable key={place.id} accessibilityRole="button" accessibilityLabel={`Abrir ${place.name}, ${pinLabel}`} onPress={() => onSelect(place.id)} style={[styles.pinPosition, pinPosition(place)]}><MapPin label={pinLabel} accent={active === '92% para mí'} /></Pressable>; })}</Animated.View></View>;
+});
 
 const styles = StyleSheet.create({
   webMap: { ...StyleSheet.absoluteFill, backgroundColor: colors.mapBase, overflow: 'hidden' },

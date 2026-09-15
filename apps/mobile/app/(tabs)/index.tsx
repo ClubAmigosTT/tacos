@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
-import { Link, router } from 'expo-router';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, router, useIsFocused, usePathname } from 'expo-router';
+import { FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
-import { lists as fixtureLists } from '@/data/fixtures';
+import { lists as fixtureLists, type Place } from '@/data/fixtures';
 import { feed as feedRequest, isDemoMode, lists as listsRequest, recommendations } from '@/lib/api';
 import { localRecommendations } from '@/lib/localCatalog';
 import { useAuth } from '@/lib/auth';
@@ -18,11 +18,14 @@ import { CatalogImage } from '@/components/CatalogImage';
 
 export default function HomeScreen() {
   const { token, user, loading: authLoading } = useAuth();
+  const isFocused = useIsFocused();
+  const pathname = usePathname();
+  const isVisible = isFocused || pathname === '/' || pathname.endsWith('/index');
   const [search, setSearch] = useState('');
   const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number }>();
   const demoMode = isDemoMode();
   useEffect(() => {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web' || !isVisible) return;
     let active = true;
     void (async () => {
       try {
@@ -33,10 +36,10 @@ export default function HomeScreen() {
       } catch { /* Location improves ranking but is never required to open the app. */ }
     })();
     return () => { active = false; };
-  }, []);
-  const { data = [], isError: recommendationsError, refetch: refetchRecommendations } = useQuery({ queryKey: ['recommendations', token, coordinates?.latitude, coordinates?.longitude], queryFn: () => recommendations(token, coordinates), initialData: () => localRecommendations(coordinates), enabled: !authLoading });
-  const { data: feedData, isError: feedError, refetch: refetchFeed } = useQuery({ queryKey: ['feed', 'home', token], queryFn: () => feedRequest(token!), enabled: !authLoading && Boolean(token), staleTime: 60_000 });
-  const { data: listData, isError: listsError, refetch: refetchLists } = useQuery({ queryKey: ['lists', 'home', token], queryFn: () => listsRequest(token), enabled: !authLoading, staleTime: 60_000 });
+  }, [isVisible]);
+  const { data = [], isError: recommendationsError, refetch: refetchRecommendations } = useQuery({ queryKey: ['recommendations', token, coordinates?.latitude, coordinates?.longitude], queryFn: () => recommendations(token, coordinates), initialData: () => localRecommendations(coordinates), enabled: !authLoading && isVisible });
+  const { data: feedData, isError: feedError, refetch: refetchFeed } = useQuery({ queryKey: ['feed', 'home', token], queryFn: () => feedRequest(token!), enabled: !authLoading && isVisible && Boolean(token), staleTime: 60_000 });
+  const { data: listData, isError: listsError, refetch: refetchLists } = useQuery({ queryKey: ['lists', 'home', token], queryFn: () => listsRequest(token), enabled: !authLoading && isVisible, staleTime: 60_000 });
   const featured = data[0];
   const featuredTaco = featured?.tacos.reduce((best, taco) => taco.rating > (best?.rating ?? 0) ? taco : best, featured.tacos[0]);
   const hour = new Date().getHours();
@@ -45,6 +48,7 @@ export default function HomeScreen() {
   const activityNeighborhoods = [...new Set(activityItems.map((item) => item.neighborhood).filter(Boolean))].slice(0, 2).join(' / ');
   const homeList = listData?.lists.find((list) => list.visibility !== 'private') ?? (!token && demoMode ? fixtureLists[0] : undefined);
   const listOwner = homeList?.owner.displayName ? `Por @${homeList.owner.displayName.toLowerCase().replace(/\s+/g, '')}` : 'Curaduría de la comunidad';
+  const renderPlaceCard = useCallback(({ item }: { item: Place }) => <PlaceCard place={item} />, []);
 
   function submitSearch() {
     const query = search.trim();
@@ -52,6 +56,7 @@ export default function HomeScreen() {
     else router.push('/(tabs)/map');
   }
 
+  if (!isVisible) return <View style={styles.screen} />;
   if (authLoading) return <View style={styles.loading}><Text style={styles.loadingText}>Preparando tu mapa de sabor…</Text></View>;
 
   return (
@@ -85,7 +90,7 @@ export default function HomeScreen() {
         </Link>
       ) : null}
 
-      <View style={styles.section}><SectionTitle eyebrow="cerca de ti" title="¿Dónde comemos?" action="Ver mapa →" onAction={() => router.push('/(tabs)/map')} /><ScrollView horizontal showsHorizontalScrollIndicator={false}>{data.map((place) => <PlaceCard key={place.id} place={place} />)}</ScrollView></View>
+      <View style={styles.section}><SectionTitle eyebrow="cerca de ti" title="¿Dónde comemos?" action="Ver mapa →" onAction={() => router.push('/(tabs)/map')} /><FlatList data={data} horizontal keyExtractor={(place) => place.id} renderItem={renderPlaceCard} showsHorizontalScrollIndicator={false} initialNumToRender={4} maxToRenderPerBatch={4} windowSize={3} /></View>
 
       <View style={styles.section}><SectionTitle eyebrow="entre amigos" title="Tus amigos andan comiendo" />{token && feedError ? <View style={styles.activityError}><View style={styles.activityErrorIcon}><Ionicons name="cloud-offline-outline" size={17} color={colors.meatDark} /></View><View style={styles.activityCopy}><Text style={styles.activityTitle}>No pudimos cargar tu actividad</Text><Text style={styles.activityMeta}>Tus conexiones siguen intactas.</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Reintentar actividad" style={styles.activityRetry} onPress={() => void refetchFeed()}><Text style={styles.activityRetryText}>Reintentar</Text></Pressable></View> : <Pressable style={styles.activity} onPress={() => router.push('/feed')}><View style={styles.activityAvatars}>{token && activityItems.length ? activityItems.slice(0, 3).map((item, index) => <View key={`${item.user_id}-${index}`} style={[styles.miniAvatar, { backgroundColor: [colors.avatarTerracotta, colors.avatarBlue, colors.avatarOchre][index] }]}><Text style={styles.miniAvatarText}>{item.display_name.slice(0, 1).toUpperCase()}</Text></View>) : demoMode ? <><View style={[styles.miniAvatar, { backgroundColor: colors.avatarTerracotta }]}><Text style={styles.miniAvatarText}>J</Text></View><View style={[styles.miniAvatar, { backgroundColor: colors.avatarBlue }]}><Text style={styles.miniAvatarText}>A</Text></View><View style={[styles.miniAvatar, { backgroundColor: colors.avatarOchre }]}><Text style={styles.miniAvatarText}>R</Text></View></> : <View style={styles.miniAvatarPlaceholder}><Ionicons name="people-outline" size={16} color={colors.textSecondary} /></View>}</View><View style={styles.activityCopy}><Text style={styles.activityTitle}>{token ? (activityItems.length ? 'Tu círculo está comiendo' : 'Encuentra gente con criterio') : demoMode ? 'Tus amigos están comiendo' : 'Construye tu círculo de tacos'}</Text><Text style={styles.activityMeta}>{token ? (activityItems.length ? `${activityItems.length} registros nuevos${activityNeighborhoods ? ` · ${activityNeighborhoods}` : ''}` : 'Sigue personas para llenar tu mapa social') : demoMode ? '3 registros nuevos · Roma / Narvarte' : 'Entra para seguir personas y ver actividad real'}</Text></View><Ionicons name="arrow-forward" size={17} color={colors.textSecondary} /></Pressable>}</View>
 

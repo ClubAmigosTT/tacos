@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { memo } from 'react';
 import { router } from 'expo-router';
 import { colors, spacing, typography } from '@/theme';
 import { RatingBadge } from './RatingBadge';
@@ -6,9 +7,10 @@ import { TacoCard } from './DesignSystem';
 import { CatalogImage } from './CatalogImage';
 import type { Place } from '@/data/fixtures';
 
-export function PlaceCard({ place, compact = false }: { place: Place; compact?: boolean }) {
+export const PlaceCard = memo(function PlaceCard({ place, compact = false }: { place: Place; compact?: boolean }) {
   const ratingLabel = place.rating > 0 ? place.rating.toFixed(2) : 'sin calificación';
   const matchLabel = place.match != null ? `${place.match}% para ti` : 'Afinidad aún no disponible';
+  const pendingReview = place.catalogStatus === 'needs_review';
   return (
     <TacoCard accessibilityLabel={`Abrir ${place.name}, ${ratingLabel}, ${matchLabel}`} style={[styles.card, compact && styles.compact]} onPress={() => router.push(`/place/${place.id}`)}>
       <CatalogImage uri={place.image} accessibilityLabel={`Imagen de ${place.name}`} style={[styles.image, compact && styles.compactImage]} />
@@ -20,12 +22,12 @@ export function PlaceCard({ place, compact = false }: { place: Place; compact?: 
         <Text style={styles.meta}>{place.neighborhood} · {place.distance}</Text>
         <View style={styles.bottomRow}>
           <Text style={styles.style}>{place.style}</Text>
-          <Text style={styles.match}>{matchLabel}</Text>
+          {pendingReview ? <Text style={styles.reviewLabel}>Por verificar</Text> : <Text style={styles.match}>{matchLabel}</Text>}
         </View>
       </View>
     </TacoCard>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: { padding: 0, overflow: 'hidden', width: 285, marginRight: spacing.md },
@@ -38,5 +40,6 @@ const styles = StyleSheet.create({
   meta: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular, fontSize: 12, marginTop: 5 },
   bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 13 },
   style: { color: colors.salsa, fontFamily: typography.fontFamily.medium, fontSize: 12, fontWeight: typography.weight.medium },
-  match: { color: colors.cilantroLight, fontFamily: typography.fontFamily.semibold, fontSize: 11, fontWeight: typography.weight.semibold }
+  match: { color: colors.cilantroLight, fontFamily: typography.fontFamily.semibold, fontSize: 11, fontWeight: typography.weight.semibold },
+  reviewLabel: { color: colors.tortilla, fontFamily: typography.fontFamily.semibold, fontSize: 10, fontWeight: typography.weight.semibold }
 });

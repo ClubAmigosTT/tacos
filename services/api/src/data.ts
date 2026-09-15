@@ -26,6 +26,8 @@ export type ApiPlace = {
   priceMin?: number;
   priceMax?: number;
   source?: { name?: string; url?: string; license?: string; attribution?: string; updatedAt?: string };
+  /** The source has valid coordinates but still needs catalog verification. */
+  catalogStatus?: 'active' | 'needs_review';
   distance: string;
   openUntil: string;
   rating: number;

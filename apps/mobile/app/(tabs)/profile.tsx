@@ -5,7 +5,7 @@ import { colors, radii, shadows, spacing, typography } from '@/theme';
 import { useAuth } from '@/lib/auth';
 import { diary as diaryRequest, isDemoMode, lists as listsRequest, taste as tasteRequest, trackEvent } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
+import { router, useIsFocused, usePathname } from 'expo-router';
 import { AsyncErrorState } from '@/components/AsyncErrorState';
 import { TasteSignature } from '@/components/TasteSignature';
 import { TacoChip } from '@/components/DesignSystem';
@@ -20,10 +20,13 @@ const profileTabs = [
 
 export default function ProfileScreen() {
   const { user, token, loading: authLoading, signOut } = useAuth();
-  useEffect(() => { void trackEvent('profile_open', {}, token); }, [token]);
-  const { data, isError: diaryError, refetch: refetchDiary } = useQuery({ queryKey: ['diary', 'profile', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token && !authLoading) });
-  const { data: listData, isError: listsError, refetch: refetchLists } = useQuery({ queryKey: ['lists', 'profile', token], queryFn: () => listsRequest(token), enabled: Boolean(token && !authLoading) });
-  const { data: tasteData, isError: tasteError, refetch: refetchTaste } = useQuery({ queryKey: ['taste', token], queryFn: () => tasteRequest(token!), enabled: Boolean(token && !authLoading) });
+  const isFocused = useIsFocused();
+  const pathname = usePathname();
+  const isVisible = isFocused || pathname === '/profile' || pathname.endsWith('/profile');
+  useEffect(() => { if (isVisible) void trackEvent('profile_open', {}, token); }, [isVisible, token]);
+  const { data, isError: diaryError, refetch: refetchDiary } = useQuery({ queryKey: ['diary', 'profile', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token && !authLoading && isVisible) });
+  const { data: listData, isError: listsError, refetch: refetchLists } = useQuery({ queryKey: ['lists', 'profile', token], queryFn: () => listsRequest(token), enabled: Boolean(token && !authLoading && isVisible) });
+  const { data: tasteData, isError: tasteError, refetch: refetchTaste } = useQuery({ queryKey: ['taste', token], queryFn: () => tasteRequest(token!), enabled: Boolean(token && !authLoading && isVisible) });
   const entries = data?.entries ?? [];
   const demoMode = isDemoMode();
   const visits = user ? entries.length : demoMode ? 17 : '—';
@@ -31,6 +34,7 @@ export default function ProfileScreen() {
   const listCount = user ? (listData?.lists.filter((list) => list.owner.id === user.id).length ?? 0) : demoMode ? 12 : '—';
   const exploredZones = user ? new Set(entries.map((entry) => entry.neighborhood).filter(Boolean)).size : demoMode ? 3 : '—';
   const tasteId = tasteData?.taste;
+  if (!isVisible) return <View style={styles.screen} />;
   if (authLoading) return <View style={styles.loading}><Text style={styles.loadingText}>Cargando tu perfil…</Text></View>;
   if (user && (diaryError || listsError || tasteError)) return <AsyncErrorState title="No pudimos cargar tu perfil" detail="Tu diario y tus listas siguen guardados. Comprueba la conexión e inténtalo de nuevo." onAction={() => { void refetchDiary(); void refetchLists(); void refetchTaste(); }} />;
   return (

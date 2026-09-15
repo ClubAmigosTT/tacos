@@ -1,10 +1,10 @@
 import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { feed as feedRequest, reportVisit, trackEvent } from '@/lib/api';
+import { feed as feedRequest, reportVisit, trackEvent, type FeedItem } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, spacing, typography } from '@/theme';
 import { RatingBadge } from '@/components/RatingBadge';
@@ -17,15 +17,25 @@ export default function FeedScreen() {
   const { data, isError, refetch } = useQuery({ queryKey: ['feed', token], queryFn: () => feedRequest(token!), enabled: Boolean(token && !authLoading) });
   const items = data?.items ?? [];
   const reportMutation = useMutation({ mutationFn: (visitId: string) => reportVisit({ visitId, reason: 'other' }, token!), onSuccess: () => Alert.alert('Gracias', 'Revisaremos este registro.'), onError: () => Alert.alert('No se pudo reportar', 'Inténtalo de nuevo más tarde.') });
-  function openReport(visitId: string) {
+  const openReport = useCallback((visitId: string) => {
     Alert.alert('Reportar registro', '¿Qué quieres reportar?', [{ text: 'Cancelar', style: 'cancel' }, { text: 'Reportar', style: 'destructive', onPress: () => reportMutation.mutate(visitId) }]);
-  }
+  }, [reportMutation]);
+  const renderItem = useCallback(({ item }: { item: FeedItem }) => <FeedItemCard item={item} reportPending={reportMutation.isPending} onReport={openReport} />, [openReport, reportMutation.isPending]);
   if (authLoading) return <View style={styles.center}><Text style={styles.loadingText}>Cargando tu actividad…</Text></View>;
   if (token && isError) return <AsyncErrorState title="No pudimos cargar tu actividad" detail="Tus conexiones siguen intactas. Revisa la conexión e inténtalo de nuevo." onAction={() => void refetch()} />;
-  return <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+  const header = <View>
     <View style={styles.header}><Pressable style={styles.back} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color={colors.textPrimary} /></Pressable><View style={styles.headerCopy}><Text style={styles.eyebrow}>SEÑALES DE CONFIANZA</Text><Text style={styles.title}>Actividad</Text></View><Pressable style={styles.peopleButton} onPress={() => router.push('/people')}><Ionicons name="person-add-outline" size={18} color={colors.background} /></Pressable></View>
-    {!user ? <Pressable style={styles.loginCard} onPress={() => router.push('/auth')}><View style={styles.loginIcon}><Ionicons name="people-outline" size={18} color={colors.background} /></View><View style={{ flex: 1 }}><Text style={styles.loginTitle}>Sigue a gente con criterio</Text><Text style={styles.loginDetail}>Entra para construir un feed a tu medida.</Text></View><Ionicons name="chevron-forward" size={17} color={colors.textSecondary} /></Pressable> : items.length ? items.map((item) => <View style={styles.item} key={item.id}><View style={styles.itemTop}><Pressable style={styles.personIdentity} onPress={() => router.push(`/user/${item.user_id}`)}><View style={styles.avatar}><Text style={styles.avatarText}>{item.display_name.slice(0, 1).toUpperCase()}</Text></View><View style={styles.itemCopy}><Text style={styles.itemTitle}><Text style={styles.bold}>{item.display_name}</Text> registró una visita</Text><Text style={styles.itemTime}>{new Date(item.visited_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}</Text></View></Pressable><RatingBadge rating={Number(item.rating)} accent /><Pressable style={styles.reportButton} disabled={reportMutation.isPending} onPress={() => openReport(item.id)}><Ionicons name="ellipsis-horizontal" size={18} color={colors.textSecondary} /></Pressable></View><Pressable style={styles.placeRow} onPress={() => router.push(`/place/${item.place_id}`)}><CatalogImage uri={item.image_url} accessibilityLabel={`Imagen de ${item.place_name}`} style={styles.placeImage} /><View style={styles.placeCopy}><Text style={styles.placeName}>{item.place_name}</Text><Text style={styles.placeMeta}>{item.neighborhood} · {item.tacos || 'Tacos'}</Text></View><Ionicons name="arrow-forward" size={17} color={colors.textSecondary} /></Pressable>{item.note ? <Text style={styles.itemNote}>“{item.note}”</Text> : null}<Pressable style={styles.commentsButton} onPress={() => router.push({ pathname: '/comments', params: { visitId: item.id, placeName: item.place_name } })}><Ionicons name="chatbubble-ellipses-outline" size={15} color={colors.tortilla} /><Text style={styles.commentsText}>{item.comment_count ? `${item.comment_count} comentario${item.comment_count === 1 ? '' : 's'}` : 'Comentar'}</Text><Ionicons name="chevron-forward" size={14} color={colors.textTertiary} /></Pressable></View>) : <View style={styles.empty}><Ionicons name="people-outline" size={28} color={colors.textTertiary} /><Text style={styles.emptyTitle}>Tu feed está en silencio</Text><Text style={styles.emptyText}>Busca personas y síguelas para ver sus visitas, ratings y descubrimientos.</Text><Pressable style={styles.primary} onPress={() => router.push('/people')}><Text style={styles.primaryText}>Encontrar personas</Text></Pressable></View>}
-  </ScrollView>;
+    {!user ? <Pressable style={styles.loginCard} onPress={() => router.push('/auth')}><View style={styles.loginIcon}><Ionicons name="people-outline" size={18} color={colors.background} /></View><View style={{ flex: 1 }}><Text style={styles.loginTitle}>Sigue a gente con criterio</Text><Text style={styles.loginDetail}>Entra para construir un feed a tu medida.</Text></View><Ionicons name="chevron-forward" size={17} color={colors.textSecondary} /></Pressable> : null}
+  </View>;
+  return <FlatList data={user ? items : []} keyExtractor={(item) => item.id} renderItem={renderItem} style={styles.screen} contentContainerStyle={styles.content} ListHeaderComponent={header} ListEmptyComponent={user ? <EmptyFeed /> : null} showsVerticalScrollIndicator={false} />;
+}
+
+function FeedItemCard({ item, reportPending, onReport }: { item: FeedItem; reportPending: boolean; onReport: (visitId: string) => void }) {
+  return <View style={styles.item}><View style={styles.itemTop}><Pressable style={styles.personIdentity} onPress={() => router.push(`/user/${item.user_id}`)}><View style={styles.avatar}><Text style={styles.avatarText}>{item.display_name.slice(0, 1).toUpperCase()}</Text></View><View style={styles.itemCopy}><Text style={styles.itemTitle}><Text style={styles.bold}>{item.display_name}</Text> registró una visita</Text><Text style={styles.itemTime}>{new Date(item.visited_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}</Text></View></Pressable><RatingBadge rating={Number(item.rating)} accent /><Pressable style={styles.reportButton} disabled={reportPending} onPress={() => onReport(item.id)}><Ionicons name="ellipsis-horizontal" size={18} color={colors.textSecondary} /></Pressable></View><Pressable style={styles.placeRow} onPress={() => router.push(`/place/${item.place_id}`)}><CatalogImage uri={item.image_url} accessibilityLabel={`Imagen de ${item.place_name}`} style={styles.placeImage} /><View style={styles.placeCopy}><Text style={styles.placeName}>{item.place_name}</Text><Text style={styles.placeMeta}>{item.neighborhood} · {item.tacos || 'Tacos'}</Text></View><Ionicons name="arrow-forward" size={17} color={colors.textSecondary} /></Pressable>{item.note ? <Text style={styles.itemNote}>“{item.note}”</Text> : null}<Pressable style={styles.commentsButton} onPress={() => router.push({ pathname: '/comments', params: { visitId: item.id, placeName: item.place_name } })}><Ionicons name="chatbubble-ellipses-outline" size={15} color={colors.tortilla} /><Text style={styles.commentsText}>{item.comment_count ? `${item.comment_count} comentario${item.comment_count === 1 ? '' : 's'}` : 'Comentar'}</Text><Ionicons name="chevron-forward" size={14} color={colors.textTertiary} /></Pressable></View>;
+}
+
+function EmptyFeed() {
+  return <View style={styles.empty}><Ionicons name="people-outline" size={28} color={colors.textTertiary} /><Text style={styles.emptyTitle}>Tu feed está en silencio</Text><Text style={styles.emptyText}>Busca personas y síguelas para ver sus visitas, ratings y descubrimientos.</Text><Pressable style={styles.primary} onPress={() => router.push('/people')}><Text style={styles.primaryText}>Encontrar personas</Text></Pressable></View>;
 }
 
 const styles = StyleSheet.create({

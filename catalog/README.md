@@ -185,6 +185,181 @@ quedan marcadas como `community` hasta que una fuente las confirme. Si una
 reimportación posterior actualiza el mismo registro desde OSM, la corrección
 debe revisarse nuevamente.
 
+## Reconciliación de Google Place IDs (v2)
+
+La búsqueda usa las fronteras regionales de OSM y una cuadrícula inicial de
+0.12 grados. Incluye todas las partes de polígonos múltiples y las celdas que
+intersectan franjas estrechas del límite. Primero recorre “tacos” y “taquería”,
+después los términos específicos. Los resultados de Google no garantizan un
+inventario completo ni equivalencia exacta con la aplicación Google Maps.
+
+Cada consulta recibe hasta tres páginas de 20 resultados. Si llega a 60,
+divide la celda en cuatro y encola sus consultas. La subdivisión termina cuando
+cada hijo sería menor que 0.015 grados (aproximadamente 1.6 km); si continúa
+saturada, aparece como saturated en el reporte. No se declara cobertura completa
+al alcanzar un límite de solicitudes.
+
+### Modos y consumo
+
+El modo predeterminado es sólo IDs: pide exactamente places.id,nextPageToken.
+Con esos campos no se puede determinar si un negocio falta en DENUE/OSM:
+los nuevos IDs quedan como unverified. El área registrada en ese modo corresponde
+al rectángulo consultado; no es una coordenada ni una pertenencia administrativa
+verificada del lugar.
+
+La opción --compare pide también displayName, formattedAddress y location:
+corresponde a Text Search Pro y puede generar consumo facturable. Compara en
+memoria contra TODO el catálogo, incluidos needs_review y archived; no guarda
+esos campos de Google en la base ni publica negocios automáticamente.
+
+Los límites predeterminados son 60 intentos HTTP por corrida y 300 acumulados
+por plan. Ambos cuentan errores y se aplican también a las subdivisiones.
+No hay un modo ilimitado. Estos límites son de solicitudes, no un presupuesto
+monetario ni una garantía de gratuidad; otros procesos del proyecto pueden
+consumir la misma cuota.
+
+Ver [campos, límites y facturación de Text Search](https://developers.google.com/maps/documentation/places/web-service/text-search).
+
+### Ejecución
+
+Configurar GOOGLE_PLACES_API_KEY como secreto del entorno. No usar claves en
+argumentos de consola, archivos versionados ni mensajes. Desde la raíz:
+
+~~~powershell
+# Planificar sin consultas ni cambios en SQLite
+python scripts/discover-google-place-ids.py --compare --dry-run
+
+# Descubrir únicamente IDs
+python scripts/discover-google-place-ids.py --ids-only --max-requests 60
+
+# Comparar con campos Pro, bajo límites explícitos
+python scripts/discover-google-place-ids.py --compare --max-requests 60 --max-plan-requests 300
+
+# Recalcular reportes locales sin consultar Google
+python scripts/discover-google-place-ids.py --compare --report-only
+~~~
+
+Repetir el mismo comando continúa su plan. Guarda el token y número de página
+después de cada respuesta. Si un token expira (400), reinicia esa celda en la
+siguiente corrida y conserva los IDs; una repetición excepcional puede consumir
+solicitudes. Una interrupción recupera la consulta running. Un bloqueo SQLite
+impide ejecutar dos trabajadores sobre la misma base simultáneamente.
+
+El plan se identifica por modo, región, términos, cuadrícula, tamaño mínimo y
+huellas del catálogo/fronteras. Cambiar esos parámetros crea otro plan con su
+propio límite. Los planes antiguos siguen guardados; no mezclamos sus consultas
+pendientes con las del plan actual. Los 26 trabajos terminados del prototipo
+no sustituyen una auditoría v2 porque no guardaban todos los datos de avance.
+
+### Resultados e interpretación
+
+- matched: coincidencia probable con un registro activo.
+- matched_unpublished: coincidencia probable con un registro de la base que
+  no está publicado; matchedCatalogStatus explica su estado.
+- review: coincidencia ambigua, nombre débil o varios puestos cercanos.
+- missing: candidato sin coincidencia confiable después de comparar toda la
+  base; todavía requiere validación humana, no es una ausencia confirmada.
+- unverified: sólo se obtuvo el ID, faltan campos para comparar o procede del
+  prototipo pendiente de revisar.
+
+La dirección por sí sola nunca confirma identidad. El emparejamiento requiere
+nombre distintivo y cercanía; varios candidatos con puntuación parecida quedan
+en revisión. La puntuación es una heurística, no una probabilidad calibrada.
+
+SQLite y las exportaciones viven en catalog/:
+
+- google-place-candidates.sqlite: IDs únicos y avance por plan.
+- google-place-candidates.json y .csv: candidatos acumulados.
+- google-place-ids-missing.txt: posibles faltantes evaluados con v2.
+- google-place-ids-review.txt: casos ambiguos evaluados con v2.
+- google-place-ids-unpublished.txt: coincidencias no publicadas.
+- google-place-ids-unverified.txt: IDs pendientes de evaluar/revalidar.
+
+El JSON incluye además el avance DEL PLAN SELECCIONADO por zona y término,
+y los rectángulos completos con estados pending, running, error, completed,
+split o saturated. Los totales de candidatos son acumulados de toda la base.
+Los resultados del prototipo conservan su clasificación anterior como
+previousMatchStatus, pero se exportan como unverified hasta volver a compararlos.
+No podemos reconstruir sus nombres/coordenadas: sólo se conservaron sus IDs.
+
+Importar a PostgreSQL requiere DATABASE_URL, aplicar las migraciones 027 y 028,
+y ejecutar pnpm catalog:import:google. La importación conserva las relaciones con
+branches; no cambia el catálogo de la app. Este cambio no requiere TestFlight.
+
+Pruebas sin red:
+
+~~~powershell
+python -m unittest discover -s scripts -p test_google_discovery.py
+~~~
+
+## Candidatos manuales de búsqueda
+
+Los CSV colocados en `Downloads/BAses tacos` se procesan como una fuente de
+staging, no como un catálogo publicable. El importador normaliza nombres y
+direcciones, elimina filas repetidas y compara los candidatos con todas las
+sucursales regionales actuales. No exporta URLs de imágenes de Google, no
+agrega filas a la app y no convierte un candidato en una taquería confirmada.
+
+Ejecutar desde la raíz del proyecto:
+
+```bash
+pnpm catalog:import:manual
+```
+
+También se puede indicar otra carpeta:
+
+```bash
+python scripts/import_manual_taco_candidates.py --input-dir "C:\\ruta\\a\\csv"
+```
+
+Los reportes locales se guardan en `catalog/reports/manual-candidates/`:
+
+- `manual-candidates-summary.json`: volumen, completitud, duplicados y estados.
+- `manual-candidates.csv`: todos los candidatos deduplicados.
+- `manual-candidates-review.csv`: faltantes potenciales y coincidencias dudosas.
+- `manual-candidates-new.csv`: candidatos sin coincidencia confiable.
+- `manual-candidates-matched.csv`: lugares que ya tienen coincidencia clara.
+
+Para intentar obtener coordenadas de los candidatos con calle y número usando
+OSM/Nominatim, ejecuta una sola corrida controlada:
+
+```bash
+pnpm catalog:geocode:manual
+```
+
+El proceso usa una sola secuencia, pausa al menos un segundo entre solicitudes,
+guarda cada respuesta en `nominatim-cache.json` y puede reanudarse sin repetir
+consultas. Produce `manual-candidates-geocoded-ready.csv` para coordenadas
+fuertes, `manual-candidates-address-review.csv` para coordenadas obtenidas
+por dirección y `manual-candidates-geocoded-review.csv` para los casos
+ambiguos. Las filas `address_low_confidence` son puntos de calle aproximados,
+no la ubicación confirmada del negocio.
+Las coordenadas son candidatas: todavía no modifican el catálogo ni la app.
+Para una operación quincenal se debe usar una instancia propia o un proveedor
+con cuota apropiada; el servicio público de Nominatim no es un backend genérico
+de geocodificación recurrente.
+
+Para publicar únicamente la primera tanda de alta confianza en la app móvil:
+
+```bash
+pnpm catalog:publish:manual
+pnpm catalog:build:mobile
+```
+
+La política de publicación exige `missing_candidate`, una señal fuerte de
+tacos, coordenadas `geocoded` obtenidas con nombre y dirección, y ausencia de
+duplicado espacial/nombre. No publica calificaciones, reseñas, fotos ni
+horarios tomados de los CSV; esos campos quedan pendientes de enriquecimiento.
+Los registros que sólo tienen un punto aproximado de calle permanecen en
+`manual-candidates-publish-review.csv` para revisión antes de aparecer en el
+mapa.
+
+Los estados son `matched`, `review`, `missing_candidate` y `rejected`. Un
+`missing_candidate` todavía requiere coordenadas y verificación independiente
+con DENUE, OSM, el sitio del negocio o una propuesta de la comunidad. Sólo
+después de esa revisión se debe crear una sucursal con fuente, licencia,
+atribución y coordenadas válidas.
+
 ## DENUE: cobertura regional sin consultas de pago
 
 La edición vigente descargada para este proyecto es DENUE mayo de 2026. La

@@ -1,0 +1,191 @@
+name: Tacos iOS TestFlight
+
+on:
+  # This workflow is deliberately manual. A push must never start an iOS
+  # compilation accidentally.
+  workflow_dispatch:
+    inputs:
+      release_note:
+        description: "Nota interna para identificar la ejecución"
+        required: false
+        default: "Tacos iOS release"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tacos-ios-testflight
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "24"
+  PNPM_VERSION: "11.19.0"
+  EAS_CLI_VERSION: "23.2.0"
+
+jobs:
+  preflight:
+    name: Validar antes de usar macOS
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+      EXPO_PUBLIC_DEMO_MODE: "false"
+      EAS_BUILD_PROFILE: production
+      EAS_BUILD_PLATFORM: ios
+      EXPO_TOKEN_VALUE: ${{ secrets.EXPO_TOKEN }}
+      APPSTORE_ISSUER_ID_VALUE: ${{ secrets.APPSTORE_ISSUER_ID }}
+      APPSTORE_API_KEY_ID_VALUE: ${{ secrets.APPSTORE_API_KEY_ID }}
+      APPSTORE_API_PRIVATE_KEY_VALUE: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Validar secretos y variables sin imprimir valores
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in EXPO_PUBLIC_API_URL EXPO_TOKEN_VALUE APPSTORE_ISSUER_ID_VALUE APPSTORE_API_KEY_ID_VALUE APPSTORE_API_PRIVATE_KEY_VALUE; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+          if ((${#missing[@]} > 0)); then
+            printf '::error title=Faltan valores de publicación::Configura en GitHub: %s\n' "${missing[*]}"
+            exit 1
+          fi
+          if [[ "$EXPO_PUBLIC_API_URL" != https://* ]]; then
+            echo "::error title=API de producción inválida::EXPO_PUBLIC_API_URL debe ser una URL HTTPS de Render."
+            exit 1
+          fi
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Validaciones de configuración y entradas
+        run: |
+          pnpm smoke:config
+          pnpm smoke:inputs
+
+      - name: Validar configuración iOS de producción
+        shell: bash
+        run: |
+          set -euo pipefail
+          config_json="$(pnpm --filter @tacos/mobile exec expo config --type public --json)"
+          node -e '
+            const config = JSON.parse(process.argv[1]);
+            if (config.ios?.bundleIdentifier !== "com.clubamigostt.tacos") throw new Error("Cambió el bundle ID de iOS");
+            if (config.owner !== "clubamigostt") throw new Error("Cambió el propietario de Expo");
+            if (config.extra?.eas?.projectId !== "155a5800-f93e-4680-9cc4-02450eb830b6") throw new Error("Cambió el proyecto EAS");
+            if (config.ios?.supportsTablet !== false) throw new Error("La versión actual debe seguir siendo solo iPhone");
+          ' "$config_json"
+
+      - name: Validar catálogo y fotos empaquetadas
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s apps/mobile/data/catalog.ts
+          photos="$(find apps/mobile/assets/catalog-dummies -type f -name '*.jpg' | wc -l | tr -d ' ')"
+          if ((photos < 27)); then
+            echo "::error title=Faltan fotos locales::Se esperaban al menos 27 imágenes y se encontraron $photos."
+            exit 1
+          fi
+          echo "Catálogo generado y $photos fotos locales disponibles."
+
+      - name: Exportar bundle web de Expo
+        run: pnpm --filter @tacos/mobile exec expo export --platform web
+
+  build-and-submit:
+    name: Compilar en macOS y subir a TestFlight
+    needs: preflight
+    runs-on: macos-26
+    timeout-minutes: 75
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+      EXPO_PUBLIC_DEMO_MODE: "false"
+      EAS_BUILD_PROFILE: production
+      EAS_BUILD_PLATFORM: ios
+      EAS_LOCAL_BUILD_SKIP_CLEANUP: "1"
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Mostrar toolchain de Apple
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          sdk_version="$(xcrun --sdk iphoneos --show-sdk-version)"
+          echo "SDK de iPhone: $sdk_version"
+          sdk_major="${sdk_version%%.*}"
+          if ((sdk_major < 26)); then
+            echo "::error title=SDK de iOS no compatible::Se requiere un SDK de iOS 26 o posterior para la publicación actual."
+            exit 1
+          fi
+
+      - name: Compilar IPA localmente sin EAS Build cloud
+        working-directory: apps/mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/Tacos.ipa"
+          pnpm dlx eas-cli@${EAS_CLI_VERSION} build \
+            --platform ios \
+            --profile production \
+            --local \
+            --non-interactive \
+            --freeze-credentials \
+            --output "$output"
+          test -s "$output"
+          echo "IPA_PATH=$output" >> "$GITHUB_ENV"
+
+      - name: Subir IPA a TestFlight
+        uses: apple-actions/upload-testflight-build@v4
+        with:
+          app-path: ${{ env.IPA_PATH }}
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          uses-non-exempt-encryption: "false"
+          wait-for-processing: "false"
+
+      - name: Resumen
+        shell: bash
+        run: |
+          {
+            echo "## Tacos iOS"
+            echo ""
+            echo "IPA compilado en runner macOS y enviado a App Store Connect."
+            echo "Apple puede tardar unos minutos en procesarlo antes de mostrarlo en TestFlight."
+            echo "Nota: ${{ inputs.release_note }}"
+          } >> "$GITHUB_STEP_SUMMARY"

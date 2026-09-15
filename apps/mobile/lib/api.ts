@@ -26,7 +26,29 @@ export type CatalogProposal = { id: string; kind: 'branch' | 'menu_item' | 'corr
 const configuredUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
 const API_URL = configuredUrl?.replace(/\/$/, '');
 const DEMO_MODE = Constants.expoConfig?.extra?.demoMode === true;
-const REQUEST_TIMEOUT_MS = 15_000;
+// Keep offline/error states responsive while allowing the Render service time
+// to wake up on a cold request.
+const REQUEST_TIMEOUT_MS = 10_000;
+
+// The catalog snapshot owns the temporary bundled media. The API may be
+// healthy while its catalog row still has no image, so hydrate only missing
+// media from the local snapshot and preserve approved/community photos.
+function withBundledCatalogMedia(place: Place): Place {
+  if (place.image?.trim() || place.photos?.length) return place;
+  const bundled = localPlace(place.id);
+  if (!bundled) return place;
+  return {
+    ...place,
+    image: bundled.image,
+    imageIsIllustrative: bundled.imageIsIllustrative,
+    photos: bundled.photos
+  };
+}
+
+function withBundledCatalogMediaList(items: Place[]) {
+  return items.map(withBundledCatalogMedia);
+}
+
 const ANONYMOUS_ID_KEY = 'tacos.analytics.anonymous_id';
 let anonymousIdPromise: Promise<string> | undefined;
 export class ApiError extends Error {
@@ -63,10 +85,12 @@ async function getAnonymousId() {
   return anonymousIdPromise;
 }
 
-async function request<T>(path: string, options?: RequestInit, token?: string): Promise<T> {
+async function request<T>(path: string, options?: RequestInit, token?: string, requestSignal?: AbortSignal): Promise<T> {
   if (!API_URL) throw new Error('API URL no configurada');
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const abortRequest = () => controller.abort();
+  requestSignal?.addEventListener('abort', abortRequest, { once: true });
   const headers: HeadersInit = {
     ...(options?.body ? { 'Content-Type': 'application/json' } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -82,6 +106,7 @@ async function request<T>(path: string, options?: RequestInit, token?: string): 
     return response.json() as Promise<T>;
   } finally {
     clearTimeout(timeout);
+    requestSignal?.removeEventListener('abort', abortRequest);
   }
 }
 
@@ -107,7 +132,7 @@ export async function reviewBranchPhoto(photoId: string, action: 'approve' | 're
   return request<{ status: string; photoId: string }>(`/v1/admin/photos/${encodeURIComponent(photoId)}`, { method: 'PATCH', body: JSON.stringify({ action, moderationNote }) }, token);
 }
 
-export async function discover(options: { q?: string; lat?: number; lng?: number; radiusKm?: number; offset?: number; openNow?: boolean; limit?: number } = {}, token?: string): Promise<Place[]> {
+export async function discover(options: { q?: string; lat?: number; lng?: number; radiusKm?: number; offset?: number; openNow?: boolean; limit?: number } = {}, token?: string, signal?: AbortSignal): Promise<Place[]> {
   try {
     const params = new URLSearchParams();
     if (options.q?.trim()) params.set('q', options.q.trim());
@@ -118,12 +143,14 @@ export async function discover(options: { q?: string; lat?: number; lng?: number
     if (options.openNow != null) params.set('openNow', String(options.openNow));
     if (options.limit != null) params.set('limit', String(options.limit));
     const query = params.toString();
-    const result = await request<{ places: Place[] }>(`/v1/discover${query ? `?${query}` : ''}`, undefined, token);
+    const result = await request<{ places: Place[] }>(`/v1/discover${query ? `?${query}` : ''}`, undefined, token, signal);
     // A healthy API with an empty catalog must not erase the small bundled
     // fallback for the normal browse screen. Search queries still preserve a
     // genuine empty result.
-    return result.places.length || options.q?.trim() ? result.places : localDiscover(options);
+    const hydratedPlaces = withBundledCatalogMediaList(result.places);
+    return hydratedPlaces.length || options.q?.trim() ? hydratedPlaces : localDiscover(options);
   } catch (cause) {
+    if (signal?.aborted) throw cause;
     // The small high-confidence snapshot remains useful while the server is
     // waking up or the device is temporarily offline.
     return localDiscover(options);
@@ -134,7 +161,8 @@ export async function recommendations(token?: string, location?: { latitude: num
   try {
     const params = location ? `?lat=${encodeURIComponent(String(location.latitude))}&lng=${encodeURIComponent(String(location.longitude))}` : '';
     const result = await request<{ places: Place[] }>(`/v1/recommendations${params}`, undefined, token);
-    return result.places.length ? result.places : localRecommendations(location);
+    const hydratedPlaces = withBundledCatalogMediaList(result.places);
+    return hydratedPlaces.length ? hydratedPlaces : localRecommendations(location);
   } catch (cause) {
     // Personal signals disappear offline, but the local catalog remains
     // available so Inicio never becomes an empty error state.
@@ -152,7 +180,7 @@ export async function passport(token: string) {
 
 export async function getPlace(id: string, token?: string): Promise<Place> {
   try {
-    return await request<Place>(`/v1/branches/${id}`, undefined, token);
+    return withBundledCatalogMedia(await request<Place>(`/v1/branches/${id}`, undefined, token));
   } catch (cause) {
     // A real 4xx means the branch is gone or the link is invalid. Network and
     // 5xx failures may still use the bundled catalog while the API recovers.
@@ -193,7 +221,8 @@ export async function unsavePlace(placeId: string, token: string) {
 
 export async function getTaqueria(id: string) {
   try {
-    return await request<ApiTaqueria>(`/v1/taquerias/${id}`);
+    const result = await request<ApiTaqueria>(`/v1/taquerias/${id}`);
+    return { ...result, branches: withBundledCatalogMediaList(result.branches) };
   } catch (cause) {
     if (cause instanceof ApiError && cause.status < 500) throw cause;
     const fallback = localTaqueria(id);
@@ -321,8 +350,8 @@ export async function removeListItem(listId: string, branchId: string, token: st
   return request<{ status: string; listId: string; branchId: string }>(`/v1/lists/${listId}/items/${encodeURIComponent(branchId)}`, { method: 'DELETE' }, token);
 }
 
-export async function searchUsers(query: string, token?: string) {
-  return request<{ users: AuthUser[] }>(`/v1/users/search?q=${encodeURIComponent(query)}`, undefined, token);
+export async function searchUsers(query: string, token?: string, signal?: AbortSignal) {
+  return request<{ users: AuthUser[] }>(`/v1/users/search?q=${encodeURIComponent(query)}`, undefined, token, signal);
 }
 
 export async function userProfile(userId: string, token?: string) {

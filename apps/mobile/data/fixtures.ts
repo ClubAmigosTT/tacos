@@ -41,7 +41,10 @@ export type Place = {
   priceMin?: number;
   priceMax?: number;
   source?: { name?: string; url?: string; license?: string; attribution?: string; updatedAt?: string };
+  /** The source has valid coordinates but still needs catalog verification. */
+  catalogStatus?: 'active' | 'needs_review';
   image: string;
+  imageIsIllustrative?: boolean;
   description: string;
   tacos: Taco[];
   photos?: Photo[];

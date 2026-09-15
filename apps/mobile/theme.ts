@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 /**
  * Tacos visual language.
  *
@@ -102,18 +104,15 @@ export const typography = {
 } as const;
 
 export const shadows = {
-  card: {
-    shadowColor: '#000000',
-    shadowOpacity: 0.22,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 9 },
-    elevation: 5
-  },
-  floating: {
-    shadowColor: '#000000',
-    shadowOpacity: 0.32,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 8
-  }
-} as const;
+  // React Native Web deprecated the legacy shadow* props. Keep the native
+  // shadows for iOS/Android and use the CSS equivalent on web to avoid a
+  // warning and an extra style conversion on every card.
+  card: Platform.select({
+    web: { boxShadow: '0px 9px 18px rgba(0,0,0,0.22)' },
+    default: { shadowColor: '#000000', shadowOpacity: 0.22, shadowRadius: 18, shadowOffset: { width: 0, height: 9 }, elevation: 5 }
+  }),
+  floating: Platform.select({
+    web: { boxShadow: '0px 12px 24px rgba(0,0,0,0.32)' },
+    default: { shadowColor: '#000000', shadowOpacity: 0.32, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 8 }
+  })
+};

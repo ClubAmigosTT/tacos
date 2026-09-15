@@ -1,10 +1,11 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { memo } from 'react';
 import { colors, typography } from '@/theme';
 
-export function MapPin({ label, accent = false, variant }: { label: string; accent?: boolean; variant?: 'default' | 'visited' | 'saved' | 'match' }) {
+export const MapPin = memo(function MapPin({ label, accent = false, variant }: { label: string; accent?: boolean; variant?: 'default' | 'visited' | 'saved' | 'match' }) {
   const tone = variant ?? (accent ? 'match' : 'default');
   return <View style={[styles.pin, styles[`pin_${tone}`]]}><Text style={[styles.text, styles[`text_${tone}`]]}>{label}</Text></View>;
-}
+});
 
 const styles = StyleSheet.create({
   pin: { minWidth: 46, height: 34, borderRadius: 18, paddingHorizontal: 9, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },

@@ -65,8 +65,15 @@ if (!rows?.length && !configuredSource) {
 }
 
 if (!Array.isArray(rows) || !rows.length) throw new Error('El catálogo móvil debe contener al menos una sucursal');
-const includeReviewRows = process.env.MOBILE_INCLUDE_REVIEW === 'true';
-const selectedRows = rows.filter((row) => includeReviewRows || text(row?.catalogStatus, 'active') === 'active');
+// Keep valid review records visible in the offline snapshot.  They are not
+// treated as verified; the app labels them so we do not silently lose places
+// that came from DENUE, OSM, or a user-provided catalog.  Set the env flag to
+// false only for a deliberately verified-only export.
+const includeReviewRows = process.env.MOBILE_INCLUDE_REVIEW !== 'false';
+const selectedRows = rows.filter((row) => {
+  const status = text(row?.catalogStatus, 'active');
+  return status === 'active' || (includeReviewRows && status === 'needs_review');
+});
 if (!selectedRows.length) throw new Error('El catálogo móvil no contiene sucursales activas');
 
 function text(value, fallback = '') {
@@ -104,6 +111,28 @@ function normalizedPhotos(value) {
     }));
 }
 
+// Temporary local photo pool. The first four are the original bundled
+// images; the user-provided photos are intentionally mixed into the same pool
+// so a place without a verified photo still looks complete offline.
+const catalogPhotoPool = [
+  'catalog-dummy://pastor',
+  'catalog-dummy://suadero',
+  'catalog-dummy://canasta',
+  'catalog-dummy://birria',
+  ...Array.from({ length: 23 }, (_, index) => `catalog-dummy://user-${String(index + 1).padStart(2, '0')}`)
+];
+
+function hashText(value) {
+  let hash = 0;
+  for (const character of value) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  return hash;
+}
+
+function dummyImageFor(row) {
+  const identity = `${row?.id ?? ''}:${row?.name ?? ''}`;
+  return catalogPhotoPool[hashText(identity) % catalogPhotoPool.length];
+}
+
 function normalizedTacos(value) {
   if (!Array.isArray(value)) return [];
   return value
@@ -133,8 +162,18 @@ const places = selectedRows.map((row, index) => {
   const sourceLicense = text(row?.sourceLicense, text(raw.license, 'ODbL 1.0'));
   const sourceAttribution = text(row?.sourceAttribution, text(raw.attribution, '© OpenStreetMap contributors'));
   const tags = Array.isArray(row?.tags) ? [...new Set(row.tags.map((tag) => text(tag)).filter(Boolean))] : [];
-  const image = text(row?.imageUrl) || text(row?.image);
-  const photos = normalizedPhotos(row?.photos);
+  const sourceImage = text(row?.imageUrl) || text(row?.image);
+  const image = sourceImage || dummyImageFor(row);
+  const catalogStatus = text(row?.catalogStatus, 'active') === 'needs_review' ? 'needs_review' : 'active';
+  const sourcePhotos = normalizedPhotos(row?.photos);
+  const hasRealPhoto = Boolean(sourceImage || sourcePhotos.length);
+  const photos = hasRealPhoto
+    ? sourcePhotos
+    : [{
+        url: image,
+        license: 'Activo temporal de prueba',
+        attribution: 'Imagen ilustrativa generada para pruebas'
+      }];
 
   return {
     id,
@@ -160,7 +199,9 @@ const places = selectedRows.map((row, index) => {
       attribution: sourceAttribution,
       ...(text(row?.sourceUpdatedAt) ? { updatedAt: text(row.sourceUpdatedAt) } : {})
     },
+    catalogStatus,
     image,
+    imageIsIllustrative: !hasRealPhoto,
     description: text(row?.description),
     tacos: normalizedTacos(row?.tacos),
     photos,
@@ -177,7 +218,9 @@ const metadata = {
   coverage: Array.isArray(raw.coverage) ? raw.coverage.map((item) => text(item)).filter(Boolean) : [],
   branchCount: places.length,
   sourceRows: rows.length,
-  excludedNeedsReview: rows.length - places.length
+  includedActive: places.filter((place) => place.catalogStatus === 'active').length,
+  includedNeedsReview: places.filter((place) => place.catalogStatus === 'needs_review').length,
+  excludedRows: rows.length - places.length
 };
 
 // Keep the bundled snapshot compact.  The catalog is read-only generated data;

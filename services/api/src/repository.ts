@@ -352,6 +352,7 @@ function normalizePlace(row: any): ApiPlace {
     priceMin: row.price_min == null ? undefined : Number(row.price_min),
     priceMax: row.price_max == null ? undefined : Number(row.price_max),
     source: row.source_name ? { name: row.source_name, url: row.source_url ?? undefined, license: row.source_license ?? row.image_license ?? undefined, attribution: row.source_attribution ?? row.image_attribution ?? undefined, updatedAt: row.source_updated_at?.toISOString?.() ?? row.source_updated_at ?? undefined } : undefined,
+    catalogStatus: row.catalog_status === 'needs_review' ? 'needs_review' : 'active',
     distance: row.distance_km == null ? 'cerca de ti' : `${Number(row.distance_km).toFixed(1)} km`,
     openUntil: row.open_until ?? '23:00',
     rating: Number(row.rating),
@@ -438,7 +439,7 @@ export async function createBranchPhotoForUser(input: {
   if (pool) {
     const branch = await pool.query(`
       SELECT id FROM branches
-      WHERE id = $1 AND is_active = true AND catalog_status = 'active'
+      WHERE id = $1 AND is_active = true AND catalog_status IN ('active', 'needs_review')
         ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"}
     `, [input.branchId]);
     if (!branch.rowCount) return 'not_found';
@@ -768,7 +769,7 @@ export async function discoverPlaces(query: DiscoverQuery, userId?: string): Pro
     discovered = ordered.slice(offset, offset + limit);
   } else {
     const values: unknown[] = [];
-    const predicates: string[] = ["b.is_active = true", "b.catalog_status = 'active'"];
+    const predicates: string[] = ["b.is_active = true", "b.catalog_status IN ('active', 'needs_review')"];
     if (!allowDemoCatalog) predicates.push("COALESCE(b.source_name, '') <> 'demo'");
     if (query.q?.trim()) {
       const terms = searchTerms(query.q.trim());
@@ -807,7 +808,7 @@ export async function discoverPlaces(query: DiscoverQuery, userId?: string): Pro
       SELECT b.id, b.taqueria_id, t.name AS taqueria_name, b.name, b.neighborhood, b.address, b.phone, b.weekly_hours, b.price_min, b.price_max, b.source_name, b.source_url, b.source_license, b.source_attribution, b.source_updated_at, b.image_license, b.image_attribution, b.open_until,
       ${reputationSelect}
       ${categoryRatingsSelect}
-      b.match_score, b.style,
+      b.match_score, b.catalog_status, b.style,
       ${effectiveBranchImageSql} AS image_url, b.description, b.tags, b.flavor_profile, ST_Y(b.location::geometry) AS latitude,
       ST_X(b.location::geometry) AS longitude, ${distanceSelect},
       COALESCE(json_agg(json_build_object('id', m.id, 'name', m.name, 'rating', COALESCE((
@@ -957,7 +958,7 @@ export async function findPlace(id: string, userId?: string): Promise<ApiPlace |
     SELECT b.id, b.taqueria_id, t.name AS taqueria_name, b.name, b.neighborhood, b.address, b.phone, b.weekly_hours, b.price_min, b.price_max, b.source_name, b.source_url, b.source_license, b.source_attribution, b.source_updated_at, b.image_license, b.image_attribution, b.open_until,
       ${reputationSelect}
       ${categoryRatingsSelect}
-      b.match_score, b.style,
+      b.match_score, b.catalog_status, b.style,
       ${effectiveBranchImageSql} AS image_url, b.description, b.tags, b.flavor_profile, ST_Y(b.location::geometry) AS latitude,
       ST_X(b.location::geometry) AS longitude, NULL::numeric AS distance_km,
       COALESCE(json_agg(json_build_object('id', m.id, 'name', m.name, 'rating', COALESCE((
@@ -968,7 +969,7 @@ export async function findPlace(id: string, userId?: string): Promise<ApiPlace |
       ${reputationJoin}
       ${categoryRatingsJoin}
       LEFT JOIN menu_items m ON m.branch_id = b.id AND m.is_active = true
-    WHERE b.id = $1 AND b.is_active = true AND b.catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(b.source_name, '') <> 'demo'"} GROUP BY b.id, t.name, reviews.review_count, reviews.score, category_ratings.tortilla, category_ratings.service, category_ratings.price, category_ratings.meat, category_ratings.salsas
+    WHERE b.id = $1 AND b.is_active = true AND b.catalog_status IN ('active', 'needs_review') ${allowDemoCatalog ? '' : "AND COALESCE(b.source_name, '') <> 'demo'"} GROUP BY b.id, t.name, reviews.review_count, reviews.score, category_ratings.tortilla, category_ratings.service, category_ratings.price, category_ratings.meat, category_ratings.salsas
     `, [id]);
     found = result.rows[0] ? normalizePlace(result.rows[0]) : undefined;
   }
@@ -1001,7 +1002,7 @@ export type ApiBranchReview = {
  */
 export async function getBranchReviews(branchId: string): Promise<ApiBranchReview[] | undefined> {
   if (pool) {
-    const branch = await pool.query(`SELECT 1 FROM branches WHERE id = $1 AND is_active = true AND catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"}`, [branchId]);
+    const branch = await pool.query(`SELECT 1 FROM branches WHERE id = $1 AND is_active = true AND catalog_status IN ('active', 'needs_review') ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"}`, [branchId]);
     if (!branch.rowCount) return undefined;
     const result = await pool.query(`
       SELECT v.id, v.visited_at, v.rating, v.tortilla_rating, v.service_rating, v.price_rating, v.meat_rating, v.salsas_rating, v.note, v.photo_url,
@@ -1051,11 +1052,11 @@ export async function getTaqueria(id: string): Promise<ApiTaqueria | undefined> 
   if (pool) {
       const parent = await pool.query(`
       SELECT t.id, t.name, t.slug, t.description, COUNT(b.id)::int AS branch_count
-      FROM taquerias t LEFT JOIN branches b ON b.taqueria_id = t.id AND b.is_active = true AND b.catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(b.source_name, '') <> 'demo'"}
+      FROM taquerias t LEFT JOIN branches b ON b.taqueria_id = t.id AND b.is_active = true AND b.catalog_status IN ('active', 'needs_review') ${allowDemoCatalog ? '' : "AND COALESCE(b.source_name, '') <> 'demo'"}
       WHERE t.id = $1 GROUP BY t.id
     `, [id]);
     if (!parent.rows[0]) return undefined;
-    const branchRows = await pool.query(`SELECT id FROM branches WHERE taqueria_id = $1 AND is_active = true AND catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"} ORDER BY neighborhood, name`, [id]);
+    const branchRows = await pool.query(`SELECT id FROM branches WHERE taqueria_id = $1 AND is_active = true AND catalog_status IN ('active', 'needs_review') ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"} ORDER BY neighborhood, name`, [id]);
     const branches = (await Promise.all(branchRows.rows.map((row) => findPlace(row.id)))).filter((place): place is ApiPlace => Boolean(place));
     if (!branches.length) return undefined;
     return { id: parent.rows[0].id, name: parent.rows[0].name, slug: parent.rows[0].slug, description: parent.rows[0].description, branchCount: Number(parent.rows[0].branch_count), branches };
@@ -1106,7 +1107,7 @@ async function getCatalogProposal(id: string): Promise<CatalogProposal | undefin
 export async function createCatalogProposal(input: { kind: CatalogProposalKind; branchId?: string; payload: Record<string, unknown>; evidenceUrl?: string }, proposerId: string): Promise<CatalogProposal | undefined> {
   if (pool) {
     if (input.kind !== 'branch') {
-      const branch = await pool.query(`SELECT 1 FROM branches WHERE id = $1 AND is_active = true AND catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"}`, [input.branchId ?? '']);
+      const branch = await pool.query(`SELECT 1 FROM branches WHERE id = $1 AND is_active = true AND catalog_status IN ('active', 'needs_review') ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"}`, [input.branchId ?? '']);
       if (!branch.rowCount) return undefined;
     }
     const id = crypto.randomUUID();
@@ -1220,7 +1221,7 @@ async function applyCatalogProposal(client: any, proposal: CatalogProposal) {
     if (!branchId || !name) throw new Error('La propuesta de taco necesita sucursal y nombre');
     const price = proposalNumber(proposal.payload, 'price');
     validateProposalPrice(price, 'price');
-    const branch = await client.query(`SELECT 1 FROM branches WHERE id = $1 AND is_active = true AND catalog_status = 'active'`, [branchId]);
+    const branch = await client.query(`SELECT 1 FROM branches WHERE id = $1 AND is_active = true AND catalog_status IN ('active', 'needs_review')`, [branchId]);
     if (!branch.rowCount) throw new Error('La sucursal ya no está disponible');
     const tacoId = `community-${proposal.id}`;
     await client.query(`INSERT INTO menu_items (id, branch_id, name, note, price, rating, is_active) VALUES ($1, $2, $3, $4, $5, 0, true)`, [tacoId, branchId, name, proposalText(proposal.payload, 'note'), price ?? 0]);
@@ -1229,7 +1230,7 @@ async function applyCatalogProposal(client: any, proposal: CatalogProposal) {
 
   const branchId = proposal.branchId ?? proposalText(proposal.payload, 'branchId');
   if (!branchId) throw new Error('La corrección necesita sucursal');
-  const current = await client.query('SELECT price_min, price_max FROM branches WHERE id = $1 AND is_active = true AND catalog_status = \'active\'', [branchId]);
+  const current = await client.query("SELECT price_min, price_max FROM branches WHERE id = $1 AND is_active = true AND catalog_status IN ('active', 'needs_review')", [branchId]);
   if (!current.rowCount) throw new Error('La sucursal ya no está disponible');
   const changes: Record<string, unknown> = proposal.payload.changes && typeof proposal.payload.changes === 'object' && !Array.isArray(proposal.payload.changes) ? proposal.payload.changes as Record<string, unknown> : proposal.payload;
   const allowed: Record<string, string> = { name: 'name', neighborhood: 'neighborhood', address: 'address', phone: 'phone', openUntil: 'open_until', weeklyHours: 'weekly_hours', priceMin: 'price_min', priceMax: 'price_max', style: 'style', description: 'description', tags: 'tags', imageUrl: 'image_url' };
@@ -1401,7 +1402,7 @@ export async function getSavedPlaceIds(userId: string): Promise<string[]> {
 
 export async function savePlaceForUser(placeId: string, userId: string): Promise<'saved' | 'already_saved' | 'not_found'> {
   if (pool) {
-    const branch = await pool.query(`SELECT 1 FROM branches WHERE id = $1 AND is_active = true AND catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"}`, [placeId]);
+    const branch = await pool.query(`SELECT 1 FROM branches WHERE id = $1 AND is_active = true AND catalog_status IN ('active', 'needs_review') ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"}`, [placeId]);
     if (!branch.rowCount) return 'not_found';
     const result = await pool.query('INSERT INTO saved_places (user_id, branch_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING branch_id', [userId, placeId]);
     return result.rowCount ? 'saved' : 'already_saved';
@@ -1823,7 +1824,7 @@ export async function getPassport(userId: string) {
         COUNT(v.id)::int AS visit_count
       FROM branches b
       LEFT JOIN visits v ON v.branch_id = b.id AND v.user_id = $1 AND v.visibility = 'visible'
-      WHERE b.is_active = true AND b.catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(b.source_name, '') <> 'demo'"}
+      WHERE b.is_active = true AND b.catalog_status IN ('active', 'needs_review') ${allowDemoCatalog ? '' : "AND COALESCE(b.source_name, '') <> 'demo'"}
       GROUP BY b.neighborhood
       ORDER BY b.neighborhood
     `, [userId]);
@@ -2094,7 +2095,7 @@ export async function addListItemForUser(listId: string, placeId: string, userId
   if (pool) {
     const role = await getListRole(listId, userId);
     if (role !== 'owner' && role !== 'editor') return false;
-    const branch = await pool.query(`SELECT 1 FROM branches WHERE id = $1 AND is_active = true AND catalog_status = 'active' ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"}`, [placeId]);
+    const branch = await pool.query(`SELECT 1 FROM branches WHERE id = $1 AND is_active = true AND catalog_status IN ('active', 'needs_review') ${allowDemoCatalog ? '' : "AND COALESCE(source_name, '') <> 'demo'"}`, [placeId]);
     if (!branch.rowCount) return false;
     await pool.query(`
       INSERT INTO list_items (list_id, branch_id, position, note)

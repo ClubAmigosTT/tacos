@@ -1,6 +1,7 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useIsFocused, usePathname } from 'expo-router';
 import { diaryEntries } from '@/data/fixtures';
 import { diary as diaryRequest, isDemoMode } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -12,25 +13,34 @@ import { AsyncErrorState } from '@/components/AsyncErrorState';
 import { MetricTile } from '@/components/DesignSystem';
 import { CatalogImage } from '@/components/CatalogImage';
 
+type DiaryEntry = { id: string; date: string; place: string; taco: string; rating: number; image?: string };
+
 export default function DiaryScreen() {
   const { token, loading: authLoading } = useAuth();
-  const { data, isError, refetch } = useQuery({ queryKey: ['diary', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token && !authLoading) });
-  if (authLoading) return <View style={styles.loading}><Text style={styles.loadingText}>Cargando tu historia…</Text></View>;
-  if (token && isError) return <AsyncErrorState title="No pudimos cargar tu diario" detail="Tu información sigue guardada. Revisa la conexión e inténtalo de nuevo." onAction={() => void refetch()} />;
+  const isFocused = useIsFocused();
+  const pathname = usePathname();
+  const isVisible = isFocused || pathname === '/diary' || pathname.endsWith('/diary');
+  const { data, isError, refetch } = useQuery({ queryKey: ['diary', token], queryFn: () => diaryRequest(token!), enabled: Boolean(token && !authLoading && isVisible) });
   const demoMode = isDemoMode();
-  const entries = data ? data.entries.map((entry) => ({ id: entry.id, date: new Date(entry.visited_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }).toUpperCase(), place: entry.place_name, taco: entry.tacos, rating: Number(entry.rating), image: entry.image_url })) : token || !demoMode ? [] : diaryEntries;
+  const entries: DiaryEntry[] = data ? data.entries.map((entry) => ({ id: entry.id, date: new Date(entry.visited_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }).toUpperCase(), place: entry.place_name, taco: entry.tacos, rating: Number(entry.rating), image: entry.image_url })) : token || !demoMode ? [] : diaryEntries;
   const diaryPeriod = data?.entries[0]?.visited_at
     ? new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' }).format(new Date(data.entries[0].visited_at))
     : token || !demoMode ? `tu historia · ${new Date().getFullYear()}` : 'agosto 2026';
-  return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}><View><Text style={styles.kicker}>TU HISTORIA</Text><Text style={styles.title}>Taco Diary</Text></View><Ionicons name="ellipsis-horizontal" size={22} color={colors.textSecondary} /></View>
-      <View style={styles.stats}><MetricTile value={token ? entries.length : demoMode ? 17 : '—'} label="visitas" /><MetricTile value={token ? entries.reduce((sum, entry) => sum + (entry.taco ? entry.taco.split(',').length : 0), 0) : demoMode ? 48 : '—'} label="tacos" /><MetricTile value={token ? (entries.length ? (entries.reduce((sum, entry) => sum + entry.rating, 0) / entries.length).toFixed(2) : '—') : demoMode ? '4.21' : '—'} label="promedio" accent /></View>
-      <Pressable style={styles.callout} onPress={() => router.push('/wrapped')}><View style={styles.calloutIcon}><Ionicons name="sparkles" color={colors.background} size={17} /></View><View style={{ flex: 1 }}><Text style={styles.calloutTitle}>Tu resumen anual</Text><Text style={styles.calloutText}>Mira tus tacos, zonas exploradas y el lugar que más defendiste.</Text></View><Ionicons name="chevron-forward" size={17} color={colors.textSecondary} /></Pressable>
-      <SectionTitle eyebrow={diaryPeriod} title="Últimos tacos" action="Ver todo" />
-      <View style={styles.timeline}>{entries.map((entry, index) => <View key={entry.id} style={styles.entry}><View style={styles.date}><Text style={styles.dateText}>{entry.date.split(' ')[0]}</Text><Text style={styles.dateMonth}>{entry.date.split(' ')[1]}</Text></View><View style={styles.lineWrap}><View style={styles.dot} />{index < entries.length - 1 ? <View style={styles.line} /> : null}</View><Pressable style={styles.entryCard} disabled={!token} onPress={() => router.push({ pathname: '/visit-edit', params: { id: entry.id } })}><CatalogImage uri={entry.image} accessibilityLabel={`Imagen de ${entry.place}`} style={styles.entryImage} /><View style={styles.entryCopy}><Text style={styles.entryPlace}>{entry.place}</Text><Text style={styles.entryTaco}>{entry.taco}</Text><View style={styles.entryBottom}><RatingBadge rating={entry.rating} /><View style={styles.entryAction}>{token ? <><Text style={styles.entryHint}>editar</Text><Ionicons name="chevron-forward" size={14} color={colors.textTertiary} /></> : <Text style={styles.entryHint}>registrado</Text>}</View></View></View></Pressable></View>)}</View>
-    </ScrollView>
-  );
+  const renderEntry = useCallback(({ item, index }: { item: DiaryEntry; index: number }) => <DiaryEntryCard entry={item} isLast={index === entries.length - 1} editable={Boolean(token)} />, [entries.length, token]);
+  if (!isVisible) return <View style={styles.screen} />;
+  if (authLoading) return <View style={styles.loading}><Text style={styles.loadingText}>Cargando tu historia…</Text></View>;
+  if (token && isError) return <AsyncErrorState title="No pudimos cargar tu diario" detail="Tu información sigue guardada. Revisa la conexión e inténtalo de nuevo." onAction={() => void refetch()} />;
+  const header = <View>
+    <View style={styles.header}><View><Text style={styles.kicker}>TU HISTORIA</Text><Text style={styles.title}>Taco Diary</Text></View><Ionicons name="ellipsis-horizontal" size={22} color={colors.textSecondary} /></View>
+    <View style={styles.stats}><MetricTile value={token ? entries.length : demoMode ? 17 : '—'} label="visitas" /><MetricTile value={token ? entries.reduce((sum, entry) => sum + (entry.taco ? entry.taco.split(',').length : 0), 0) : demoMode ? 48 : '—'} label="tacos" /><MetricTile value={token ? (entries.length ? (entries.reduce((sum, entry) => sum + entry.rating, 0) / entries.length).toFixed(2) : '—') : demoMode ? '4.21' : '—'} label="promedio" accent /></View>
+    <Pressable style={styles.callout} onPress={() => router.push('/wrapped')}><View style={styles.calloutIcon}><Ionicons name="sparkles" color={colors.background} size={17} /></View><View style={{ flex: 1 }}><Text style={styles.calloutTitle}>Tu resumen anual</Text><Text style={styles.calloutText}>Mira tus tacos, zonas exploradas y el lugar que más defendiste.</Text></View><Ionicons name="chevron-forward" size={17} color={colors.textSecondary} /></Pressable>
+    <SectionTitle eyebrow={diaryPeriod} title="Últimos tacos" action="Ver todo" />
+  </View>;
+  return <FlatList data={entries} keyExtractor={(entry) => entry.id} renderItem={renderEntry} style={styles.screen} contentContainerStyle={styles.content} ListHeaderComponent={header} showsVerticalScrollIndicator={false} />;
+}
+
+function DiaryEntryCard({ entry, isLast, editable }: { entry: DiaryEntry; isLast: boolean; editable: boolean }) {
+  return <View style={styles.entry}><View style={styles.date}><Text style={styles.dateText}>{entry.date.split(' ')[0]}</Text><Text style={styles.dateMonth}>{entry.date.split(' ')[1]}</Text></View><View style={styles.lineWrap}><View style={styles.dot} />{!isLast ? <View style={styles.line} /> : null}</View><Pressable style={styles.entryCard} disabled={!editable} onPress={() => router.push({ pathname: '/visit-edit', params: { id: entry.id } })}><CatalogImage uri={entry.image} accessibilityLabel={`Imagen de ${entry.place}`} style={styles.entryImage} /><View style={styles.entryCopy}><Text style={styles.entryPlace}>{entry.place}</Text><Text style={styles.entryTaco}>{entry.taco}</Text><View style={styles.entryBottom}><RatingBadge rating={entry.rating} /><View style={styles.entryAction}>{editable ? <><Text style={styles.entryHint}>editar</Text><Ionicons name="chevron-forward" size={14} color={colors.textTertiary} /></> : <Text style={styles.entryHint}>registrado</Text>}</View></View></View></Pressable></View>;
 }
 
 const styles = StyleSheet.create({

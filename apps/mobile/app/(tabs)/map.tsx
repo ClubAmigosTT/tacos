@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { router, useIsFocused, useLocalSearchParams, usePathname } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { discover, isDemoMode, trackEvent } from '@/lib/api';
 import { localDiscover, places } from '@/lib/localCatalog';
@@ -20,6 +20,9 @@ const defaultMapCenter = { latitude: 19.402, longitude: -99.163 };
 
 export default function MapScreen() {
   const { token, loading: authLoading } = useAuth();
+  const isFocused = useIsFocused();
+  const pathname = usePathname();
+  const isVisible = isFocused || pathname === '/map' || pathname.endsWith('/map');
   const { q: initialQuery } = useLocalSearchParams<{ q?: string }>();
   const [active, setActive] = useState<MapFilter>('Todos');
   const [search, setSearch] = useState(initialQuery ?? '');
@@ -30,6 +33,15 @@ export default function MapScreen() {
   const [mapMoved, setMapMoved] = useState(false);
   const [locationDenied, setLocationDenied] = useState(false);
   const [sheetCollapsed, setSheetCollapsed] = useState(false);
+  const sheetTransition = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(sheetTransition, {
+      toValue: sheetCollapsed ? 1 : 0,
+      duration: 220,
+      useNativeDriver: Platform.OS !== 'web'
+    }).start();
+  }, [sheetCollapsed, sheetTransition]);
 
   useEffect(() => {
     if (initialQuery != null) setSearch(initialQuery);
@@ -59,11 +71,11 @@ export default function MapScreen() {
   }
 
   useEffect(() => {
-    if (Platform.OS !== 'web') void loadLocation();
-  }, []);
+    if (Platform.OS !== 'web' && isVisible) void loadLocation();
+  }, [isVisible]);
 
   const searchCoordinates = searchCenter ?? coordinates;
-  const handleMapRegionChange = (next: { latitude: number; longitude: number }) => {
+  const handleMapRegionChange = useCallback((next: { latitude: number; longitude: number }) => {
     const baseline = searchCoordinates ?? defaultMapCenter;
     const moved = Math.abs(next.latitude - baseline.latitude) > 0.002 || Math.abs(next.longitude - baseline.longitude) > 0.002;
     if (moved) {
@@ -73,7 +85,11 @@ export default function MapScreen() {
       setPendingMapCenter(undefined);
       setMapMoved(false);
     }
-  };
+  }, [searchCoordinates]);
+
+  const handlePlaceSelect = useCallback((id: string) => {
+    router.push(`/place/${id}`);
+  }, []);
 
   const discoveryQuery = {
     q: searchQuery,
@@ -85,10 +101,11 @@ export default function MapScreen() {
   };
   const { data, isLoading: discoverLoading, isError: discoverError, refetch: refetchDiscover } = useQuery({
     queryKey: ['discover', 'map', searchQuery, searchCoordinates?.latitude, searchCoordinates?.longitude, active, token],
-    queryFn: () => discover(discoveryQuery, token),
+    queryFn: ({ signal }) => discover(discoveryQuery, token, signal),
     initialData: () => localDiscover(discoveryQuery),
-    enabled: !authLoading
+    enabled: !authLoading && isVisible
   });
+  const renderMapResult = useCallback(({ item }: { item: (typeof places)[number] }) => <MapResultCard place={item} onPress={handlePlaceSelect} />, [handlePlaceSelect]);
 
   // The small bundled fallback remains useful while the API wakes up or the
   // device is offline. Fixtures are only a deliberate demo-mode fallback.
@@ -117,6 +134,7 @@ export default function MapScreen() {
         ? 'Taquerías cerca de ti'
         : active;
 
+  if (!isVisible) return <View style={styles.screen} />;
   if (authLoading) {
     return <View style={styles.authLoading}><Text style={styles.authLoadingText}>Preparando tu mapa…</Text></View>;
   }
@@ -137,7 +155,7 @@ export default function MapScreen() {
 
   return (
     <View style={styles.screen}>
-      <MapCanvas places={sorted} active={active} onSelect={(id) => router.push(`/place/${id}`)} userCoordinates={coordinates} onRegionChangeComplete={handleMapRegionChange} />
+      <MapCanvas places={sorted} active={active} onSelect={handlePlaceSelect} userCoordinates={coordinates} onRegionChangeComplete={handleMapRegionChange} />
 
       <View style={styles.topOverlay}>
         <Pressable accessibilityRole="button" accessibilityLabel="Volver" style={styles.backButton} onPress={() => router.back()}>
@@ -220,15 +238,17 @@ export default function MapScreen() {
         </Pressable>
 
         {sheetCollapsed ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="Expandir lugares de la zona" style={styles.collapsedSummary} onPress={() => setSheetCollapsed(false)}>
-            <View style={styles.collapsedCopy}>
-              <Text style={styles.sheetEyebrow}>{discoverLoading ? 'BUSCANDO EN EL CATÁLOGO' : `${sorted.length} LUGARES EN ESTA ZONA`}</Text>
-              <Text style={styles.collapsedTitle} numberOfLines={1}>{sheetTitle}</Text>
-            </View>
-            <Ionicons name="chevron-up" size={18} color={colors.tortilla} />
-          </Pressable>
+          <Animated.View style={{ opacity: sheetTransition }}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Expandir lugares de la zona" style={styles.collapsedSummary} onPress={() => setSheetCollapsed(false)}>
+              <View style={styles.collapsedCopy}>
+                <Text style={styles.sheetEyebrow}>{discoverLoading ? 'BUSCANDO EN EL CATÁLOGO' : `${sorted.length} LUGARES EN ESTA ZONA`}</Text>
+                <Text style={styles.collapsedTitle} numberOfLines={1}>{sheetTitle}</Text>
+              </View>
+              <Ionicons name="chevron-up" size={18} color={colors.tortilla} />
+            </Pressable>
+          </Animated.View>
         ) : (
-          <>
+          <Animated.View style={{ opacity: sheetTransition.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }}>
             <View style={styles.sheetHeader}>
               <View style={styles.sheetHeaderCopy}>
                 <Text style={styles.sheetEyebrow}>{discoverLoading ? 'BUSCANDO EN EL CATÁLOGO' : `${sorted.length} LUGARES EN ESTA ZONA`}</Text>
@@ -242,27 +262,17 @@ export default function MapScreen() {
                 <Text style={styles.loadingResultsText}>Consultando el catálogo de Tacos…</Text>
               </View>
             ) : sorted.length ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {sorted.map((place) => (
-                  <Pressable
-                    key={place.id}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${place.name}, ${place.rating > 0 ? place.rating.toFixed(1) : 'sin calificación'}, ${place.distance}`}
-                    style={styles.resultCard}
-                    onPress={() => router.push(`/place/${place.id}`)}
-                  >
-                    <CatalogImage uri={place.image} fallbackLabel="Imagen ilustrativa" accessibilityLabel={`Imagen de ${place.name}`} style={styles.resultImage} />
-                    <View style={styles.resultBody}>
-                      <View style={styles.resultTop}>
-                        <Text style={styles.resultName} numberOfLines={1}>{place.name}</Text>
-                        <RatingBadge rating={place.rating} />
-                      </View>
-                      <Text style={styles.resultMeta}>{place.neighborhood} · {place.distance}</Text>
-                      <Text style={styles.resultStyle}>{place.style}</Text>
-                    </View>
-                  </Pressable>
-                ))}
-              </ScrollView>
+              <FlatList
+                data={sorted}
+                horizontal
+                keyExtractor={(place) => place.id}
+                renderItem={renderMapResult}
+                showsHorizontalScrollIndicator={false}
+                initialNumToRender={4}
+                maxToRenderPerBatch={4}
+                windowSize={3}
+                style={styles.resultsList}
+              />
             ) : (
               <View style={styles.emptyResults}>
                 <Ionicons name="moon-outline" size={21} color={colors.salsa} />
@@ -278,7 +288,7 @@ export default function MapScreen() {
                 </Pressable>
               </View>
             )}
-          </>
+          </Animated.View>
         )}
       </View>
 
@@ -331,7 +341,9 @@ const styles = StyleSheet.create({
   resultTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
   resultName: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, fontSize: 15, fontWeight: typography.weight.semibold, flex: 1 },
   resultMeta: { color: colors.textSecondary, fontFamily: typography.fontFamily.regular, fontSize: 11, marginTop: 7 },
-  resultStyle: { color: colors.salsa, fontFamily: typography.fontFamily.medium, fontSize: 11, fontWeight: typography.weight.medium, marginTop: 13 },
+  resultBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginTop: 13 },
+  resultStyle: { color: colors.salsa, fontFamily: typography.fontFamily.medium, fontSize: 11, fontWeight: typography.weight.medium, flex: 1 },
+  reviewLabel: { color: colors.tortilla, fontFamily: typography.fontFamily.semibold, fontSize: 9, fontWeight: typography.weight.semibold },
   emptyResults: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radii.lg, backgroundColor: colors.surface, padding: spacing.md, ...shadows.card },
   emptyResultsCopy: { flex: 1 },
   emptyResultsTitle: { color: colors.textPrimary, fontFamily: typography.fontFamily.semibold, fontSize: 12, fontWeight: typography.weight.semibold },
@@ -339,8 +351,33 @@ const styles = StyleSheet.create({
   proposeLink: { color: colors.tortilla, fontFamily: typography.fontFamily.semibold, fontSize: 10, fontWeight: typography.weight.semibold, marginTop: 7 },
   loadingResults: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: radii.lg, backgroundColor: colors.surface, padding: spacing.md, ...shadows.card },
   loadingResultsText: { color: colors.textSecondary, fontFamily: typography.fontFamily.medium, fontSize: 11, fontWeight: typography.weight.medium },
+  resultsList: { height: 181 },
   clearButton: { borderRadius: radii.pill, backgroundColor: colors.tortilla, paddingHorizontal: 11, paddingVertical: 8 },
   clearButtonText: { color: colors.meatDark, fontFamily: typography.fontFamily.semibold, fontSize: 10, fontWeight: typography.weight.semibold },
   locationHint: { position: 'absolute', top: 220, left: spacing.lg, right: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.surfaceTranslucent, borderRadius: radii.pill, paddingVertical: 9 },
   locationHintText: { color: colors.salsa, fontFamily: typography.fontFamily.medium, fontSize: 10, fontWeight: typography.weight.medium }
 });
+
+function MapResultCard({ place, onPress }: { place: (typeof places)[number]; onPress: (id: string) => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${place.name}, ${place.rating > 0 ? place.rating.toFixed(1) : 'sin calificación'}, ${place.distance}`}
+      style={styles.resultCard}
+      onPress={() => onPress(place.id)}
+    >
+      <CatalogImage uri={place.image} fallbackLabel="Imagen ilustrativa" accessibilityLabel={`Imagen de ${place.name}`} style={styles.resultImage} />
+      <View style={styles.resultBody}>
+        <View style={styles.resultTop}>
+          <Text style={styles.resultName} numberOfLines={1}>{place.name}</Text>
+          <RatingBadge rating={place.rating} />
+        </View>
+        <Text style={styles.resultMeta}>{place.neighborhood} · {place.distance}</Text>
+        <View style={styles.resultBottom}>
+          <Text style={styles.resultStyle}>{place.style}</Text>
+          {place.catalogStatus === 'needs_review' ? <Text style={styles.reviewLabel}>Por verificar</Text> : null}
+        </View>
+      </View>
+    </Pressable>
+  );
+}

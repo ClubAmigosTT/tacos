@@ -12,7 +12,13 @@ import { colors, typography } from '@/theme';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,
+      // Most catalog and profile reads are safe to reuse briefly. Refetching
+      // every time a tab regains focus made navigation feel like a loading
+      // screen, especially when the API was waking up.
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
       // A missing place/list should resolve immediately; retry only network
       // failures and server-side errors that may recover on the next attempt.
       retry: (failureCount, error) => error instanceof ApiError ? error.status >= 500 && failureCount < 1 : failureCount < 1
