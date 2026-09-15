@@ -31,3 +31,7 @@ catalog/osm-boundaries.json
 !catalog/osm-cdmx-edomex.json
 data/denue/
 scripts/__pycache__/
+
+# Local iOS signing credentials downloaded from EAS; never commit these.
+apps/mobile/credentials.json
+apps/mobile/credentials/

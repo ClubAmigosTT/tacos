@@ -1,19 +1,16 @@
 # Publicar Tacos en TestFlight desde GitHub Actions
 
-El workflow `.github/workflows/ios-testflight.yml` compila Tacos en un runner
-macOS con `eas build --local` y usa `eas submit` para enviarlo a TestFlight. No
-usa la cuota de compilación cloud de EAS.
+El workflow `.github/workflows/ios-testflight.yml` compila Tacos directamente
+en un runner macOS de GitHub usando `expo prebuild`, `xcodebuild` y CocoaPods;
+después sube el IPA con `apple-actions/upload-testflight-build`. No usa EAS
+Build cloud ni necesita `EXPO_TOKEN`.
 
-Sí consume los minutos de GitHub Actions del repositorio. La compilación es
-manual para no gastar minutos por cada push y el chequeo barato de Ubuntu se
-ejecuta antes de reservar el runner macOS.
-
-El workflow es manual: se ejecuta desde GitHub en **Actions > Tacos iOS
-TestFlight > Run workflow**. No se ejecuta con cada push.
+El workflow es manual: se ejecuta desde **Actions > Tacos iOS TestFlight > Run
+workflow**. No se ejecuta con cada push.
 
 ## Configuración única en GitHub
 
-En **Settings > Secrets and variables > Actions** agrega:
+En **Settings > Secrets and variables > Actions** configura:
 
 ### Repository variable
 
@@ -21,22 +18,28 @@ En **Settings > Secrets and variables > Actions** agrega:
 
 ### Repository secrets
 
-- `EXPO_TOKEN`: token de Expo con acceso de Developer al proyecto `tacos`.
+- `APPLE_TEAM_ID`
+- `APPSTORE_ISSUER_ID`
+- `APPSTORE_API_KEY_ID`
+- `APPSTORE_API_PRIVATE_KEY`
+- `APPLE_DISTRIBUTION_P12`
+- `APPLE_DISTRIBUTION_P12_PASSWORD`
+- `APPLE_PROVISIONING_PROFILE`
 
-La API key de App Store Connect ya está configurada en el servicio de
-credenciales de EAS para este proyecto. Nunca guardes contraseñas o tokens en
-el repositorio. El workflow detiene la ejecución antes de usar macOS si falta
-algún valor.
+Los valores de firma y App Store Connect se guardan cifrados en GitHub; nunca
+se agregan al repositorio. El workflow valida todos los secretos antes de
+compilar.
 
 ## Orden de ejecución
 
 1. Ubuntu instala dependencias y ejecuta typecheck, configuración, entradas,
    catálogo, fotos y exportación web.
-2. Solo si todo pasa, macOS genera el IPA con las credenciales remotas ya
-   existentes en Expo.
-3. El IPA se sube a TestFlight con EAS Submit usando la API key existente de
-   App Store Connect.
+2. macOS valida Xcode/iOS 26, genera el proyecto nativo con Expo y ejecuta
+   `pod install`.
+3. Se prepara un llavero temporal, se archiva con firma manual y se exporta el
+   IPA usando el bundle ID `com.clubamigostt.tacos`.
+4. El IPA se envía a App Store Connect y se valida que Apple haya recibido la
+   app.
 
-Si la subida a Apple falla después de generar el IPA, se debe corregir el paso
-de subida y reutilizar el mismo artefacto; no se debe iniciar otra compilación
-sin revisar los logs.
+Sí consume minutos de GitHub Actions. El disparador manual evita gastarlos en
+cada push y la compilación no consume la cuota de EAS Build cloud.
