@@ -34,9 +34,6 @@ jobs:
       EAS_BUILD_PROFILE: production
       EAS_BUILD_PLATFORM: ios
       EXPO_TOKEN_VALUE: ${{ secrets.EXPO_TOKEN }}
-      APPSTORE_ISSUER_ID_VALUE: ${{ secrets.APPSTORE_ISSUER_ID }}
-      APPSTORE_API_KEY_ID_VALUE: ${{ secrets.APPSTORE_API_KEY_ID }}
-      APPSTORE_API_PRIVATE_KEY_VALUE: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@v4
@@ -60,7 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=()
-          for name in EXPO_PUBLIC_API_URL EXPO_TOKEN_VALUE APPSTORE_ISSUER_ID_VALUE APPSTORE_API_KEY_ID_VALUE APPSTORE_API_PRIVATE_KEY_VALUE; do
+          for name in EXPO_PUBLIC_API_URL EXPO_TOKEN_VALUE; do
             if [[ -z "${!name:-}" ]]; then
               missing+=("$name")
             fi
@@ -169,15 +166,17 @@ jobs:
           test -s "$output"
           echo "IPA_PATH=$output" >> "$GITHUB_ENV"
 
-      - name: Subir IPA a TestFlight
-        uses: apple-actions/upload-testflight-build@v4
-        with:
-          app-path: ${{ env.IPA_PATH }}
-          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
-          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
-          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
-          uses-non-exempt-encryption: "false"
-          wait-for-processing: "false"
+      - name: Subir IPA a TestFlight con EAS Submit
+        working-directory: apps/mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm dlx eas-cli@${EAS_CLI_VERSION} submit \
+            --platform ios \
+            --profile production \
+            --path "$IPA_PATH" \
+            --non-interactive \
+            --wait
 
       - name: Resumen
         shell: bash
