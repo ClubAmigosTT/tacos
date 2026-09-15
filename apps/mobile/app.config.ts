@@ -5,6 +5,7 @@ const demoMode = process.env.EXPO_PUBLIC_DEMO_MODE?.trim().toLowerCase() === 'tr
 const mapsApiKey = process.env.GOOGLE_MAPS_API_KEY?.trim() || '';
 const easProfile = process.env.EAS_BUILD_PROFILE?.trim();
 const easPlatform = process.env.EAS_BUILD_PLATFORM?.trim();
+const iosBuildNumber = process.env.IOS_BUILD_NUMBER?.trim() || '1';
 
 if (easProfile === 'production') {
   if (!apiUrl.startsWith('https://')) throw new Error('EXPO_PUBLIC_API_URL must be an HTTPS Render URL for production builds');
@@ -34,6 +35,7 @@ const config: ExpoConfig = {
     // would advertise a layout that has not yet completed tablet QA.
     supportsTablet: false,
     bundleIdentifier: 'com.clubamigostt.tacos',
+    buildNumber: iosBuildNumber,
     config: {
       usesNonExemptEncryption: false
     },
