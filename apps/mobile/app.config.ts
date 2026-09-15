@@ -49,7 +49,9 @@ const config: ExpoConfig = {
     }
   },
   android: {
-    package: 'com.tacos.app',
+    // com.tacos.app is already reserved in Google Play. Keep Android aligned
+    // with the Club Amigos namespace so the app can be created in our account.
+    package: 'com.clubamigostt.tacos',
     adaptiveIcon: {
       foregroundImage: './assets/taco-logo.png',
       backgroundColor: '#F2D99B'
