@@ -4,6 +4,10 @@ El workflow `.github/workflows/ios-testflight.yml` compila Tacos en un runner
 macOS con `eas build --local` y usa `eas submit` para enviarlo a TestFlight. No
 usa la cuota de compilación cloud de EAS.
 
+Sí consume los minutos de GitHub Actions del repositorio. La compilación es
+manual para no gastar minutos por cada push y el chequeo barato de Ubuntu se
+ejecuta antes de reservar el runner macOS.
+
 El workflow es manual: se ejecuta desde GitHub en **Actions > Tacos iOS
 TestFlight > Run workflow**. No se ejecuta con cada push.
 

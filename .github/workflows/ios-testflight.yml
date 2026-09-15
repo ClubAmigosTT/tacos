@@ -119,6 +119,7 @@ jobs:
       EAS_BUILD_PROFILE: production
       EAS_BUILD_PLATFORM: ios
       EAS_LOCAL_BUILD_SKIP_CLEANUP: "1"
+      RELEASE_NOTE: ${{ inputs.release_note }}
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@v4
@@ -186,5 +187,5 @@ jobs:
             echo ""
             echo "IPA compilado en runner macOS y enviado a App Store Connect."
             echo "Apple puede tardar unos minutos en procesarlo antes de mostrarlo en TestFlight."
-            echo "Nota: ${{ inputs.release_note }}"
+            echo "Nota: ${RELEASE_NOTE}"
           } >> "$GITHUB_STEP_SUMMARY"
