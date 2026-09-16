@@ -38,8 +38,17 @@ export function hasCommercialPlaceName(value: unknown) {
   return tokens(normalized).some((token) => !genericNameTokens.has(token) && !/^\d+$/.test(token) && token.length >= 2);
 }
 
-export function isDisplayablePlace(place: Pick<Place, 'name' | 'taqueriaName'>) {
+export function isDisplayablePlace(place: { name?: unknown; taqueriaName?: unknown }) {
   return hasCommercialPlaceName(place.name || place.taqueriaName);
+}
+
+const tacoSignal = /(^|\s)(tacos?|taquer(?:ia|ía)s?|pastor|suadero|carnitas?|barbacoa|birria|canasta)(\s|$)/i;
+
+export function isTacoCatalogPlace(place: { name?: unknown; taqueriaName?: unknown; catalogStatus?: unknown; tags?: string[] }) {
+  if (!isDisplayablePlace(place)) return false;
+  if (place.catalogStatus !== 'needs_review') return true;
+  const text = [place.name, place.taqueriaName, ...(place.tags ?? [])].filter(Boolean).join(' ');
+  return tacoSignal.test(text);
 }
 
 export function searchEvidence(place: Pick<Place, 'name' | 'taqueriaName' | 'tacos'>, query?: string): SearchEvidence | undefined {

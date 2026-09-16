@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { branchReviews, getPlace, googleBranchPhotos, savePlace, savedPlaces, trackEvent, unsavePlace, type BranchReview } from '@/lib/api';
+import { branchReviews, getPlace, googleBranchPhotos, hasRealPlaceMedia, savePlace, savedPlaces, trackEvent, unsavePlace, type BranchReview } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { colors, radii, shadows, spacing, typography } from '@/theme';
 import { RatingBadge } from '@/components/RatingBadge';
@@ -21,7 +21,7 @@ export default function PlaceScreen() {
   const queryClient = useQueryClient();
   useEffect(() => { if (id) void trackEvent('place_open', { place_id: id }, token); }, [id, token]);
   const { data: place, isLoading, isError } = useQuery({ queryKey: ['place', id, token], queryFn: () => getPlace(id, token), enabled: Boolean(id && !authLoading) });
-  const hasCatalogPhotos = Boolean(place?.image || place?.photos?.length);
+  const hasCatalogPhotos = Boolean(place && hasRealPlaceMedia(place));
   const { data: googlePhotoData, isLoading: googlePhotosLoading } = useQuery({ queryKey: ['google-photos', id], queryFn: () => googleBranchPhotos(id), enabled: Boolean(id && place && !hasCatalogPhotos), staleTime: 15 * 60_000, gcTime: 30 * 60_000, retry: false, refetchOnMount: false });
   const { data: reviewData, isLoading: reviewsLoading, isError: reviewsError, refetch: refetchReviews } = useQuery({ queryKey: ['branch-reviews', id], queryFn: () => branchReviews(id), enabled: Boolean(id), staleTime: 60_000 });
   const { data: savedData } = useQuery({ queryKey: ['saved-places', token], queryFn: () => savedPlaces(token!), enabled: Boolean(token && !authLoading) });

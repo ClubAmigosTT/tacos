@@ -2,7 +2,7 @@ import { Pool } from 'pg';
 import bcrypt from 'bcryptjs';
 import { createHash } from 'node:crypto';
 import { lists as fixtureLists, places, type ApiList, type ApiListDetail, type ApiPhoto, type ApiPlace, type ApiTaqueria, type CategoryRatings, type FlavorProfile, type RatingBreakdown, type RatingCategory, type TasteProfile } from './data.js';
-import { isDisplayableCatalogPlace } from './catalogQuality.js';
+import { dedupeCatalogPlaces, isDisplayableCatalogPlace, isTacoCatalogPlace } from './catalogQuality.js';
 import { isOpenNow } from './hours.js';
 
 const configuredDatabaseUrl = process.env.DATABASE_URL?.trim();
@@ -17,7 +17,7 @@ const allowDemoCatalog = process.env.ALLOW_DEMO_CATALOG?.trim().toLowerCase() ==
 const demoPlaceIds = new Set(places.map((place) => place.id));
 
 function localCatalogPlaces() {
-  const displayable = places.filter(isDisplayableCatalogPlace);
+  const displayable = places.filter(isTacoCatalogPlace);
   return allowDemoCatalog ? displayable : displayable.filter((place) => !demoPlaceIds.has(place.id));
 }
 
@@ -803,7 +803,9 @@ export async function discoverPlaces(query: DiscoverQuery, userId?: string): Pro
     // Without a deterministic tie-breaker, PostgreSQL may repeat or skip rows
     // between pages, which is especially visible in a new catalog with no
     // user reviews yet.
-    const orderBy = query.lat != null && query.lng != null ? 'distance_km ASC NULLS LAST, rating DESC, b.id ASC' : 'rating DESC, b.id ASC';
+    const orderBy = query.lat != null && query.lng != null
+      ? "distance_km ASC NULLS LAST, CASE WHEN b.catalog_status = 'active' THEN 0 ELSE 1 END, rating DESC, b.id ASC"
+      : "CASE WHEN b.catalog_status = 'active' THEN 0 ELSE 1 END, rating DESC, b.id ASC";
     const result = await pool.query(`
       SELECT b.id, b.taqueria_id, t.name AS taqueria_name, b.name, b.neighborhood, b.address, b.phone, b.weekly_hours, b.price_min, b.price_max, b.source_name, b.source_url, b.source_license, b.source_attribution, b.source_updated_at, b.image_license, b.image_attribution, b.open_until,
       ${reputationSelect}
@@ -822,7 +824,7 @@ export async function discoverPlaces(query: DiscoverQuery, userId?: string): Pro
     WHERE ${predicates.join(' AND ')}
     GROUP BY b.id, t.name, reviews.review_count, reviews.score, category_ratings.tortilla, category_ratings.service, category_ratings.price, category_ratings.meat, category_ratings.salsas ORDER BY ${orderBy} LIMIT $${limitParam}
     `, values);
-    discovered = result.rows.map(normalizePlace).filter(isDisplayableCatalogPlace);
+    discovered = dedupeCatalogPlaces(result.rows.map(normalizePlace).filter(isTacoCatalogPlace));
     if (query.openNow) discovered = discovered.filter((place) => isOpenNow(place.openUntil, new Date(), place.weeklyHours, place.hoursKnown));
     discovered = discovered.slice(offset, offset + limit);
   }

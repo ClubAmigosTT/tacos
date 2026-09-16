@@ -3,11 +3,14 @@ import cors from '@fastify/cors';
 import { z } from 'zod';
 import { addListCollaborator, addListItemForUser, authenticateUser, closeRepository, consumeAuthRateLimit, createBranchPhotoForUser, createCatalogProposal, createEmailVerificationToken, createListForUser, createPasswordResetToken, createSession, createVisitComment, createVisitForUser, deleteBranchPhotoForUser, deleteUserAccount, deleteVisitComment, deleteVisitForUser, discoverPlaces, exportUserData, findPlace, findUnverifiedUserByEmail, findUserById, followUser, getAdminAnalytics, getAdminBranchPhotos, getAdminComments, getAdminReports, getBranchReviews, getCatalogProposals, getDiary, getFeed, getHealth, getListDetails, getLists, getPassport, getPrivacyForUser, getRecommendations, getSavedPlaceIds, getTaqueria, getTasteProfile, getUserProfile, getVisitComments, isSessionActive, listSessions, recordProductEvent, registerUser, removeListCollaborator, removeListItemForUser, reportVisitForUser, resetPassword, revokeAllSessions, revokeSession, reviewAdminComment, reviewAdminReport, reviewBranchPhoto, reviewCatalogProposal, savePlaceForUser, searchUsers, unfollowUser, unsavePlaceForUser, updateListForUser, updatePrivacyForUser, updateUserProfileForUser, updateVisitForUser, verifyEmailToken, type PublicUser } from './repository.js';
 import { issueToken, verifyToken } from './auth.js';
-import { getGooglePlacePhotos } from './google-places.js';
+import { getGooglePlacePhotos, isGooglePlacesConfigured } from './google-places.js';
 import { uploadBranchPhotoImage, uploadVisitImage } from './storage.js';
 import { passwordResetUrl, sendTransactionalEmail, verificationUrl } from './email.js';
 
 const app = Fastify({ logger: true, bodyLimit: 12 * 1024 * 1024, trustProxy: true });
+const googlePhotoRateLimits = new Map<string, { windowStartedAt: number; requests: number }>();
+const GOOGLE_PHOTO_WINDOW_MS = 10 * 60_000;
+const GOOGLE_PHOTO_LIMIT = 30;
 const configuredCorsOrigins = (process.env.CORS_ORIGINS ?? '').split(',').map((value) => value.trim()).filter(Boolean);
 await app.register(cors, {
   origin: configuredCorsOrigins.length ? configuredCorsOrigins : (process.env.NODE_ENV === 'production' ? false : true),
@@ -62,6 +65,19 @@ async function enforceAuthRateLimit(request: FastifyRequest, reply: FastifyReply
 function authMetadata(request: FastifyRequest) {
   const userAgent = typeof request.headers['user-agent'] === 'string' ? request.headers['user-agent'].slice(0, 240) : undefined;
   return { userAgent, ip: request.ip };
+}
+
+function allowGooglePhotoRequest(request: FastifyRequest) {
+  const now = Date.now();
+  const key = request.ip || 'unknown';
+  const current = googlePhotoRateLimits.get(key);
+  if (!current || now - current.windowStartedAt >= GOOGLE_PHOTO_WINDOW_MS) {
+    googlePhotoRateLimits.set(key, { windowStartedAt: now, requests: 1 });
+    return true;
+  }
+  if (current.requests >= GOOGLE_PHOTO_LIMIT) return false;
+  current.requests += 1;
+  return true;
 }
 
 async function requireUser(request: FastifyRequest, reply: FastifyReply) {
@@ -321,6 +337,10 @@ app.get('/v1/branches/:id/google-photos', async (request, reply) => {
   const params = z.object({ id: z.string() }).parse(request.params);
   const place = await findPlace(params.id);
   if (!place) return reply.code(404).send({ error: 'BRANCH_NOT_FOUND' });
+  if (isGooglePlacesConfigured() && !allowGooglePhotoRequest(request)) {
+    reply.header('Retry-After', String(GOOGLE_PHOTO_WINDOW_MS / 1000));
+    return reply.code(429).send({ error: 'GOOGLE_PHOTO_RATE_LIMIT' });
+  }
   // Google photo references and URLs are runtime content. Do not let a proxy,
   // browser, or CDN turn this temporary fallback into a permanent catalog.
   reply.header('Cache-Control', 'no-store');

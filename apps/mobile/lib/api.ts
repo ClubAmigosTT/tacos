@@ -31,18 +31,36 @@ const DEMO_MODE = Constants.expoConfig?.extra?.demoMode === true;
 // to wake up on a cold request.
 const REQUEST_TIMEOUT_MS = 10_000;
 
+function isIllustrativeUri(uri?: string | null) {
+  return typeof uri === 'string' && uri.startsWith('catalog-dummy://');
+}
+
+export function hasRealPlaceMedia(place: Pick<Place, 'image' | 'imageIsIllustrative' | 'photos'>) {
+  const hasRealImage = Boolean(place.image?.trim()) && !place.imageIsIllustrative && !isIllustrativeUri(place.image);
+  const hasRealPhoto = (place.photos ?? []).some((photo) => !isIllustrativeUri(photo.url));
+  return hasRealImage || hasRealPhoto;
+}
+
 // The catalog snapshot owns the temporary bundled media. The API may be
 // healthy while its catalog row still has no image, so hydrate only missing
 // media from the local snapshot and preserve approved/community photos.
 function withBundledCatalogMedia(place: Place): Place {
-  if (place.image?.trim() || place.photos?.length) return place;
+  const realPhotos = (place.photos ?? []).filter((photo) => !isIllustrativeUri(photo.url));
+  if (hasRealPlaceMedia(place)) {
+    // Cards use `image` as their cover. Promote the first approved/community
+    // photo when the API returned the gallery without a primary image.
+    return !place.image?.trim() && realPhotos[0]
+      ? { ...place, image: realPhotos[0].url, imageIsIllustrative: false }
+      : place;
+  }
   const bundled = localPlace(place.id);
   if (!bundled) return place;
+  const realImage = place.image?.trim() && !isIllustrativeUri(place.image) ? place.image : realPhotos[0]?.url;
   return {
     ...place,
-    image: bundled.image,
-    imageIsIllustrative: bundled.imageIsIllustrative,
-    photos: bundled.photos
+    image: realImage || bundled.image,
+    imageIsIllustrative: Boolean(!realImage && bundled.imageIsIllustrative),
+    ...(realPhotos.length ? { photos: realPhotos } : { photos: [] })
   };
 }
 

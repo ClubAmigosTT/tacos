@@ -31,6 +31,13 @@ export type RuntimeGooglePhoto = {
 const googleApiKey = process.env.GOOGLE_PLACES_API_KEY?.trim();
 const textSearchUrl = 'https://places.googleapis.com/v1/places:searchText';
 const placesApiBaseUrl = 'https://places.googleapis.com/v1';
+const photoCache = new Map<string, { expiresAt: number; result: { configured: true; photos: RuntimeGooglePhoto[] } }>();
+const PHOTO_CACHE_TTL_MS = 5 * 60_000;
+const NEGATIVE_PHOTO_CACHE_TTL_MS = 60_000;
+
+export function isGooglePlacesConfigured() {
+  return Boolean(googleApiKey);
+}
 
 function isHttpsUrl(value: unknown): value is string {
   if (typeof value !== 'string') return false;
@@ -78,6 +85,16 @@ function text(value: unknown) {
 export async function getGooglePlacePhotos(input: { name: string; address?: string; coordinates: Coordinates }) {
   if (!googleApiKey) return { configured: false, photos: [] as RuntimeGooglePhoto[] };
 
+  const cacheKey = [
+    normalizeCacheText(input.name),
+    normalizeCacheText(input.address),
+    input.coordinates.latitude.toFixed(4),
+    input.coordinates.longitude.toFixed(4)
+  ].join('|');
+  const cached = photoCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.result;
+  if (cached) photoCache.delete(cacheKey);
+
   const search = await getJson(textSearchUrl, {
     method: 'POST',
     headers: {
@@ -101,13 +118,17 @@ export async function getGooglePlacePhotos(input: { name: string; address?: stri
 
   const place = (search?.places as GooglePlaceSearchResult[] | undefined)?.[0];
   if (!place?.location || !Array.isArray(place.photos) || !place.photos.length) {
-    return { configured: true, photos: [] as RuntimeGooglePhoto[] };
+    const result = { configured: true as const, photos: [] as RuntimeGooglePhoto[] };
+    cachePhotoResult(cacheKey, result, NEGATIVE_PHOTO_CACHE_TTL_MS);
+    return result;
   }
 
   // Avoid showing photos from a similarly named place that Google resolved
   // outside the immediate area of the catalog branch.
   if (distanceKm(input.coordinates, place.location) > 3) {
-    return { configured: true, photos: [] as RuntimeGooglePhoto[] };
+    const result = { configured: true as const, photos: [] as RuntimeGooglePhoto[] };
+    cachePhotoResult(cacheKey, result, NEGATIVE_PHOTO_CACHE_TTL_MS);
+    return result;
   }
 
   const photos = await Promise.all(place.photos.slice(0, 2).map(async (photo): Promise<RuntimeGooglePhoto | undefined> => {
@@ -131,5 +152,19 @@ export async function getGooglePlacePhotos(input: { name: string; address?: stri
     return { url: photoUri, source: 'google_maps', sourceUrl: googleMapsUri, googleMapsUri, attribution };
   }));
 
-  return { configured: true, photos: photos.filter((photo): photo is RuntimeGooglePhoto => Boolean(photo)) };
+  const result = { configured: true as const, photos: photos.filter((photo): photo is RuntimeGooglePhoto => Boolean(photo)) };
+  cachePhotoResult(cacheKey, result, result.photos.length ? PHOTO_CACHE_TTL_MS : NEGATIVE_PHOTO_CACHE_TTL_MS);
+  return result;
+}
+
+function normalizeCacheText(value: unknown) {
+  return typeof value === 'string' ? value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ') : '';
+}
+
+function cachePhotoResult(key: string, result: { configured: true; photos: RuntimeGooglePhoto[] }, ttlMs: number) {
+  if (photoCache.size >= 500) {
+    const oldestKey = photoCache.keys().next().value;
+    if (oldestKey) photoCache.delete(oldestKey);
+  }
+  photoCache.set(key, { expiresAt: Date.now() + ttlMs, result });
 }
