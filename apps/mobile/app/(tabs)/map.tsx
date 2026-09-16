@@ -100,17 +100,21 @@ export default function MapScreen() {
     openNow: active === 'Abierto ahora' ? true : undefined,
     limit: 50
   };
+  const { data: localData } = useQuery({
+    queryKey: ['local-discover', 'map', searchQuery, searchCoordinates?.latitude, searchCoordinates?.longitude, active],
+    queryFn: () => localDiscover(discoveryQuery),
+    enabled: !authLoading && isVisible
+  });
   const { data, isLoading: discoverLoading, isError: discoverError, refetch: refetchDiscover } = useQuery({
     queryKey: ['discover', 'map', searchQuery, searchCoordinates?.latitude, searchCoordinates?.longitude, active, token],
     queryFn: ({ signal }) => discover(discoveryQuery, token, signal),
-    initialData: () => localDiscover(discoveryQuery),
     enabled: !authLoading && isVisible
   });
   const renderMapResult = useCallback(({ item }: { item: (typeof places)[number] }) => <MapResultCard place={item} onPress={handlePlaceSelect} />, [handlePlaceSelect]);
 
   // The complete bundled catalog remains useful while the API wakes up or the
   // device is offline. Fixtures are only a deliberate demo-mode fallback.
-  const rawDiscoveryPlaces = data ?? (isDemoMode() ? places : []);
+  const rawDiscoveryPlaces = data?.length ? data : localData ?? (isDemoMode() ? places : []);
   const discoveryPlaces = useMemo(() => rawDiscoveryPlaces
     .map((place) => ({ ...place, searchEvidence: searchEvidence(place, searchQuery) })), [rawDiscoveryPlaces, searchQuery]);
   const sorted = useMemo(() => {
@@ -142,7 +146,7 @@ export default function MapScreen() {
     return <View style={styles.authLoading}><Text style={styles.authLoadingText}>Preparando tu mapa…</Text></View>;
   }
 
-  if (discoverError && !isDemoMode() && !data?.length) {
+  if (discoverError && !isDemoMode() && !data?.length && !localData?.length) {
     return <View style={styles.errorScreen}><AsyncErrorState title="No pudimos actualizar tu mapa" detail="Revisa la conexión para ver sucursales reales del catálogo." onAction={() => void refetchDiscover()} /></View>;
   }
 

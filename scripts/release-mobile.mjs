@@ -32,9 +32,12 @@ function run(args, cwd = root) {
 
 console.log(`Validando Tacos antes del release ${platform}...`);
 await run(['catalog:build:mobile']);
+await run(['smoke:mobile-catalog']);
 await run(['typecheck']);
 await run(['smoke:config']);
-await run(['--filter', '@tacos/mobile', 'exec', 'expo', 'export', '--platform', 'web']);
+// Bundle the same native platform that EAS will compile. This catches a
+// platform-specific resolver/import problem before consuming build capacity.
+await run(['--filter', '@tacos/mobile', 'exec', 'expo', 'export', '--platform', platform]);
 
 const easArgs = [
   'dlx',

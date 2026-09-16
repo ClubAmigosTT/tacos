@@ -85,6 +85,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          pnpm catalog:build:mobile
+          pnpm smoke:mobile-catalog
           test -s apps/mobile/data/catalog.ts
           photos="$(find apps/mobile/assets/catalog-dummies -type f -name '*.jpg' | wc -l | tr -d ' ')"
           if ((photos < 27)); then

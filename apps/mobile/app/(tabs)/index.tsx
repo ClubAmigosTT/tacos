@@ -37,7 +37,9 @@ export default function HomeScreen() {
     })();
     return () => { active = false; };
   }, [isVisible]);
-  const { data = [], isError: recommendationsError, refetch: refetchRecommendations } = useQuery({ queryKey: ['recommendations', token, coordinates?.latitude, coordinates?.longitude], queryFn: () => recommendations(token, coordinates), initialData: () => localRecommendations(coordinates), enabled: !authLoading && isVisible });
+  const { data: remoteRecommendations, isError: recommendationsError, refetch: refetchRecommendations } = useQuery({ queryKey: ['recommendations', token, coordinates?.latitude, coordinates?.longitude], queryFn: () => recommendations(token, coordinates), enabled: !authLoading && isVisible });
+  const { data: localRecommendationsData } = useQuery({ queryKey: ['local-recommendations', coordinates?.latitude, coordinates?.longitude], queryFn: () => localRecommendations(coordinates), enabled: !authLoading && isVisible });
+  const data = remoteRecommendations?.length ? remoteRecommendations : localRecommendationsData ?? [];
   const { data: feedData, isError: feedError, refetch: refetchFeed } = useQuery({ queryKey: ['feed', 'home', token], queryFn: () => feedRequest(token!), enabled: !authLoading && isVisible && Boolean(token), staleTime: 60_000 });
   const { data: listData, isError: listsError, refetch: refetchLists } = useQuery({ queryKey: ['lists', 'home', token], queryFn: () => listsRequest(token), enabled: !authLoading && isVisible, staleTime: 60_000 });
   const featured = data[0];

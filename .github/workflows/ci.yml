@@ -51,6 +51,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build and validate mobile catalog
+        run: |
+          pnpm catalog:build:mobile
+          pnpm smoke:mobile-catalog
+
       - name: Typecheck
         run: pnpm typecheck
 

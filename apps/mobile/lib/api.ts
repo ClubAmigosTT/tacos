@@ -44,7 +44,7 @@ export function hasRealPlaceMedia(place: Pick<Place, 'image' | 'imageIsIllustrat
 // The catalog snapshot owns the temporary bundled media. The API may be
 // healthy while its catalog row still has no image, so hydrate only missing
 // media from the local snapshot and preserve approved/community photos.
-function withBundledCatalogMedia(place: Place): Place {
+async function withBundledCatalogMedia(place: Place): Promise<Place> {
   const realPhotos = (place.photos ?? []).filter((photo) => !isIllustrativeUri(photo.url));
   if (hasRealPlaceMedia(place)) {
     // Cards use `image` as their cover. Promote the first approved/community
@@ -53,7 +53,7 @@ function withBundledCatalogMedia(place: Place): Place {
       ? { ...place, image: realPhotos[0].url, imageIsIllustrative: false }
       : place;
   }
-  const bundled = localPlace(place.id);
+  const bundled = await localPlace(place.id);
   if (!bundled) return place;
   const realImage = place.image?.trim() && !isIllustrativeUri(place.image) ? place.image : realPhotos[0]?.url;
   return {
@@ -64,8 +64,27 @@ function withBundledCatalogMedia(place: Place): Place {
   };
 }
 
-function withBundledCatalogMediaList(items: Place[]) {
-  return items.map(withBundledCatalogMedia);
+async function withBundledCatalogMediaList(items: Place[]) {
+  return Promise.all(items.map(withBundledCatalogMedia));
+}
+
+async function mergeDiscoveryWithBundledCatalog(remotePlaces: Place[], options: { q?: string; lat?: number; lng?: number; radiusKm?: number; offset?: number; openNow?: boolean; limit?: number }) {
+  const localPlaces = await localDiscover(options);
+  const hydratedRemote = await withBundledCatalogMediaList(remotePlaces);
+  const remoteById = new Map(hydratedRemote.map((place) => [place.id, place]));
+  const mergedLocal = localPlaces.map((place) => {
+    const remote = remoteById.get(place.id);
+    if (!remote) return place;
+    return {
+      ...place,
+      ...remote,
+      searchEvidence: remote.searchEvidence ?? place.searchEvidence
+    };
+  });
+  const localIds = new Set(localPlaces.map((place) => place.id));
+  const remoteOnly = hydratedRemote.filter((place) => !localIds.has(place.id));
+  const limit = Math.min(Math.max(Math.trunc(options.limit ?? 50), 1), 100);
+  return [...mergedLocal, ...remoteOnly].slice(0, limit);
 }
 
 const ANONYMOUS_ID_KEY = 'tacos.analytics.anonymous_id';
@@ -173,16 +192,15 @@ export async function discover(options: { q?: string; lat?: number; lng?: number
       if (signal?.aborted) throw cause;
       result = await request<{ places: Place[] }>(path, undefined, token, signal);
     }
-    const hydratedPlaces = withBundledCatalogMediaList(result.places);
-    // The bundled catalog is the source of truth for coverage. If the API is
-    // healthy but has no matching row yet, keep locally supplied places
-    // visible instead of turning a valid local match into an empty result.
-    return hydratedPlaces.length ? hydratedPlaces : localDiscover(options);
+    // The bundled catalog is the source of truth for coverage. Merge live
+    // reputation/media with the complete local result set so a partial or
+    // stale server catalog cannot hide a supplied branch such as Los Güeros.
+    return mergeDiscoveryWithBundledCatalog(result.places, options);
   } catch (cause) {
     if (signal?.aborted) throw cause;
     // The complete bundled catalog remains useful while the server is waking
     // up or the device is temporarily offline.
-    return localDiscover(options);
+    return await localDiscover(options);
   }
 }
 
@@ -190,12 +208,12 @@ export async function recommendations(token?: string, location?: { latitude: num
   try {
     const params = location ? `?lat=${encodeURIComponent(String(location.latitude))}&lng=${encodeURIComponent(String(location.longitude))}` : '';
     const result = await request<{ places: Place[] }>(`/v1/recommendations${params}`, undefined, token);
-    const hydratedPlaces = withBundledCatalogMediaList(result.places);
-    return hydratedPlaces.length ? hydratedPlaces : localRecommendations(location);
+    const hydratedPlaces = await withBundledCatalogMediaList(result.places);
+    return hydratedPlaces.length ? hydratedPlaces : await localRecommendations(location);
   } catch (cause) {
     // Personal signals disappear offline, but the local catalog remains
     // available so Inicio never becomes an empty error state.
-    return localRecommendations(location);
+    return await localRecommendations(location);
   }
 }
 
@@ -209,14 +227,14 @@ export async function passport(token: string) {
 
 export async function getPlace(id: string, token?: string): Promise<Place> {
   try {
-    return withBundledCatalogMedia(await request<Place>(`/v1/branches/${id}`, undefined, token));
+    return await withBundledCatalogMedia(await request<Place>(`/v1/branches/${id}`, undefined, token));
   } catch (cause) {
+    const fallback = await localPlace(id);
+    if (fallback) return fallback;
     // A real 4xx means the branch is gone or the link is invalid. Network and
     // 5xx failures may still use the bundled catalog while the API recovers.
     if (cause instanceof ApiError && cause.status < 500) throw cause;
-    const fallback = localPlace(id);
-    if (!fallback) throw new Error('Taquería no encontrada');
-    return fallback;
+    throw new Error('Taquería no encontrada');
   }
 }
 
@@ -251,12 +269,12 @@ export async function unsavePlace(placeId: string, token: string) {
 export async function getTaqueria(id: string) {
   try {
     const result = await request<ApiTaqueria>(`/v1/taquerias/${id}`);
-    return { ...result, branches: withBundledCatalogMediaList(result.branches) };
+    return { ...result, branches: await withBundledCatalogMediaList(result.branches) };
   } catch (cause) {
+    const fallback = await localTaqueria(id);
+    if (fallback) return fallback satisfies ApiTaqueria;
     if (cause instanceof ApiError && cause.status < 500) throw cause;
-    const fallback = localTaqueria(id);
-    if (!fallback) throw new Error('Taquería no encontrada');
-    return fallback satisfies ApiTaqueria;
+    throw new Error('Taquería no encontrada');
   }
 }
 
