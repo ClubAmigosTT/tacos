@@ -1,6 +1,6 @@
 import { catalogMetadata, catalogRows, type OfflineCatalogRow } from '@/data/catalog';
 import type { Place } from '@/data/fixtures';
-import { isTacoCatalogPlace, searchEvidence } from './catalogQuality';
+import { searchEvidence } from './catalogQuality';
 import { isOpenNow } from './hours';
 
 type Coordinates = { latitude: number; longitude: number };
@@ -120,7 +120,9 @@ function toPlace(row: OfflineCatalogRow, distance?: string): Place {
 
 // Keep rows compact in memory. Full Place objects are created only for the
 // handful of results rendered by the screen or for an explicitly opened ID.
-const displayableRows = catalogRows.filter((row) => isTacoCatalogPlace(row));
+// The imported regional databases are already curated. Do not apply a second
+// heuristic filter here: every bundled row must remain searchable/offline.
+const displayableRows = catalogRows;
 
 export function localDiscover(options: LocalCatalogQuery = {}) {
   const queryTerms = options.q?.trim() ? terms(options.q.trim()) : [];

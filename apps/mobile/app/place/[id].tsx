@@ -13,7 +13,6 @@ import { StarRating } from '@/components/StarRating';
 import { isOpenNow } from '@/lib/hours';
 import type { Place } from '@/data/fixtures';
 import { CatalogImage } from '@/components/CatalogImage';
-import { isDisplayablePlace } from '@/lib/catalogQuality';
 
 export default function PlaceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,7 +29,7 @@ export default function PlaceScreen() {
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['saved-places', token] }); }
   });
   if (authLoading || isLoading) return <View style={styles.loading}><Text style={styles.loadingText}>{authLoading ? 'Preparando la ficha…' : 'Cargando lugar…'}</Text></View>;
-  if (isError || !place || !isDisplayablePlace(place)) return <View style={styles.notFound}><Ionicons name="location-outline" size={28} color={colors.tortilla} /><Text style={styles.notFoundTitle}>Taquería no disponible</Text><Text style={styles.notFoundCopy}>El enlace puede haber cambiado o la sucursal no tiene un nombre comercial verificable.</Text><Pressable style={styles.notFoundButton} onPress={() => router.replace('/(tabs)/map')}><Text style={styles.notFoundButtonText}>Volver al mapa</Text></Pressable></View>;
+  if (isError || !place) return <View style={styles.notFound}><Ionicons name="location-outline" size={28} color={colors.tortilla} /><Text style={styles.notFoundTitle}>Taquería no disponible</Text><Text style={styles.notFoundCopy}>El enlace puede haber cambiado o la sucursal todavía no está disponible.</Text><Pressable style={styles.notFoundButton} onPress={() => router.replace('/(tabs)/map')}><Text style={styles.notFoundButtonText}>Volver al mapa</Text></Pressable></View>;
   const currentPlace = place;
   const averagePrice = place.tacos.length ? Math.round(place.tacos.reduce((sum, taco) => sum + taco.price, 0) / place.tacos.length) : undefined;
   const priceLabel = place.priceMin != null || place.priceMax != null

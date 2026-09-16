@@ -12,7 +12,7 @@ import { MapCanvas } from '@/components/MapCanvas';
 import { AsyncErrorState } from '@/components/AsyncErrorState';
 import { CatalogImage } from '@/components/CatalogImage';
 import { useAuth } from '@/lib/auth';
-import { isDisplayablePlace, searchEvidence, searchEvidenceLabel } from '@/lib/catalogQuality';
+import { searchEvidence, searchEvidenceLabel } from '@/lib/catalogQuality';
 
 const filters = ['Todos', 'Abierto ahora', 'Barato'] as const;
 type MapFilter = (typeof filters)[number];
@@ -108,11 +108,10 @@ export default function MapScreen() {
   });
   const renderMapResult = useCallback(({ item }: { item: (typeof places)[number] }) => <MapResultCard place={item} onPress={handlePlaceSelect} />, [handlePlaceSelect]);
 
-  // The small bundled fallback remains useful while the API wakes up or the
+  // The complete bundled catalog remains useful while the API wakes up or the
   // device is offline. Fixtures are only a deliberate demo-mode fallback.
   const rawDiscoveryPlaces = data ?? (isDemoMode() ? places : []);
   const discoveryPlaces = useMemo(() => rawDiscoveryPlaces
-    .filter(isDisplayablePlace)
     .map((place) => ({ ...place, searchEvidence: searchEvidence(place, searchQuery) })), [rawDiscoveryPlaces, searchQuery]);
   const sorted = useMemo(() => {
     if (active !== 'Barato') return discoveryPlaces;

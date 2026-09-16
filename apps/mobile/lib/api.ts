@@ -3,7 +3,6 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { type CategoryRatings, type Place } from '@/data/fixtures';
 import { localDiscover, localPlace, localRecommendations, localTaqueria } from '@/lib/localCatalog';
-import { isDisplayablePlace } from '@/lib/catalogQuality';
 
 export type AuthUser = { id: string; email: string; displayName: string; role?: 'user' | 'admin'; following?: boolean; emailVerified?: boolean };
 export type ApiList = { id: string; title: string; description: string; owner: { id: string; displayName: string }; itemCount: number; visitedCount: number; coverImage: string; visibility?: 'public' | 'private'; collaboratorCount?: number; canEdit?: boolean };
@@ -29,7 +28,8 @@ const API_URL = configuredUrl?.replace(/\/$/, '');
 const DEMO_MODE = Constants.expoConfig?.extra?.demoMode === true;
 // Keep offline/error states responsive while allowing the Render service time
 // to wake up on a cold request.
-const REQUEST_TIMEOUT_MS = 10_000;
+const REQUEST_TIMEOUT_MS = 20_000;
+const DISCOVER_RETRY_DELAY_MS = 750;
 
 function isIllustrativeUri(uri?: string | null) {
   return typeof uri === 'string' && uri.startsWith('catalog-dummy://');
@@ -65,7 +65,7 @@ function withBundledCatalogMedia(place: Place): Place {
 }
 
 function withBundledCatalogMediaList(items: Place[]) {
-  return items.filter(isDisplayablePlace).map(withBundledCatalogMedia);
+  return items.map(withBundledCatalogMedia);
 }
 
 const ANONYMOUS_ID_KEY = 'tacos.analytics.anonymous_id';
@@ -162,16 +162,26 @@ export async function discover(options: { q?: string; lat?: number; lng?: number
     if (options.openNow != null) params.set('openNow', String(options.openNow));
     if (options.limit != null) params.set('limit', String(options.limit));
     const query = params.toString();
-    const result = await request<{ places: Place[] }>(`/v1/discover${query ? `?${query}` : ''}`, undefined, token, signal);
-    // A healthy API with an empty catalog must not erase the small bundled
-    // fallback for the normal browse screen. Search queries still preserve a
-    // genuine empty result.
+    const path = `/v1/discover${query ? `?${query}` : ''}`;
+    let result: { places: Place[] };
+    try {
+      result = await request<{ places: Place[] }>(path, undefined, token, signal);
+    } catch (cause) {
+      const isClientError = cause instanceof ApiError && cause.status < 500;
+      if (signal?.aborted || isClientError) throw cause;
+      await new Promise((resolve) => setTimeout(resolve, DISCOVER_RETRY_DELAY_MS));
+      if (signal?.aborted) throw cause;
+      result = await request<{ places: Place[] }>(path, undefined, token, signal);
+    }
     const hydratedPlaces = withBundledCatalogMediaList(result.places);
-    return hydratedPlaces.length || options.q?.trim() ? hydratedPlaces : localDiscover(options);
+    // The bundled catalog is the source of truth for coverage. If the API is
+    // healthy but has no matching row yet, keep locally supplied places
+    // visible instead of turning a valid local match into an empty result.
+    return hydratedPlaces.length ? hydratedPlaces : localDiscover(options);
   } catch (cause) {
     if (signal?.aborted) throw cause;
-    // The small high-confidence snapshot remains useful while the server is
-    // waking up or the device is temporarily offline.
+    // The complete bundled catalog remains useful while the server is waking
+    // up or the device is temporarily offline.
     return localDiscover(options);
   }
 }
